@@ -23,6 +23,7 @@ ui <- fluidPage(
     ),
     column(
       width = 10,
+      uiOutput("viewSelect"),
       uiOutput("profilePlots"), # Plot area with zoom brush
       textOutput("profileHoverInfo"),
       hr(),
