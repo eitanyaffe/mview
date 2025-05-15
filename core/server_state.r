@@ -22,15 +22,6 @@ observeEvent(input$clearLog, {
   log_messages(character())
 })
 
-observeEvent(input$helpBtn, {
-  showModal(modalDialog(
-    title = "Keyboard Shortcuts",
-    "Double-click window to zoom in",
-    "Double-click without window to zoom out",
-    easyClose = TRUE
-  ))
-})
-
 output$contig_count <- renderUI({
   zoom_text <- if (is.null(state$zoom)) {
     "Zoom: full range"

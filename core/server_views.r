@@ -16,8 +16,7 @@ output$viewSelect <- renderUI({
 observeEvent(input$view_id,
   {
     req(input$view_id)
-    id <- input$view_id
-    set_view(id)
+    set_view(input$view_id)
   },
   ignoreInit = TRUE
 )

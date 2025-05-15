@@ -8,13 +8,25 @@ register_views <- function() {
     }
 }
 
+get_server <- function() {
+    server <- function(input, output, session) {
+        source("core/server_state.r", local = TRUE)
+        source("core/server_brush.r", local = TRUE)
+        source("core/server_profiles.r", local = TRUE)
+        source("core/server_tables.r", local = TRUE)
+        source("core/server_buttons.r", local = TRUE)
+        source("core/server_views.r", local = TRUE)
+    }
+}
+
 rl <- function() {
     source("start.r", local = FALSE)
     source("core/data.r", local = FALSE)
 
-    # profile manager
+    source("core/context.r", local = FALSE)
+    
+    # profile code
     source("core/profile_manager.r", local = FALSE)
-
     source("core/profile_viewer.r", local = FALSE)
 
     # source all profile files
@@ -28,7 +40,7 @@ rl <- function() {
 
     # shiny app
     source("core/ui.r", local = TRUE)
-    source("core/server.r", local = TRUE)
+    server <- get_server()
 
     shiny::shinyApp(ui = ui, server = server)
 }

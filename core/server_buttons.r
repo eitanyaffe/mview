@@ -42,3 +42,12 @@ observeEvent(input$removeContigsBtn, {
     addLog(paste("Del:", paste(removed_cids, collapse = ",")))
   }
 })
+
+observeEvent(input$helpBtn, {
+  showModal(modalDialog(
+    title = "Keyboard Shortcuts",
+    "Double-click window to zoom in",
+    "Double-click without window to zoom out",
+    easyClose = TRUE
+  ))
+})
