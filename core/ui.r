@@ -2,6 +2,7 @@ library(shiny)
 library(DT)
 library(ggplot2)
 library(shinyjqui)
+library(plotly)
 
 ui <- fluidPage(
   titlePanel("mview"),
@@ -25,7 +26,6 @@ ui <- fluidPage(
       width = 10,
       uiOutput("viewSelect"),
       uiOutput("profilePlots"), # Plot area with zoom brush
-      textOutput("profileHoverInfo"),
       hr(),
       tabsetPanel(
         tabPanel(

@@ -37,19 +37,25 @@ points_profile <- function(id, name, height = 1,
   plot_f <- function(cxt, gg) {
     df <- data_f(cxt)
     if (nrow(df) == 0) {
-      return(list(plot = gg, info_df = NULL))
+      # Return just the plot object, no info_df
+      return(gg)
     }
-    aes_map <- ggplot2::aes(x = gcoord, y = .data[[y_col]])
-    geom_args <- c(list(mapping = aes_map, data = df), point_aes)
-    gg2 <- gg + do.call(ggplot2::geom_point, geom_args)
-    info_df <- data.frame(gcoord = df$gcoord, y_value = df[[y_col]], stringsAsFactors = FALSE)
+
+    # Prepare description for hover text
     if (!is.null(desc_col) && desc_col %in% names(df)) {
-      info_df$description <- df[[desc_col]]
+      df$hover_text <- df[[desc_col]]
     } else {
-      info_df$description <- paste0(name, ": ", round(df[[y_col]], 2))
+      df$hover_text <- paste0(name, ": ", round(df[[y_col]], 2))
     }
-    info_df$raw_y <- df[[y_col]]
-    list(plot = gg2, info_df = info_df)
+
+    aes_map <- ggplot2::aes(x = gcoord, y = .data[[y_col]], text = hover_text)
+    geom_args <- c(list(mapping = aes_map, data = df), point_aes)
+
+    # Suppress warnings specifically for the geom_point call regarding unknown aesthetics like 'text'
+    gg2 <- gg + suppressWarnings(do.call(ggplot2::geom_point, geom_args))
+
+    # Return just the plot object
+    return(gg2)
   }
   profile_create(
     id = id,

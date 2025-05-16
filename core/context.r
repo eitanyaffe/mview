@@ -1,6 +1,6 @@
 build_context <- function(state_contigs, contig_table, zoom) {
-    req(state_contigs)
-    req(contig_table)
+  req(state_contigs)
+  req(contig_table)
   valid_cids <- intersect(state_contigs, contig_table$cid)
   cdf <- contig_table[match(valid_cids, contig_table$cid), ]
   if (nrow(cdf) == 0) {
@@ -31,5 +31,7 @@ build_context <- function(state_contigs, contig_table, zoom) {
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
-  list(mapper = mapper, zoom = zoom, contigs=state_contigs)
+  # print zoom range, number of contigs
+  cat(sprintf("zoom: %s, contigs: %s\n", jsonlite::toJSON(zoom), length(state_contigs)))
+  list(mapper = mapper, zoom = zoom, contigs = state_contigs)
 }

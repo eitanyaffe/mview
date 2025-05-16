@@ -3,6 +3,8 @@
 # This file handles the plotting logic for all registered profiles.
 # For each profile, it calls pre_plot, profile$plot_f, and post_plot, and collects the results.
 
+library(plotly)
+
 #' Pre-plot function: sets up the base ggplot object for a profile
 #' @param cxt Context object
 #' @param profile The profile object
@@ -42,17 +44,73 @@ post_plot <- function(cxt, gg, profile) {
 
 #' Plot all registered profiles
 #' @param cxt The context object containing mapper and other dynamic info
-#' @return A list of lists: each with plot (ggplot) and info_df (for hover)
+#' @return A plotly object combining all profile plots
 plot_profiles <- function(cxt) {
   profiles <- profiles_get_all()
-  results <- list()
-  for (id in names(profiles)) {
-    cat(sprintf("Plotting profile: %s\n", id))
-    profile <- profiles[[id]]
-    gg <- pre_plot(cxt, profile)
-    pf_result <- profile$plot_f(cxt, gg)
-    gg_final <- post_plot(cxt, pf_result$plot, profile)
-    results[[id]] <- list(plot = gg_final, info_df = pf_result$info_df, profile = profile)
+  if (length(profiles) == 0) {
+    return(NULL)
   }
-  results
+
+  plotly_list <- list()
+  heights <- numeric()
+
+  for (id in names(profiles)) {
+    cat(sprintf("plotting profile: %s\n", id))
+    profile <- profiles[[id]]
+
+    # Create base ggplot
+    gg <- pre_plot(cxt, profile)
+
+    # Get the profile's plot result
+    pf_result <- profile$plot_f(cxt, gg)
+
+    # Add overlays
+    gg_final <- post_plot(cxt, pf_result, profile)
+
+    # Convert to plotly, ensuring 'text' aesthetic is available for hover
+    # The actual 'text' aesthetic should be defined in the profile's plot_f
+    p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
+
+    # Store in list
+    plotly_list[[id]] <- p_ly
+    heights <- c(heights, profile$height)
+  }
+
+  if (length(plotly_list) == 0) {
+    return(NULL) # Return NULL if no plots were generated
+  }
+
+  # Normalize heights to add up to 1 if there are any heights
+  if (sum(heights) > 0) {
+    heights <- heights / sum(heights)
+  } else if (length(heights) > 0) {
+    # if all heights are 0, distribute equally
+    heights <- rep(1 / length(heights), length(heights))
+  }
+
+
+  # Combine plots
+  # Need to handle the case where plotly_list is empty or has only one plot
+  if (length(plotly_list) > 1) {
+    combined_plot <- plotly::subplot(
+      plotly_list,
+      nrows = length(plotly_list),
+      shareX = TRUE,
+      titleY = TRUE,
+      margin = 0.01,
+      heights = if (length(heights) == length(plotly_list)) heights else NULL
+    )
+  } else if (length(plotly_list) == 1) {
+    combined_plot <- plotly_list[[1]]
+  } else {
+    return(NULL) # Should not happen if profiles list was not empty initially
+  }
+
+  # Configure the combined plot
+  combined_plot <- plotly::layout(combined_plot,
+    xaxis = list(title = ""),
+    margin = list(l = 50, r = 20, t = 30, b = 30) # Adjust margins as needed
+  )
+
+  return(combined_plot)
 }

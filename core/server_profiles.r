@@ -1,7 +1,6 @@
 # ---- Dynamic Profile Rendering ----
 
-# Store info_df for each profile for efficient hover
-profile_info_dfs <- reactiveValues()
+library(plotly)
 
 # UI side: dynamically generate plot outputs for all registered profiles
 output$profilePlots <- renderUI({
@@ -12,21 +11,10 @@ output$profilePlots <- renderUI({
   if (length(profiles) == 0) {
     return(NULL)
   }
-  weights <- sapply(profiles, function(p) p$height)
-  total <- sum(weights)
-  brush_opts <- brushOpts(id = "zoomBrush", direction = "x")
-
-  plot_list <- lapply(names(profiles), function(id) {
-    prof <- profiles[[id]]
-    plotOutput(
-      outputId = paste0("plot_", id),
-      height = paste0(300 * prof$height / total, "px"),
-      hover = hoverOpts(id = paste0("hover_", id), delay = 50),
-      brush = brush_opts,
-      dblclick = "plot_dblclick"
-    )
-  })
-  tagList(plot_list)
+  plotlyOutput(
+    outputId = "combined_plot",
+    height = "500px" # Adjust height as needed, or make dynamic
+  )
 })
 
 # Server side: render plots for all registered profiles and cache info_df for hover
@@ -36,17 +24,43 @@ observe({
     contig_table = contigs,
     zoom = state$zoom
   )
+  req(input$view_id)
   req(cxt)
-  plots <- plot_profiles(cxt)
-  for (id in names(plots)) {
-    local({
-      myid <- id
-      myplot <- plots[[id]]$plot
-      myinfo <- plots[[id]]$info_df
-      output[[paste0("plot_", myid)]] <- renderPlot({
-        myplot
-      })
-      profile_info_dfs[[myid]] <- myinfo
-    })
+
+  state$plotly_registered <- FALSE
+
+  # Get combined plotly object
+  combined_plotly_obj <- plot_profiles(cxt)
+
+  # Register the relayout event for the plot so zoom events can be captured with the correct source ID
+  if (!is.null(combined_plotly_obj)) {
+    combined_plotly_obj <- plotly::event_register(combined_plotly_obj, "plotly_relayout")
+    # add a reactive flag to indicate that the plotly object has been registered
+    state$plotly_registered <- TRUE
+  }
+
+  # Render the combined plot
+  output$combined_plot <- renderPlotly({
+    combined_plotly_obj
+  })
+})
+
+# Handle plotly zoom/relayout events to update state$zoom
+observeEvent(eventExpr = plotly::event_data("plotly_relayout"), {
+  return()
+
+  req(state$plotly_registered)
+  event_data <- suppressWarnings(plotly::event_data("plotly_relayout"))
+  req(event_data)
+  cat(sprintf("relayout event_data: %s\n", paste(names(event_data), collapse = ", ")))
+  print(event_data)
+  if (!is.null(event_data[["xaxis.range[0]"]]) && !is.null(event_data[["xaxis.range[1]"]])) {
+    # Zoom event with defined range
+    new_zoom <- c(event_data[["xaxis.range[0]"]], event_data[["xaxis.range[1]"]])
+    # Check if zoom has actually changed to avoid infinite loops
+    if (!isTRUE(all.equal(state$zoom, new_zoom))) {
+      state$zoom <- new_zoom
+      cat(sprintf("zoom set by plotly: %.1f - %.1f\n", new_zoom[1], new_zoom[2]))
+    }
   }
 })
