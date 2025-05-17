@@ -54,6 +54,10 @@ ui <- fluidPage(
             min = 1,
             max = 1000
           )
+        ),
+        tabPanel(
+          "Parameters",
+          uiOutput("parameters_ui")
         )
       )
     )

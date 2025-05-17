@@ -17,8 +17,9 @@
 points_profile <- function(id, name, height = 1,
                            data,
                            y_col = "value", desc_col = "desc",
+                           color = "black", size = 1,
                            point_aes = list(),
-                           attr = list(),
+                           params = list(),
                            auto_register = TRUE) {
   # data_f: get data, map to gcoord using mapper, filter by xlim if present
   data_f <- function(cxt) {
@@ -34,7 +35,7 @@ points_profile <- function(id, name, height = 1,
     df
   }
   # plot_f: add points layer, return info_df for hover
-  plot_f <- function(cxt, gg) {
+  plot_f <- function(profile, cxt, gg) {
     df <- data_f(cxt)
     if (nrow(df) == 0) {
       # Return just the plot object, no info_df
@@ -51,18 +52,21 @@ points_profile <- function(id, name, height = 1,
     aes_map <- ggplot2::aes(x = gcoord, y = .data[[y_col]], text = hover_text)
     geom_args <- c(list(mapping = aes_map, data = df), point_aes)
 
+    geom_args$color <- profile$color %||% color
+
     # Suppress warnings specifically for the geom_point call regarding unknown aesthetics like 'text'
     gg2 <- gg + suppressWarnings(do.call(ggplot2::geom_point, geom_args))
 
     # Return just the plot object
     return(gg2)
   }
+
   profile_create(
     id = id,
     name = name,
     type = "points",
     height = height,
-    attr = attr,
+    params = params,
     data_f = data_f,
     plot_f = plot_f,
     auto_register = auto_register

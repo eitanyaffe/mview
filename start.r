@@ -15,14 +15,27 @@ get_server <- function() {
         source("core/server_tables.r", local = TRUE)
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
+        source("core/server_parameters.r", local = TRUE)
     }
 }
 
 rl <- function() {
     source("start.r", local = FALSE)
+
+    # utils
+    source("core/utils.r", local = FALSE)
+
+    # data
     source("core/data.r", local = FALSE)
 
+    # cache
+    source("core/cache.r", local = FALSE)
+
+    # context
     source("core/context.r", local = FALSE)
+
+    # parameters
+    source("core/parameters.r", local = FALSE)
 
     # profile code
     source("core/profile_manager.r", local = FALSE)

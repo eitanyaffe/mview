@@ -16,7 +16,7 @@ axis_profile <- function(id = "coord_axis",
   }
 
   # plot_f: draw axes for each contig
-  plot_f <- function(cxt, gg) {
+  plot_f <- function(profile, cxt, gg) {
     if (is.null(cxt$mapper) || is.null(cxt$mapper$cdf) || nrow(cxt$mapper$cdf) == 0 || is.null(cxt$mapper$xlim)) {
       return(gg)
     }

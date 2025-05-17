@@ -49,11 +49,14 @@ get_view_ids <- function() {
 #' @param type Character, type of profile (e.g., "points", "lines").
 #' @param height Numeric, weight for vertical space allocation.
 #' @param attr List, additional profile attributes.
+#' @param params List, optionalUI parameters for the profile.
 #' @param data_f Function, returns data for plotting.
 #' @param plot_f Function, adds layers to ggplot object.
 #' @param auto_register Logical, if TRUE, registers profile immediately.
 #' @return A profile object (list).
-profile_create <- function(id, name, type, height, attr, data_f, plot_f, auto_register = FALSE) {
+profile_create <- function(
+    id, name, type, height,
+    attr = list(), params = list(), data_f = NULL, plot_f = NULL, auto_register = FALSE) {
   # Basic validation
   stopifnot(
     is.character(id) && length(id) == 1 && nzchar(id),
@@ -71,9 +74,24 @@ profile_create <- function(id, name, type, height, attr, data_f, plot_f, auto_re
     type = type,
     height = height,
     attr = attr,
+    params = params,
     data_f = data_f,
     plot_f = plot_f
   )
+
+  # register UI parameters
+  if (length(params) > 0) {
+    for (i in 1:length(params)) {
+      param_id <- names(params)[i]
+      param <- params[[i]]
+      register_param(
+        group = id,
+        id = param_id,
+        type = param$type,
+        default_value = param$default
+      )
+    }
+  }
 
   # Set defaults for common attributes
   if (is.null(profile$attr$title)) {

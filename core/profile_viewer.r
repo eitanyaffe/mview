@@ -58,11 +58,20 @@ plot_profiles <- function(cxt) {
     cat(sprintf("plotting profile: %s\n", id))
     profile <- profiles[[id]]
 
+    if (length(profile$params) > 0) {
+      for (i in seq_along(profile$params)) {
+        param_id <- names(profile$params)[i]
+        param_value <- get_param(id, param_id)()
+        cat(sprintf("profile %s, param: %s, value: %s\n", id, param_id, param_value))
+        profile[[param_id]] <- param_value
+      }
+    }
+
     # Create base ggplot
     gg <- pre_plot(cxt, profile)
 
     # Get the profile's plot result
-    pf_result <- profile$plot_f(cxt, gg)
+    pf_result <- profile$plot_f(profile, cxt, gg)
 
     # Add overlays
     gg_final <- post_plot(cxt, pf_result, profile)
