@@ -33,6 +33,7 @@ ui <- fluidPage(
       uiOutput("profilePlots"), # Plot area with zoom brush
       hr(),
       tabsetPanel(
+        id = "mainTabs",
         tabPanel(
           "Contigs",
           actionButton("addContigsBtn", "Add selected contigs"),

@@ -54,7 +54,7 @@ points_profile <- function(id, name, height = 1,
     aes_map <- ggplot2::aes(x = gcoord, y = .data[[y_col]], text = hover_text)
     geom_args <- c(list(mapping = aes_map, data = df), point_aes)
 
-    geom_args$color <- profile$color %||% color
+    geom_args$color <- verify_color(profile$color %||% color)
 
     # Suppress warnings specifically for the geom_point call regarding unknown aesthetics like 'text'
     gg2 <- gg + suppressWarnings(do.call(ggplot2::geom_point, geom_args))

@@ -1,16 +1,20 @@
 # keyboard.r
 # Handles keyboard shortcuts and events
 
+shifted_numbers <- c("!", "@", "#", "$", "%", "^", "&", "*", "(", ")")
+
 # Define keyboard shortcuts globally
 keyboard_shortcuts <- list(
-  "Ctrl+z" = list(
+  "Shift+backspace" = list(
     description = "Undo last action",
+    type = "general", # Added type for dispatch
     action = function(states_module_output) {
       states_module_output$undo_state()
     }
   ),
-  "Ctrl+s" = list(
+  "Shift+X" = list(
     description = "Zoom to current region",
+    type = "general", # Added type for dispatch
     action = function(states_module_output) {
       # Code to zoom to current region
       # This will be implemented later
@@ -18,6 +22,34 @@ keyboard_shortcuts <- list(
     }
   )
 )
+
+# Function to generate and add tab-switching shortcuts
+create_and_add_tab_shortcuts <- function() {
+  # Fixed vector of tab titles as they appear in the UI
+  tabs <- c(
+    "Contigs", "Genomes", "Contig Map", "Selected Contigs",
+    "Options", "Parameters", "States"
+  )
+
+  for (i in seq_along(tabs)) {
+    shortcut_key <- paste0("Shift+", shifted_numbers[i])
+    tab <- tabs[i]
+
+    keyboard_shortcuts[[shortcut_key]] <<- list(
+      description = paste0("Switch to ", tab, " tab"),
+      type = "tab_switch",
+      action = local({
+        tab_value <- tab
+        function(session_obj) {
+          updateTabsetPanel(session_obj, "mainTabs", selected = tab_value)
+        }
+      })
+    )
+  }
+}
+
+# Call this function once to populate the shortcuts when the script is sourced
+create_and_add_tab_shortcuts()
 
 # Initialize keyboard shortcuts
 keyboard_initialize <- function() {
@@ -51,9 +83,19 @@ keyboard_server <- function(input, session, states_module_output) {
 
     # Check if the key combo matches any of our shortcuts
     if (!is.null(key_combo) && key_combo != "") {
-      for (shortcut in names(keyboard_shortcuts)) {
-        if (tolower(key_combo) == tolower(shortcut)) {
-          keyboard_shortcuts[[shortcut]]$action(states_module_output)
+      current_shortcut_names <- names(keyboard_shortcuts) # Use a local copy of names
+      for (shortcut_name in current_shortcut_names) {
+        if (tolower(key_combo) == tolower(shortcut_name)) {
+          shortcut_details <- keyboard_shortcuts[[shortcut_name]]
+
+          # Dispatch action based on type
+          if (!is.null(shortcut_details$type) && shortcut_details$type == "tab_switch") {
+            shortcut_details$action(session) # Pass session for tab switching
+          } else {
+            # Default for "general" type or if type is not specified
+            shortcut_details$action(states_module_output)
+          }
+
           keyboard_events(keyboard_events() + 1)
           break
         }
@@ -64,7 +106,7 @@ keyboard_server <- function(input, session, states_module_output) {
   # Help button shows keyboard shortcuts
   observeEvent(input$helpBtn, {
     showModal(modalDialog(
-      title = "Help",
+      title = "Keyboard Shortcuts",
       keyboard_summary(),
       easyClose = TRUE
     ))
@@ -80,8 +122,13 @@ keyboard_server <- function(input, session, states_module_output) {
 
 # Generate keyboard shortcuts documentation for help
 keyboard_summary <- function() {
-  html_content <- "<h4>Keyboard Shortcuts</h4><ul>"
-  for (shortcut in names(keyboard_shortcuts)) {
+  html_content <- "<h5>Actions</h5><ul>"
+  for (i in seq_along(keyboard_shortcuts)) {
+    shortcut <- names(keyboard_shortcuts)[i]
+    type <- keyboard_shortcuts[[i]]$type
+    if (type == "tab_switch") {
+      next
+    }
     html_content <- paste0(
       html_content,
       "<li><strong>", shortcut, ":</strong> ",
