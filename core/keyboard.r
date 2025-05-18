@@ -23,7 +23,7 @@ keyboard_initialize <- function() {
 }
 
 # Server-side handler for keyboard shortcuts
-keyboard_server <- function(input, session, undo_trigger_rv = NULL) {
+keyboard_server <- function(input, session, states_module_output) {
   # Create a reactive value to track keyboard events
   keyboard_events <- reactiveVal(0)
 
@@ -32,9 +32,7 @@ keyboard_server <- function(input, session, undo_trigger_rv = NULL) {
     "Shift+Backspace" = list(
       description = "Undo last action",
       action = function() {
-        if (!is.null(undo_trigger_rv)) {
-          undo_trigger_rv(undo_trigger_rv() + 1)
-        }
+        states_module_output$undo_state()
       }
     ),
     "Z" = list(

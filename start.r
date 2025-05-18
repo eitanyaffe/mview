@@ -10,12 +10,6 @@ register_views <- function() {
 
 get_server <- function() {
     server <- function(input, output, session) {
-        # --- Reactive Triggers for Inter-Module Communication ---
-        # Trigger for telling the states module to push the current state
-        push_state_trigger <- shiny::reactiveVal(0)
-        # Trigger for telling the states module to perform an undo action
-        undo_action_trigger <- shiny::reactiveVal(0)
-
         # --- Source Core Server Logic Files ---
         source("core/server_state.r", local = TRUE)
         source("core/server_profiles.r", local = TRUE)
@@ -23,9 +17,6 @@ get_server <- function() {
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
-
-        # Initialize the keyboard handler
-        keyboard_module_output <- keyboard_server(input, session, undo_action_trigger)
 
         # Output for the last key pressed
         output$last_key_output <- renderText({
@@ -36,9 +27,13 @@ get_server <- function() {
         states_module_output <- states_server(
             id = "states_module",
             main_state_rv = state,
+            session = session
+        )
+
+        keyboard_module_output <- keyboard_server(
+            input = input,
             session = session,
-            push_trigger_rv = push_state_trigger,
-            undo_trigger_rv = undo_action_trigger
+            states_module_output = states_module_output
         )
     }
 }

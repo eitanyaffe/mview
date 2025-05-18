@@ -23,7 +23,7 @@ states_ui <- function(id = "states_module") {
           shiny::actionButton(ns("confirm_add_state_from_input"), "Add Current State", style = "margin-left: 10px;")
         ),
         shiny::actionButton(ns("delete_state"), "Delete Selected State"),
-        shiny::actionButton(ns("goto_state"), "Go to Selected State"),
+        shiny::actionButton(ns("goto_state"), "Go to Selected State")
       )
     ),
     shiny::fluidRow(
@@ -39,7 +39,7 @@ states_ui <- function(id = "states_module") {
 
 # ---- Server Logic ----
 
-states_server <- function(id = "states_module", main_state_rv, session, push_trigger_rv, undo_trigger_rv) {
+states_server <- function(id = "states_module", main_state_rv, session) {
   shiny::moduleServer(
     id,
     function(input, output, session) {
@@ -79,31 +79,31 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
       # --- Reactive Values for the states module ---
       state_table <- shiny::reactiveVal(create_empty_state_table())
       undo_stack <- shiny::reactiveVal(list())
-      current_save_filename <- shiny::reactiveVal("mview_states_default.state") # Default filename suggestion
+      current_save_filename <- shiny::reactiveVal("mview_states_default.state")
 
-      # --- Undo/Push Logic (defined before observers that use them) ---
-      internal_push_state <- function() {
+      # --- Direct Push/Undo Functions ---
+      push_state <- function() {
         current_app_state <- shiny::isolate(shiny::reactiveValuesToList(main_state_rv))
         state_to_push <- current_app_state[TRACKED_STATE_FIELDS]
-        cat("push, current_stack size: ", length(undo_stack()), "\n")
-        print_state(state_to_push, "Push")
         current_stack <- undo_stack()
+        print_state(state_to_push, "Push")
         current_stack <- c(list(state_to_push), current_stack)
         undo_stack(current_stack)
       }
 
-      internal_undo_state <- function() {
+      undo_state <- function() {
         current_stack <- undo_stack()
         if (length(current_stack) > 0) {
-          cat("pop, current stack size: ", length(current_stack), "\n")
           state_to_restore <- current_stack[[1]]
           main_state_rv$contigs <- state_to_restore$contigs
           main_state_rv$zoom <- state_to_restore$zoom
           print_state(state_to_restore, "Undo")
           undo_stack(current_stack[-1])
           shiny::showNotification("Undo successful.", type = "message")
+          return(TRUE)
         } else {
           shiny::showNotification("Nothing to undo.", type = "warning")
+          return(FALSE)
         }
       }
 
@@ -184,7 +184,7 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
           shiny::showModal(shiny::modalDialog(title = "Go to State", "Please select a state to go to.", footer = shiny::modalButton("OK")))
           return()
         }
-        internal_push_state()
+        push_state()
         selected_row_data <- state_table()[selected_rows[1], ]
         main_state_rv$contigs <- selected_row_data$.Contigs_Data[[1]]
         main_state_rv$zoom <- selected_row_data$.Zoom_Data[[1]]
@@ -270,36 +270,6 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
         }
       )
 
-      observeEvent(push_trigger_rv(),
-        {
-          # Trigger on any change after initialization, assuming trigger starts at 0 and increments.
-          if (shiny::isolate(push_trigger_rv()) != 0) {
-            internal_push_state()
-          }
-        },
-        ignoreInit = TRUE
-      )
-
-      # Observe external trigger for undoing state
-      observeEvent(undo_trigger_rv(),
-        {
-          if (shiny::isolate(undo_trigger_rv()) != 0) { # Assuming it starts at 0 and increments
-            internal_undo_state()
-          }
-        },
-        ignoreInit = TRUE
-      )
-
-      # --- Push/Undo Button Handlers ---
-      observeEvent(input$push_state_test, {
-        internal_push_state()
-        shiny::showNotification("Test: Current state pushed to undo stack.", type = "message")
-      })
-
-      observeEvent(input$undo_state_test, {
-        internal_undo_state()
-      })
-
       # --- Table Display ---
       output$state_table_display <- DT::renderDT({
         st <- state_table()
@@ -312,9 +282,11 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
         )
       })
 
-      return(
-        list(undo_state = internal_undo_state)
-      )
+      # Return the direct functions for use outside the module
+      return(list(
+        push_state = push_state,
+        undo_state = undo_state
+      ))
     }
   )
 }

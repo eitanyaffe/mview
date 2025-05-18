@@ -35,6 +35,7 @@ axis_profile <- function(id = "coord_axis",
     axis_lines_list <- list()
     tick_marks_list <- list()
     tick_labels_list <- list()
+    contig_names_list <- list() # list to store contig name labels
 
     for (i in 1:nrow(contig_df)) {
       contig_info <- contig_df[i, ]
@@ -42,7 +43,7 @@ axis_profile <- function(id = "coord_axis",
       draw_start <- max(contig_info$start, zoom_xlim[1])
       draw_end <- min(contig_info$end, zoom_xlim[2])
       contig_length <- contig_info$length
-      # contig_name <- contig_info$cid # Not used if no hover
+      contig_name <- contig_info$cid # Get contig name
 
       # Axis line segments (clipped to zoom window)
       axis_lines_list[[i]] <- data.frame(
@@ -79,6 +80,27 @@ axis_profile <- function(id = "coord_axis",
           label = tick_positions_local_visible
         )
       }
+
+      # Define a suitable y_offset for contig names to bring them closer to the axis
+      # Base the calculation on a unit equivalent to tick_height logic
+      base_y_multiplier <- (zoom_xlim[2] - zoom_xlim[1]) * 0.005
+      if (base_y_multiplier == 0) base_y_multiplier <- 0.1 # Ensure a minimum step, similar to tick_height
+
+      if (length(tick_positions_global_visible) > 0) {
+        # Ticks are present. Tick labels are at an offset of base_y_multiplier * 2.
+        # Place contig names below tick labels, but closer to the axis.
+        contig_name_y_offset <- base_y_multiplier * 2.5
+      } else {
+        # No ticks. Place contig names closer to the axis.
+        contig_name_y_offset <- base_y_multiplier * 1.0
+      }
+
+      contig_names_list[[length(contig_names_list) + 1]] <- data.frame(
+        x = (draw_start + draw_end) / 2,
+        y = y_baseline - contig_name_y_offset, # Position below ticks
+        label = contig_name,
+        stringsAsFactors = FALSE
+      )
     }
 
     # Combine list of data.frames into single data.frames
@@ -86,6 +108,7 @@ axis_profile <- function(id = "coord_axis",
     final_axis_lines_df <- if (length(axis_lines_list) > 0) do.call(rbind, axis_lines_list) else NULL
     final_tick_marks_df <- if (length(tick_marks_list) > 0) do.call(rbind, tick_marks_list) else NULL
     final_tick_labels_df <- if (length(tick_labels_list) > 0) do.call(rbind, tick_labels_list) else NULL
+    final_contig_names_df <- if (length(contig_names_list) > 0) do.call(rbind, contig_names_list) else NULL # Combine contig names
 
     if (!is.null(final_axis_lines_df) && nrow(final_axis_lines_df) > 0) {
       gg <- gg + ggplot2::geom_segment(
@@ -106,6 +129,14 @@ axis_profile <- function(id = "coord_axis",
         data = final_tick_labels_df,
         ggplot2::aes(x = x, y = y, label = label),
         color = "black", size = 3, vjust = 1
+      )
+    }
+    # Add contig names to the plot
+    if (!is.null(final_contig_names_df) && nrow(final_contig_names_df) > 0) {
+      gg <- gg + ggplot2::geom_text(
+        data = final_contig_names_df,
+        ggplot2::aes(x = x, y = y, label = label),
+        color = "black", size = 3.5, vjust = 1, fontface = "bold" # Adjust appearance as needed
       )
     }
     return(gg)
