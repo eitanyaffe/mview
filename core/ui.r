@@ -6,6 +6,9 @@ library(plotly)
 
 ui <- fluidPage(
   titlePanel("mview"),
+  tags$head(
+    keyboard_initialize() # Add the keyboard event listener
+  ),
   tags$style(HTML("
     .ui-resizable-s {
       height: 8px;
@@ -20,6 +23,8 @@ ui <- fluidPage(
       uiOutput("state_info"),
       actionButton("clearLog", "Clear Log"),
       verbatimTextOutput("log"),
+      h4("Last Key Press"), # Label for the new output
+      verbatimTextOutput("last_key_output"), # New output for last key press
       actionButton("helpBtn", "Help")
     ),
     column(

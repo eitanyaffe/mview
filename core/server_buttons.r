@@ -46,11 +46,12 @@ observeEvent(input$removeContigsBtn, {
   }
 })
 
+
+# Help button shows keyboard shortcuts
 observeEvent(input$helpBtn, {
   showModal(modalDialog(
-    title = "Keyboard Shortcuts",
-    "Double-click window to zoom in",
-    "Double-click without window to zoom out",
+    title = "Help",
+    keyboard_summary(),
     easyClose = TRUE
   ))
 })

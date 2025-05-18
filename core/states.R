@@ -86,6 +86,7 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
         current_app_state <- shiny::isolate(shiny::reactiveValuesToList(main_state_rv))
         state_to_push <- current_app_state[TRACKED_STATE_FIELDS]
         cat("push, current_stack size: ", length(undo_stack()), "\n")
+        print_state(state_to_push, "Push")
         current_stack <- undo_stack()
         current_stack <- c(list(state_to_push), current_stack)
         undo_stack(current_stack)
@@ -98,6 +99,7 @@ states_server <- function(id = "states_module", main_state_rv, session, push_tri
           state_to_restore <- current_stack[[1]]
           main_state_rv$contigs <- state_to_restore$contigs
           main_state_rv$zoom <- state_to_restore$zoom
+          print_state(state_to_restore, "Undo")
           undo_stack(current_stack[-1])
           shiny::showNotification("Undo successful.", type = "message")
         } else {

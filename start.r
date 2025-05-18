@@ -24,6 +24,15 @@ get_server <- function() {
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
 
+        # Initialize the keyboard handler
+        keyboard_module_output <- keyboard_server(input, session, undo_action_trigger)
+
+        # Output for the last key pressed
+        output$last_key_output <- renderText({
+            req(keyboard_module_output$last_key_pressed())
+            paste("Pressed:", keyboard_module_output$last_key_pressed())
+        })
+
         states_module_output <- states_server(
             id = "states_module",
             main_state_rv = state,
@@ -54,6 +63,9 @@ rl <- function() {
 
     # states
     source("core/states.R", local = FALSE)
+
+    # keyboard module
+    source("core/keyboard.r", local = FALSE)
 
     # profile code
     source("core/profile_manager.r", local = FALSE)
