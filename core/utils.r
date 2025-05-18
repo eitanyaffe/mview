@@ -32,11 +32,17 @@ print_state <- function(state, title = "State") {
     paste(length(state$contigs), "contigs")
   }
 
+  assembly_display <- if (is.null(state$assembly) || state$assembly == "") {
+    "None"
+  } else {
+    state$assembly
+  }
+
   # Format zoom display based on available values
   zoom_display <- if (is.null(state$zoom) || length(state$zoom) != 2) {
     "Full range"
   } else {
     paste(state$zoom[1], "–", state$zoom[2])
   }
-  cat(title, ":", contig_display, zoom_display, "\n")
+  cat(title, ":", assembly_display, contig_display, zoom_display, "\n")
 }

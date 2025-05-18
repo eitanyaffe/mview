@@ -2,7 +2,8 @@
 
 state <- reactiveValues(
   contigs = character(),
-  zoom = NULL
+  zoom = NULL,
+  assembly = assemblies$assembly[1]
 )
 
 log_messages <- reactiveVal(character())
@@ -29,8 +30,15 @@ output$contig_count <- renderUI({
     sprintf("Zoom: %d – %d", state$zoom[1], state$zoom[2])
   }
 
+  assembly_text <- if (is.null(state$assembly) || state$assembly == "") {
+    "Assembly: none selected"
+  } else {
+    sprintf("Assembly: %s", state$assembly)
+  }
+
   contig_text <- sprintf("Contigs: %d", length(state$contigs))
   list(
+    tags$div(style = "margin-bottom: 4px;", assembly_text),
     tags$div(style = "margin-bottom: 4px;", contig_text),
     tags$div(style = "white-space: pre-wrap;", paste("  ", paste(state$contigs, collapse = ", "))),
     tags$div(style = "margin-top: 6px;", zoom_text)

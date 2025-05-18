@@ -1,3 +1,8 @@
+assemblies <- data.frame(
+  assembly = paste0("a", 1:3),
+  stringsAsFactors = FALSE
+)
+
 contigs <- data.frame(
   cid = paste0("c", 1:10),
   length = sample(100:500, 10),

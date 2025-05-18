@@ -2,7 +2,7 @@
 # Defines the UI and server logic for the state management module.
 
 # Hardcoded fields from the main 'state' reactiveValues to be tracked
-TRACKED_STATE_FIELDS <- c("contigs", "zoom")
+TRACKED_STATE_FIELDS <- c("contigs", "zoom", "assembly")
 
 # ---- UI Definition ----
 
@@ -52,8 +52,10 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           Description = character(),
           Contigs = character(),
           Zoom = character(),
+          Assembly = character(),
           .Contigs_Data = I(list()),
           .Zoom_Data = I(list()),
+          .Assembly_Data = I(list()),
           stringsAsFactors = FALSE
         )
         return(df)
@@ -76,10 +78,47 @@ states_server <- function(id = "states_module", main_state_rv, session) {
         return(paste(zoom_vector[1], "–", zoom_vector[2]))
       }
 
+      format_assembly_for_display <- function(assembly_value) {
+        if (is.null(assembly_value) || assembly_value == "") {
+          return("None")
+        }
+        return(as.character(assembly_value))
+      }
+
       # --- Reactive Values for the states module ---
       state_table <- shiny::reactiveVal(create_empty_state_table())
       undo_stack <- shiny::reactiveVal(list())
       current_save_filename <- shiny::reactiveVal("mview_states_default.state")
+
+      # Observer for assembly selection changes
+      observeEvent(input$assembly_select,
+        {
+          req(input$assembly_select)
+          # Do not trigger on initial NULL or empty string selection from selectInput clearing
+          if (is.null(main_state_rv$assembly) || shiny::isolate(main_state_rv$assembly) != input$assembly_select) {
+            push_state() # Push current state before changing assembly
+            main_state_rv$assembly <- input$assembly_select
+            shiny::showNotification(paste("Assembly changed to:", input$assembly_select), type = "message")
+          }
+        },
+        ignoreNULL = FALSE,
+        ignoreInit = TRUE
+      ) # ignoreNULL=FALSE to react to deselection (empty string)
+
+      # Update assembly dropdown when main_state_rv$assembly changes (e.g., on Go to State)
+      observeEvent(main_state_rv$assembly,
+        {
+          current_selection <- shiny::isolate(input$assembly_select)
+          if (!is.null(main_state_rv$assembly) && main_state_rv$assembly != "" && main_state_rv$assembly != current_selection) {
+            shiny::updateSelectInput(session, "assembly_select", selected = main_state_rv$assembly)
+          } else if ((is.null(main_state_rv$assembly) || main_state_rv$assembly == "") && !is.null(current_selection) && current_selection != "") {
+            # If main state assembly becomes NULL (e.g. new table), clear selection
+            shiny::updateSelectInput(session, "assembly_select", selected = "")
+          }
+        },
+        ignoreNULL = FALSE,
+        ignoreInit = TRUE
+      )
 
       # --- Direct Push/Undo Functions ---
       push_state <- function() {
@@ -97,6 +136,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           state_to_restore <- current_stack[[1]]
           main_state_rv$contigs <- state_to_restore$contigs
           main_state_rv$zoom <- state_to_restore$zoom
+          main_state_rv$assembly <- state_to_restore$assembly
           print_state(state_to_restore, "Undo")
           undo_stack(current_stack[-1])
           shiny::showNotification("Undo successful.", type = "message")
@@ -121,6 +161,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
 
       observeEvent(input$confirm_new_state_table, {
         state_table(create_empty_state_table())
+        main_state_rv$assembly <- NULL # Clear assembly in main state
         shiny::removeModal()
         shiny::showNotification("New state table created.", type = "message")
       })
@@ -142,8 +183,10 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           Description = description,
           Contigs = format_contigs_for_display(current_app_state$contigs),
           Zoom = format_zoom_for_display(current_app_state$zoom),
+          Assembly = format_assembly_for_display(current_app_state$assembly),
           .Contigs_Data = I(list(current_app_state$contigs)),
           .Zoom_Data = I(list(current_app_state$zoom)),
+          .Assembly_Data = I(list(current_app_state$assembly)),
           stringsAsFactors = FALSE
         )
         state_table(rbind(state_table(), new_row))
@@ -188,6 +231,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
         selected_row_data <- state_table()[selected_rows[1], ]
         main_state_rv$contigs <- selected_row_data$.Contigs_Data[[1]]
         main_state_rv$zoom <- selected_row_data$.Zoom_Data[[1]]
+        main_state_rv$assembly <- selected_row_data$.Assembly_Data[[1]]
         shiny::showNotification(paste("Went to state: ", selected_row_data$Description), type = "message")
       })
 
@@ -210,7 +254,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           {
             loaded_data <- readRDS(file_path)
             if (!is.data.frame(loaded_data) ||
-              !all(c("ID", "Description", "Contigs", "Zoom", ".Contigs_Data", ".Zoom_Data") %in% names(loaded_data))) {
+              !all(c("ID", "Description", "Contigs", "Zoom", "Assembly", ".Contigs_Data", ".Zoom_Data", ".Assembly_Data") %in% names(loaded_data))) {
               stop("Invalid state file format.")
             }
             state_table(loaded_data)
@@ -273,7 +317,8 @@ states_server <- function(id = "states_module", main_state_rv, session) {
       # --- Table Display ---
       output$state_table_display <- DT::renderDT({
         st <- state_table()
-        display_table <- st[, c("ID", "Description", "Contigs", "Zoom"), drop = FALSE]
+        # Reorder columns to show Assembly before Contigs
+        display_table <- st[, c("ID", "Description", "Assembly", "Contigs", "Zoom"), drop = FALSE]
         DT::datatable(
           display_table,
           rownames = FALSE,

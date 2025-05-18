@@ -22,7 +22,8 @@ observe({
   cxt <- build_context(
     state_contigs = state$contigs,
     contig_table = contigs,
-    zoom = state$zoom
+    zoom = state$zoom,
+    assembly = state$assembly
   )
   req(input$view_id)
   req(cxt)
