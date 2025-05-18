@@ -3,10 +3,7 @@
 
 # Cache initialization
 cache_init <- function(clean = FALSE) {
-  if (!exists("g.cache")) {
-    g.cache <<- list()
-  }
-  if (clean) {
+  if (!exists("g.cache") || clean) {
     g.cache <<- list()
   }
 }

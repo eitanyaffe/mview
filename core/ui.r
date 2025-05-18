@@ -58,6 +58,10 @@ ui <- fluidPage(
         tabPanel(
           "Parameters",
           uiOutput("parameters_ui")
+        ),
+        tabPanel(
+          "States",
+          states_ui("states_module")
         )
       )
     )

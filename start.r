@@ -10,12 +10,27 @@ register_views <- function() {
 
 get_server <- function() {
     server <- function(input, output, session) {
+        # --- Reactive Triggers for Inter-Module Communication ---
+        # Trigger for telling the states module to push the current state
+        push_state_trigger <- shiny::reactiveVal(0)
+        # Trigger for telling the states module to perform an undo action
+        undo_action_trigger <- shiny::reactiveVal(0)
+
+        # --- Source Core Server Logic Files ---
         source("core/server_state.r", local = TRUE)
         source("core/server_profiles.r", local = TRUE)
         source("core/server_tables.r", local = TRUE)
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
+
+        states_module_output <- states_server(
+            id = "states_module",
+            main_state_rv = state,
+            session = session,
+            push_trigger_rv = push_state_trigger,
+            undo_trigger_rv = undo_action_trigger
+        )
     }
 }
 
@@ -36,6 +51,9 @@ rl <- function() {
 
     # parameters
     source("core/parameters.r", local = FALSE)
+
+    # states
+    source("core/states.R", local = FALSE)
 
     # profile code
     source("core/profile_manager.r", local = FALSE)

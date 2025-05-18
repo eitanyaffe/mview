@@ -15,6 +15,7 @@ observeEvent(input$addContigsBtn, {
     new_cids <- contigs$cid[rows]
     new_cids <- new_cids[!new_cids %in% state$contigs]
     if (length(new_cids) > 0) {
+      push_state_trigger(isolate(push_state_trigger()) + 1)
       state$contigs <- c(state$contigs, new_cids)
       addLog(paste("Add:", paste(new_cids, collapse = ",")))
     }
@@ -28,6 +29,7 @@ observeEvent(input$addGenomesBtn, {
     new_cids <- contig_map$cid[contig_map$gid %in% selected_gids]
     new_cids <- new_cids[!new_cids %in% state$contigs]
     if (length(new_cids) > 0) {
+      push_state_trigger(isolate(push_state_trigger()) + 1)
       state$contigs <- c(state$contigs, new_cids)
       addLog(paste("From genome:", paste(selected_gids, collapse = ",")))
     }
@@ -38,6 +40,7 @@ observeEvent(input$removeContigsBtn, {
   rows <- input$selectedTable_rows_selected
   removed_cids <- selected_cids_from_table(state$contigs, contigs, rows)
   if (length(removed_cids) > 0) {
+    push_state_trigger(isolate(push_state_trigger()) + 1)
     state$contigs <- setdiff(state$contigs, removed_cids)
     addLog(paste("Del:", paste(removed_cids, collapse = ",")))
   }

@@ -81,7 +81,7 @@ profile_create <- function(
 
   # register UI parameters
   if (length(params) > 0) {
-    for (i in 1:length(params)) {
+    for (i in seq_along(params)) {
       param_id <- names(params)[i]
       param <- params[[i]]
       register_param(
