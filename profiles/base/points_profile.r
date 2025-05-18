@@ -25,14 +25,16 @@ points_profile <- function(id, name, height = 1,
   data_f <- function(cxt) {
     df <- if (is.function(data)) data(cxt) else data
     if (!all(c("contig", "coord", y_col) %in% names(df))) stop("Missing required columns in points data.")
-    # Use mapper to get gcoord
-    df$gcoord <- cxt$mapper$l2g(data.frame(cid = df$contig, coord = df$coord))
-    # filter by xlim if present
-    if (!is.null(cxt$mapper) && !is.null(cxt$mapper$xlim) && nrow(df) > 0 && is.numeric(df$gcoord)) {
-      xlim <- range(cxt$mapper$xlim)
-      df <- df[df$gcoord >= xlim[1] & df$gcoord <= xlim[2], ]
+
+    # Use the new filter_coords function to handle coordinate mapping and filtering
+    df <- filter_coords(df, cxt, cxt$mapper$xlim)
+
+    # Return empty data frame if filtering resulted in no rows
+    if (is.null(df) || nrow(df) == 0) {
+      return(data.frame())
     }
-    df
+
+    return(df)
   }
   # plot_f: add points layer, return info_df for hover
   plot_f <- function(profile, cxt, gg) {

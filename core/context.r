@@ -35,3 +35,92 @@ build_context <- function(state_contigs, contig_table, zoom) {
   cat(sprintf("zoom: %s, contigs: %s\n", jsonlite::toJSON(zoom), length(state_contigs)))
   list(mapper = mapper, zoom = zoom, contigs = state_contigs)
 }
+
+# Safely filters point data and adds global coordinates
+filter_coords <- function(df, cxt, xlim = NULL) {
+  if (is.null(df) || nrow(df) == 0) {
+    return(NULL)
+  }
+
+  # Check required columns
+  if (!all(c("contig", "coord") %in% names(df))) {
+    warning("missing required columns in filter_coords: contig, coord")
+    return(NULL)
+  }
+
+  # Map contig names to those in context
+  idx <- match(df$contig, cxt$mapper$cdf$cid)
+  valid <- !is.na(idx)
+
+  if (!any(valid)) {
+    return(NULL)
+  }
+
+  if (!all(valid)) {
+    warning(sprintf(
+      "some contigs not found in context: %s",
+      paste(unique(df$contig[!valid]), collapse = ", ")
+    ))
+    df <- df[valid, ]
+  }
+
+  # Add global coordinates
+  df$gcoord <- cxt$mapper$cdf$start[idx[valid]] + df$coord
+
+  # Filter by xlim if provided
+  if (!is.null(xlim)) {
+    in_range <- df$gcoord >= xlim[1] & df$gcoord <= xlim[2]
+    if (!any(in_range)) {
+      return(NULL)
+    }
+    df <- df[in_range, ]
+  }
+
+  return(df)
+}
+
+# Safely filters segment data and adds global coordinates
+filter_segments <- function(df, cxt, xlim = NULL) {
+  if (is.null(df) || nrow(df) == 0) {
+    return(NULL)
+  }
+
+  # Check required columns
+  if (!all(c("contig", "start", "end") %in% names(df))) {
+    warning("missing required columns in filter_segments: contig, start, end")
+    return(NULL)
+  }
+
+  # Map contig names to those in context
+  idx <- match(df$contig, cxt$mapper$cdf$cid)
+  valid <- !is.na(idx)
+
+  if (!any(valid)) {
+    return(NULL)
+  }
+
+  if (!all(valid)) {
+    warning(sprintf(
+      "some contigs not found in context: %s",
+      paste(unique(df$contig[!valid]), collapse = ", ")
+    ))
+    df <- df[valid, ]
+  }
+
+  # Add global coordinates
+  contig_starts <- cxt$mapper$cdf$start[idx[valid]]
+  df$gstart <- contig_starts + df$start
+  df$gend <- contig_starts + df$end
+
+  # Filter by xlim if provided
+  if (!is.null(xlim)) {
+    # Keep segments with any overlap with xlim (partial or complete)
+    has_overlap <- df$gstart <= xlim[2] & df$gend >= xlim[1]
+    if (!any(has_overlap)) {
+      return(NULL)
+    }
+    df <- df[has_overlap, ]
+  }
+
+  return(df)
+}
