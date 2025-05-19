@@ -22,7 +22,7 @@ get_server <- function() {
     }
 }
 
-rl_core <- function() {
+rl_core <- function(project_id) {
     source("app.r", local = FALSE)
 
     # utils
@@ -30,6 +30,9 @@ rl_core <- function() {
 
     # cache
     source("core/cache.r", local = FALSE)
+
+    # initialize cache
+    cache_init(project_id = project_id)
 
     # data
     source("core/data.r", local = FALSE)
@@ -57,11 +60,12 @@ rl_core <- function() {
     }
 }
 
-rl <- function(cfg_file = "configs/cfg_test.r") {
+rl <- function(project_id = "c60") {
     # load core modules
-    rl_core()
+    rl_core(project_id = "c60")
 
     # load specific config
+    cfg_file <- paste0("configs/", project_id, "_cfg.r")
     source(cfg_file, local = FALSE)
 
     # shiny app

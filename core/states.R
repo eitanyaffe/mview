@@ -6,13 +6,15 @@ TRACKED_STATE_FIELDS <- c("contigs", "zoom", "assembly")
 
 # ---- UI Definition ----
 
+states_default_fn <- paste0(get_project_id() %||% "states1", ".mv")
+
 states_ui <- function(id = "states_module") {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::fluidRow(
       shiny::column(
         width = 12,
-        shiny::textInput(ns("states_file_input"), "States File:", value = "states1.mv", width = "200px"),
+        shiny::textInput(ns("states_file_input"), "States File:", value = states_default_fn, width = "200px"),
         shiny::actionButton(ns("select_table_trigger"), "Select Table"),
         shiny::actionButton(ns("new_state_table"), "New Table"),
         shiny::actionButton(ns("load_state_table_modal_trigger"), "Load Table"),

@@ -57,6 +57,7 @@ filter_coords <- function(df, cxt, xlim = NULL) {
   }
 
   if (!all(valid)) {
+    browser()
     warning(sprintf(
       "some contigs not found in context: %s",
       paste(unique(df$contig[!valid]), collapse = ", ")

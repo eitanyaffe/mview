@@ -30,8 +30,16 @@ set_lookup <- function(lookup_files) {
   # Combine all tables
   combined_lookup <- do.call(rbind, lookup_tables)
 
+  # print number of rows
+  cat(sprintf("number of lookup files: %d\n", nrow(combined_lookup)))
+
   # Store in the module environment
   .data_env$lookups <- combined_lookup
+}
+
+list_lookup <- function() {
+  # print lookup ids
+  cat(sprintf("lookup ids:\n%s\n", paste(.data_env$lookups$id, collapse = "\n")))
 }
 
 # Get data by ID with optional tag and custom read function
@@ -40,15 +48,14 @@ get_data <- function(id, tag = "", read_f = read.delim) {
     stop("lookup table not set, call set_lookup first")
   }
 
-  id <- paste0("DATA_", id)
-  # Create cache key
-  cache_key <- if (tag != "") paste(id, tag, sep = ":") else id
+  id <- if (tag != "") paste(id, tag, sep = ":") else id
+  cache_key <- paste0("DATA_", id)
 
   # Use the cache module to load or retrieve from cache
   cache(cache_key, {
     # Check if ID exists in lookup table
     if (!id %in% .data_env$lookups$id) {
-      stop(sprintf("id not found in lookup table: %s", id))
+      return(NULL)
     }
 
     # Get path from lookup table
@@ -71,8 +78,8 @@ list_data <- function() {
 
 # Clear data from cache
 clear_data <- function(id, tag = "") {
-  id <- paste0("DATA_", id)
-  cache_key <- if (tag != "") paste(id, tag, sep = ":") else id
+  id <- if (tag != "") paste(id, tag, sep = ":") else id
+  cache_key <- paste0("DATA_", id)
   if (cache_exists(cache_key)) {
     cache_unset(cache_key)
     return(TRUE)
@@ -105,9 +112,12 @@ get_contigs <- function(assembly = NULL) {
   }
   key <- sprintf("global.contigs.%s", if (is.null(assembly)) "default" else assembly)
   cat(sprintf("getting contigs for assembly: %s\n", key))
-  cache(key, {
+  rr <- cache(key, {
     .data_env$register_contigs_f(assembly)
   })
+  # print number of rows
+  cat(sprintf("number of contigs: %d\n", nrow(rr)))
+  rr
 }
 
 # Get genomes using the registered function

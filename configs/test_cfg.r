@@ -19,7 +19,6 @@ test_contigs_f <- function(N, M) {
   return(rr)
 }
 
-
 # make genome table from contig table
 test_genomes_f <- function(contigs) {
   ss <- split(contigs, contigs$assembly)

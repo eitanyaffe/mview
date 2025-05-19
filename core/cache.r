@@ -2,45 +2,60 @@
 # Primarily designed for caching large data frames
 
 # Cache initialization
-cache_init <- function(clean = FALSE) {
+cache_init <- function(project_id = "default", clean = FALSE) {
   if (!exists("g.cache") || clean) {
     g.cache <<- list()
+  }
+  g.project_id <<- project_id
+}
+
+get_project_id <- function() {
+  if (exists("g.project_id")) {
+    return(g.project_id)
+  } else {
+    return("default")
   }
 }
 
 # Clean the cache (remove all entries)
 cache_clear <- function() {
-  cache_init(clean = TRUE)
+  cache_init(project_id = g.project_id, clean = TRUE)
+}
+
+# Get full key with project prefix
+get_full_key <- function(key) {
+  paste0(g.project_id, "_", key)
 }
 
 # Check if a key exists in the cache
 cache_exists <- function(key) {
-  is.element(key, names(g.cache))
+  full_key <- get_full_key(key)
+  is.element(full_key, names(g.cache))
 }
 
 # Get a value from the cache
 cache_get <- function(key) {
+  full_key <- get_full_key(key)
   if (!cache_exists(key)) {
     stop(sprintf("key %s not found in cache\n", key))
   }
-  g.cache[[key]]
+  g.cache[[full_key]]
 }
 
 # Set a value in the cache
 cache_set <- function(key, value) {
-  cache_init()
-  g.cache[[key]] <<- value
+  full_key <- get_full_key(key)
+  g.cache[[full_key]] <<- value
 }
 
 # Remove a value from the cache
 cache_unset <- function(key) {
-  cache_init()
-  g.cache[[key]] <<- NULL
+  full_key <- get_full_key(key)
+  g.cache[[full_key]] <<- NULL
 }
 
 # Main cache function: evaluates expression or retrieves cached result
 cache <- function(key, expr) {
-  cache_init()
   if (cache_exists(key)) {
     return(cache_get(key))
   }
@@ -56,7 +71,6 @@ cache <- function(key, expr) {
 
 # Get information about the cache contents
 cache_info <- function() {
-  cache_init()
   cache_size <- length(g.cache)
 
   if (cache_size == 0) {
@@ -74,6 +88,7 @@ cache_info <- function() {
 
   cat("cache contains", cache_size, "elements\n")
   cat("total cache size:", sprintf("%.2f GB", total_gb), "\n")
+  cat("current project:", g.project_id, "\n")
 
   invisible(NULL)
 }
@@ -93,22 +108,23 @@ format_size <- function(size) {
 
 # cache list, print items, their type and sizes
 cache_list <- function(prefix = "") {
+  project_prefix <- paste0(g.project_id, "_")
   for (key in names(g.cache)) {
-    if (startsWith(key, prefix)) {
+    if (startsWith(key, project_prefix) && startsWith(key, paste0(project_prefix, prefix))) {
       item <- g.cache[[key]]
       size <- object.size(item)
       size_str <- format_size(size)
-      cat(sprintf("%s: %s (%s)\n", key, typeof(item), size_str))
+      # Remove project prefix from display
+      display_key <- sub(project_prefix, "", key)
+      cat(sprintf("%s: %s (%s)\n", display_key, typeof(item), size_str))
     }
   }
 }
 
 # cache test
 cache_test <- function() {
-  cache_init()
+  cache_init(project_id = "test")
   cache_set("test", 1:10)
   cache_get("test")
   cache_list()
 }
-
-cache_init()
