@@ -4,14 +4,14 @@
 # Create test data
 ########################################################
 
-# define contig table with assemby, cid, length
+# define contig table with assemby, contig, length
 test_contigs_f <- function(N, M) {
   rr <- NULL
   for (i in 1:N) {
     assembly <- paste0("a", i)
     rr <- rbind(rr, data.frame(
       assembly = assembly,
-      cid = paste0(assembly, "_c", 1:M),
+      contig = paste0(assembly, "_c", 1:M),
       length = sample(100:500, M)
     ))
   }

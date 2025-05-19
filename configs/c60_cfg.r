@@ -22,7 +22,7 @@ register_contigs_f(function(assembly = NULL) {
   if (is.null(df)) {
     return(NULL)
   }
-  data.frame(cid = df$contig, length = df$length)
+  data.frame(contig = df$contig, length = df$length)
 })
 
 # Register genomes function
@@ -41,7 +41,7 @@ register_contig_map_f(function(assembly = NULL) {
   if (is.null(df)) {
     return(NULL)
   }
-  data.frame(cid = df$contig, gid = df$contig)
+  data.frame(contig = df$contig, gid = df$contig)
 })
 
 # Register views

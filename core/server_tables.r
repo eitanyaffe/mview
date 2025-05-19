@@ -17,7 +17,7 @@ get.highlight.options <- function(contigs, index) {
 
 output$contigTable <- renderDT({
     dat <- get_contigs(state$assembly)
-    index <- which(names(dat) == "cid")
+    index <- which(names(dat) == "contig")
     datatable(
         dat,
         rownames = FALSE,
@@ -32,7 +32,7 @@ output$genomeTable <- renderDT({
 
 output$mapTable <- renderDT({
     dat <- get_contig_map(state$assembly)
-    index <- which(names(dat) == "cid")
+    index <- which(names(dat) == "contig")
     datatable(
         dat,
         rownames = FALSE,
@@ -44,11 +44,11 @@ output$mapTable <- renderDT({
 output$selectedTable <- renderDT({
     contigs_data <- get_contigs(state$assembly)
     contig_map_data <- get_contig_map(state$assembly)
-    selected_df <- contigs_data[contigs_data$cid %in% state$contigs, ]
-    selected_df$gid_list <- sapply(selected_df$cid, function(cid) {
-        paste(contig_map_data$gid[contig_map_data$cid == cid], collapse = ", ")
+    selected_df <- contigs_data[contigs_data$contig %in% state$contigs, ]
+    selected_df$gid_list <- sapply(selected_df$contig, function(contig) {
+        paste(contig_map_data$gid[contig_map_data$contig == contig], collapse = ", ")
     })
-    selected_df <- selected_df[, c("cid", "length", "gid_list")]
+    selected_df <- selected_df[, c("contig", "length", "gid_list")]
     datatable(selected_df,
         rownames = FALSE,
         selection = list(mode = "multiple", target = "row")

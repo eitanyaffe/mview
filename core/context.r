@@ -1,8 +1,8 @@
 build_context <- function(state_contigs, contig_table, zoom, assembly) {
   req(state_contigs)
   req(contig_table)
-  valid_cids <- intersect(state_contigs, contig_table$cid)
-  cdf <- contig_table[match(valid_cids, contig_table$cid), ]
+  valid_contigs <- intersect(state_contigs, contig_table$contig)
+  cdf <- contig_table[match(valid_contigs, contig_table$contig), ]
   if (nrow(cdf) == 0) {
     return(NULL)
   }
@@ -12,14 +12,14 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
     g2l = function(gcoords) {
       ii <- findInterval(gcoords, c(cdf$start, Inf), left.open = TRUE, all.inside = TRUE)
       if (any(ii <= 0 | ii > nrow(cdf))) stop("Some coordinate indices are out of range")
-      data.frame(cid = cdf$cid[ii], coord = gcoords - cdf$start[ii], gcoord = gcoords)
+      data.frame(contig = cdf$contig[ii], coord = gcoords - cdf$start[ii], gcoord = gcoords)
     },
     l2g = function(df) {
-      idx <- match(df$cid, cdf$cid)
+      idx <- match(df$contig, cdf$contig)
       if (any(is.na(idx))) {
         stop(sprintf(
-          "Some cids are not found in the contig table: %s",
-          paste(df$cid[is.na(idx)], collapse = ", ")
+          "Some contigs are not found in the contig table: %s",
+          paste(df$contig[is.na(idx)], collapse = ", ")
         ))
       }
       cdf$start[idx] + df$coord
@@ -49,24 +49,13 @@ filter_coords <- function(df, cxt, xlim = NULL) {
   }
 
   # Map contig names to those in context
-  idx <- match(df$contig, cxt$mapper$cdf$cid)
-  valid <- !is.na(idx)
-
-  if (!any(valid)) {
+  df <- df[df$contig %in% cxt$mapper$cdf$contig, ]
+  if (nrow(df) == 0) {
     return(NULL)
   }
 
-  if (!all(valid)) {
-    browser()
-    warning(sprintf(
-      "some contigs not found in context: %s",
-      paste(unique(df$contig[!valid]), collapse = ", ")
-    ))
-    df <- df[valid, ]
-  }
-
   # Add global coordinates
-  df$gcoord <- cxt$mapper$cdf$start[idx[valid]] + df$coord
+  df$gcoord <- cxt$mapper$cdf$start + df$coord
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {
@@ -93,25 +82,14 @@ filter_segments <- function(df, cxt, xlim = NULL) {
   }
 
   # Map contig names to those in context
-  idx <- match(df$contig, cxt$mapper$cdf$cid)
-  valid <- !is.na(idx)
-
-  if (!any(valid)) {
+  df <- df[df$contig %in% cxt$mapper$cdf$contig, ]
+  if (nrow(df) == 0) {
     return(NULL)
   }
 
-  if (!all(valid)) {
-    warning(sprintf(
-      "some contigs not found in context: %s",
-      paste(unique(df$contig[!valid]), collapse = ", ")
-    ))
-    df <- df[valid, ]
-  }
-
   # Add global coordinates
-  contig_starts <- cxt$mapper$cdf$start[idx[valid]]
-  df$gstart <- contig_starts + df$start
-  df$gend <- contig_starts + df$end
+  df$gstart <- cxt$mapper$cdf$start + df$start
+  df$gend <- cxt$mapper$cdf$start + df$end
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {

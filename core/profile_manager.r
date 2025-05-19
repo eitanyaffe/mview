@@ -17,7 +17,7 @@ view_register <- function(id, filename) {
   stopifnot(is.character(id) && length(id) == 1 && nzchar(id))
   stopifnot(is.character(filename) && length(filename) == 1 && nzchar(filename))
   .view_env$registered_views[[id]] <- list(id = id, filename = filename)
-  cat(sprintf("Registered view: %s, filename: %s\n", id, filename))
+  cat(sprintf("registering view: %s, filename: %s\n", id, filename))
   invisible(NULL)
 }
 
@@ -73,7 +73,7 @@ profile_create <- function(
     is.function(data_f),
     is.function(plot_f)
   )
-
+  cat(sprintf("registering profile: %s\n", id))
   profile <- list(
     id = id,
     name = name,

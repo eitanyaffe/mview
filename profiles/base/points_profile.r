@@ -29,6 +29,7 @@ points_profile <- function(id, name, height = 1,
     # Use the new filter_coords function to handle coordinate mapping and filtering
     df <- filter_coords(df, cxt, cxt$mapper$xlim)
 
+    cat(sprintf("data_f: %s, nrow: %d\n", name, nrow(df)))
     # Return empty data frame if filtering resulted in no rows
     if (is.null(df) || nrow(df) == 0) {
       return(data.frame())

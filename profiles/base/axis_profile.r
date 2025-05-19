@@ -43,7 +43,7 @@ axis_profile <- function(id = "coord_axis",
       draw_start <- max(contig_info$start, zoom_xlim[1])
       draw_end <- min(contig_info$end, zoom_xlim[2])
       contig_length <- contig_info$length
-      contig_name <- contig_info$cid # Get contig name
+      contig_name <- contig_info$contig # Get contig name
 
       # Axis line segments (clipped to zoom window)
       axis_lines_list[[i]] <- data.frame(
