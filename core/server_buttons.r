@@ -12,7 +12,8 @@ selected_cids_from_table <- function(
 observeEvent(input$addContigsBtn, {
   rows <- input$contigTable_rows_selected
   if (length(rows) > 0) {
-    new_cids <- contigs$cid[rows]
+    contigs_data <- get_contigs(state$assembly)
+    new_cids <- contigs_data$cid[rows]
     new_cids <- new_cids[!new_cids %in% state$contigs]
     if (length(new_cids) > 0) {
       states_module_output$push_state()
@@ -25,8 +26,10 @@ observeEvent(input$addContigsBtn, {
 observeEvent(input$addGenomesBtn, {
   rows <- input$genomeTable_rows_selected
   if (length(rows) > 0) {
-    selected_gids <- genomes$gid[rows]
-    new_cids <- contig_map$cid[contig_map$gid %in% selected_gids]
+    genomes_data <- get_genomes(state$assembly)
+    contig_map_data <- get_contig_map(state$assembly)
+    selected_gids <- genomes_data$gid[rows]
+    new_cids <- contig_map_data$cid[contig_map_data$gid %in% selected_gids]
     new_cids <- new_cids[!new_cids %in% state$contigs]
     if (length(new_cids) > 0) {
       states_module_output$push_state()
@@ -38,7 +41,8 @@ observeEvent(input$addGenomesBtn, {
 
 observeEvent(input$removeContigsBtn, {
   rows <- input$selectedTable_rows_selected
-  removed_cids <- selected_cids_from_table(state$contigs, contigs, rows)
+  contigs_data <- get_contigs(state$assembly)
+  removed_cids <- selected_cids_from_table(state$contigs, contigs_data, rows)
   if (length(removed_cids) > 0) {
     states_module_output$push_state()
     state$contigs <- setdiff(state$contigs, removed_cids)

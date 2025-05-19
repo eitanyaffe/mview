@@ -9,7 +9,7 @@ cache_init <- function(clean = FALSE) {
 }
 
 # Clean the cache (remove all entries)
-cache_clean <- function() {
+cache_clear <- function() {
   cache_init(clean = TRUE)
 }
 
@@ -92,12 +92,14 @@ format_size <- function(size) {
 }
 
 # cache list, print items, their type and sizes
-cache_list <- function() {
+cache_list <- function(prefix = "") {
   for (key in names(g.cache)) {
-    item <- g.cache[[key]]
-    size <- object.size(item)
-    size_str <- format_size(size)
-    cat(sprintf("%s: %s (%s)\n", key, typeof(item), size_str))
+    if (startsWith(key, prefix)) {
+      item <- g.cache[[key]]
+      size <- object.size(item)
+      size_str <- format_size(size)
+      cat(sprintf("%s: %s (%s)\n", key, typeof(item), size_str))
+    }
   }
 }
 

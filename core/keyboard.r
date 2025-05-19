@@ -73,7 +73,7 @@ keyboard_initialize <- function() {
 }
 
 # Server-side handler for keyboard shortcuts
-keyboard_server <- function(input, session, states_module_output) {
+keyboard_server <- function(input, output, session, states_module_output) {
   # Create a reactive value to track keyboard events
   keyboard_events <- reactiveVal(0)
 
@@ -110,6 +110,11 @@ keyboard_server <- function(input, session, states_module_output) {
       keyboard_summary(),
       easyClose = TRUE
     ))
+  })
+
+  # Output for the last key pressed
+  output$last_key_output <- renderText({
+    paste("Pressed:", input$key_pressed)
   })
 
   return(list(

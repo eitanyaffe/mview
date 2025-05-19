@@ -21,7 +21,12 @@ ui <- fluidPage(
       width = 2,
       h4("State"),
       uiOutput("state_info"),
-      shiny::selectInput("states_module-assembly_select", "Select Assembly:", choices = assemblies$assembly, selected = assemblies$assembly[1], multiple = FALSE, width = "100%"),
+      shiny::selectInput("states_module-assembly_select", "Select Assembly:",
+        choices = get_assemblies(),
+        selected = get_assemblies()[1],
+        multiple = FALSE,
+        width = "100%"
+      ),
       actionButton("clearLog", "Clear Log"),
       verbatimTextOutput("log"),
       h4("Last Key Press"), # Label for the new output

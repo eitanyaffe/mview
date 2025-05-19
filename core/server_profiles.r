@@ -21,7 +21,7 @@ output$profilePlots <- renderUI({
 observe({
   cxt <- build_context(
     state_contigs = state$contigs,
-    contig_table = contigs,
+    contig_table = get_contigs(state$assembly),
     zoom = state$zoom,
     assembly = state$assembly
   )

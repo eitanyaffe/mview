@@ -29,10 +29,16 @@ set_view <- function(id) {
   }
   cat(sprintf("Setting view to %s\n", id))
   profiles_clear_all()
+  clear_parameters(clear_cache = FALSE)
+
   view_file <- views[[id]]$filename
   cat(sprintf("Sourcing view file: %s\n", view_file))
   # source the view file to register its profiles
   source(view_file, local = TRUE)
+
+  # Trigger UI update to display parameters
+  param_registration_done()
+
   invisible(NULL)
 }
 

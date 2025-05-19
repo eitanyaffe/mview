@@ -1,22 +1,142 @@
-assemblies <- data.frame(
-  assembly = paste0("a", 1:3),
-  stringsAsFactors = FALSE
-)
+# Data module for loading and managing lookups, assemblies, contigs, genomes, etc.
 
-contigs <- data.frame(
-  cid = paste0("c", 1:10),
-  length = sample(100:500, 10),
-  stringsAsFactors = FALSE
-)
+# Private storage for data and registered functions
+.data_env <- new.env(parent = emptyenv())
+.data_env$lookups <- NULL
+.data_env$register_contigs_f <- NULL
+.data_env$register_genomes_f <- NULL
+.data_env$register_contig_map_f <- NULL
+.data_env$assemblies <- NULL
 
-genomes <- data.frame(
-  gid = paste0("g", 1:3),
-  length = sample(1000:2000, 3),
-  stringsAsFactors = FALSE
-)
+# Set lookup tables from files
+set_lookup <- function(lookup_files) {
+  if (length(lookup_files) == 0) {
+    stop("no lookup files provided")
+  }
 
-contig_map <- data.frame(
-  cid = c("c1", "c2", "c3", "c4", "c5", "c6", "c1", "c7"),
-  gid = c("g1", "g1", "g1", "g2", "g2", "g3", "g2", "g3"),
-  stringsAsFactors = FALSE
-)
+  # Load and combine all lookup files
+  lookup_tables <- list()
+  for (file in lookup_files) {
+    if (!file.exists(file)) {
+      stop(sprintf("lookup file not found: %s", file))
+    }
+    table <- read.delim(file, stringsAsFactors = FALSE)
+    if (!all(c("id", "path") %in% colnames(table))) {
+      stop(sprintf("lookup file missing required columns (id, path): %s", file))
+    }
+    lookup_tables[[length(lookup_tables) + 1]] <- table
+  }
+
+  # Combine all tables
+  combined_lookup <- do.call(rbind, lookup_tables)
+
+  # Store in the module environment
+  .data_env$lookups <- combined_lookup
+}
+
+# Get data by ID with optional tag and custom read function
+get_data <- function(id, tag = "", read_f = read.delim) {
+  if (!exists("lookups", envir = .data_env) || is.null(.data_env$lookups)) {
+    stop("lookup table not set, call set_lookup first")
+  }
+
+  id <- paste0("DATA_", id)
+  # Create cache key
+  cache_key <- if (tag != "") paste(id, tag, sep = ":") else id
+
+  # Use the cache module to load or retrieve from cache
+  cache(cache_key, {
+    # Check if ID exists in lookup table
+    if (!id %in% .data_env$lookups$id) {
+      stop(sprintf("id not found in lookup table: %s", id))
+    }
+
+    # Get path from lookup table
+    path <- .data_env$lookups$path[.data_env$lookups$id == id]
+
+    # Check if file exists
+    if (!file.exists(path)) {
+      stop(sprintf("data file not found: %s", path))
+    }
+
+    # Load the data
+    read_f(path, stringsAsFactors = FALSE)
+  })
+}
+
+# List all data entries in cache with their sizes
+list_data <- function() {
+  cache_list(prefix = "DATA_")
+}
+
+# Clear data from cache
+clear_data <- function(id, tag = "") {
+  id <- paste0("DATA_", id)
+  cache_key <- if (tag != "") paste(id, tag, sep = ":") else id
+  if (cache_exists(cache_key)) {
+    cache_unset(cache_key)
+    return(TRUE)
+  } else {
+    warning(sprintf("no cached data found for id: %s", cache_key))
+    return(FALSE)
+  }
+}
+
+# Register functions for contigs, genomes, and contig mapping
+register_contigs_f <- function(f) {
+  cat(sprintf("registering contigs function\n"))
+  .data_env$register_contigs_f <- f
+}
+
+register_genomes_f <- function(f) {
+  cat(sprintf("registering genomes function\n"))
+  .data_env$register_genomes_f <- f
+}
+
+register_contig_map_f <- function(f) {
+  cat(sprintf("registering contig map function\n"))
+  .data_env$register_contig_map_f <- f
+}
+
+# Get contigs using the registered function
+get_contigs <- function(assembly = NULL) {
+  if (is.null(.data_env$register_contigs_f)) {
+    stop("contigs function not registered, call register_contigs_f first")
+  }
+  key <- sprintf("global.contigs.%s", if (is.null(assembly)) "default" else assembly)
+  cat(sprintf("getting contigs for assembly: %s\n", key))
+  cache(key, {
+    .data_env$register_contigs_f(assembly)
+  })
+}
+
+# Get genomes using the registered function
+get_genomes <- function(assembly = NULL) {
+  if (is.null(.data_env$register_genomes_f)) {
+    stop("genomes function not registered, call register_genomes_f first")
+  }
+  key <- sprintf("global.genomes.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_genomes_f(assembly)
+  })
+}
+
+# Get contig map using the registered function
+get_contig_map <- function(assembly = NULL) {
+  if (is.null(.data_env$register_contig_map_f)) {
+    stop("contig map function not registered, call register_contig_map_f first")
+  }
+  key <- sprintf("global.contig_map.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_contig_map_f(assembly)
+  })
+}
+
+# Set and get assemblies, which is a vector of assembly string IDs
+set_assemblies <- function(assemblies) {
+  .data_env$assemblies <- assemblies
+}
+
+get_assemblies <- function() {
+  .data_env$assemblies
+}

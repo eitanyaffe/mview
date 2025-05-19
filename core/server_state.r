@@ -3,7 +3,7 @@
 state <- reactiveValues(
   contigs = character(),
   zoom = NULL,
-  assembly = assemblies$assembly[1]
+  assembly = get_assemblies()[1]
 )
 
 log_messages <- reactiveVal(character())

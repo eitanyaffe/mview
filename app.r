@@ -1,28 +1,11 @@
-# start.r
-
-register_views <- function() {
-    view_files <- list.files("views", pattern = "\\.r$", full.names = TRUE)
-    for (view_file in view_files) {
-        view_name <- tools::file_path_sans_ext(basename(view_file))
-        view_register(view_name, view_file)
-    }
-}
-
 get_server <- function() {
     server <- function(input, output, session) {
-        # --- Source Core Server Logic Files ---
         source("core/server_state.r", local = TRUE)
         source("core/server_profiles.r", local = TRUE)
         source("core/server_tables.r", local = TRUE)
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
-
-        # Output for the last key pressed
-        output$last_key_output <- renderText({
-            req(keyboard_module_output$last_key_pressed())
-            paste("Pressed:", keyboard_module_output$last_key_pressed())
-        })
 
         states_module_output <- states_server(
             id = "states_module",
@@ -32,23 +15,24 @@ get_server <- function() {
 
         keyboard_module_output <- keyboard_server(
             input = input,
+            output = output,
             session = session,
             states_module_output = states_module_output
         )
     }
 }
 
-rl <- function() {
-    source("start.r", local = FALSE)
+rl_core <- function() {
+    source("app.r", local = FALSE)
 
     # utils
     source("core/utils.r", local = FALSE)
 
-    # data
-    source("core/data.r", local = FALSE)
-
     # cache
     source("core/cache.r", local = FALSE)
+
+    # data
+    source("core/data.r", local = FALSE)
 
     # context
     source("core/context.r", local = FALSE)
@@ -56,13 +40,13 @@ rl <- function() {
     # parameters
     source("core/parameters.r", local = FALSE)
 
-    # states
+    # state table
     source("core/states.R", local = FALSE)
 
-    # keyboard module
+    # keyboard
     source("core/keyboard.r", local = FALSE)
 
-    # profile code
+    # profiles
     source("core/profile_manager.r", local = FALSE)
     source("core/profile_viewer.r", local = FALSE)
 
@@ -71,9 +55,14 @@ rl <- function() {
     for (profile_file in profile_files) {
         source(profile_file, local = FALSE)
     }
+}
 
-    # register all views
-    register_views()
+rl <- function(cfg_file = "configs/cfg_test.r") {
+    # load core modules
+    rl_core()
+
+    # load specific config
+    source(cfg_file, local = FALSE)
 
     # shiny app
     source("core/ui.r", local = TRUE)
