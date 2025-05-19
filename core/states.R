@@ -12,9 +12,11 @@ states_ui <- function(id = "states_module") {
     shiny::fluidRow(
       shiny::column(
         width = 12,
+        shiny::textInput(ns("states_file_input"), "States File:", value = "states1.mv", width = "200px"),
+        shiny::actionButton(ns("select_table_trigger"), "Select Table"),
         shiny::actionButton(ns("new_state_table"), "New Table"),
         shiny::actionButton(ns("load_state_table_modal_trigger"), "Load Table"),
-        shiny::actionButton(ns("save_state_modal_trigger"), "Save Table As..."),
+        shiny::actionButton(ns("save_table_trigger"), "Save Table"),
         shiny::hr(),
         # UI for adding state with inline text input
         shiny::div(
@@ -33,7 +35,6 @@ states_ui <- function(id = "states_module") {
         DT::DTOutput(ns("state_table_display"))
       )
     )
-    # Removed uiOutput(ns("file_input_ui")) as it was a placeholder
   )
 }
 
@@ -88,7 +89,16 @@ states_server <- function(id = "states_module", main_state_rv, session) {
       # --- Reactive Values for the states module ---
       state_table <- shiny::reactiveVal(create_empty_state_table())
       undo_stack <- shiny::reactiveVal(list())
-      current_save_filename <- shiny::reactiveVal("mview_states_default.state")
+      current_save_filename <- shiny::reactiveVal("states1.mv")
+
+      # Ensure states directory exists
+      ensure_states_dir <- function() {
+        states_dir <- "states"
+        if (!dir.exists(states_dir)) {
+          dir.create(states_dir)
+        }
+        return(states_dir)
+      }
 
       # Observer for assembly selection changes
       observeEvent(input$assembly_select,
@@ -237,81 +247,105 @@ states_server <- function(id = "states_module", main_state_rv, session) {
 
       # --- File Load Operations ---
       observeEvent(input$load_state_table_modal_trigger, {
-        shiny::showModal(shiny::modalDialog(
-          title = "Load State Table",
-          shiny::fileInput(ns("load_file_input"), "Choose .state File", accept = c(".state")),
-          footer = shiny::tagList(
-            shiny::modalButton("Cancel"),
-            shiny::actionButton(ns("confirm_load_state_table"), "Load")
-          )
-        ))
-      })
-
-      observeEvent(input$confirm_load_state_table, {
-        req(input$load_file_input)
-        file_path <- input$load_file_input$datapath
-        tryCatch(
-          {
-            loaded_data <- readRDS(file_path)
-            if (!is.data.frame(loaded_data) ||
-              !all(c("ID", "Description", "Contigs", "Zoom", "Assembly", ".Contigs_Data", ".Zoom_Data", ".Assembly_Data") %in% names(loaded_data))) {
-              stop("Invalid state file format.")
+        states_dir <- ensure_states_dir()
+        file_path <- file.path(states_dir, current_save_filename())
+        if (file.exists(file_path)) {
+          tryCatch(
+            {
+              loaded_data <- readRDS(file_path)
+              if (!is.data.frame(loaded_data) ||
+                !all(c("ID", "Description", "Contigs", "Zoom", "Assembly", ".Contigs_Data", ".Zoom_Data", ".Assembly_Data") %in% names(loaded_data))) {
+                stop("Invalid state file format.")
+              }
+              state_table(loaded_data)
+              shiny::showNotification(paste("State table loaded from", current_save_filename()), type = "message")
+            },
+            error = function(e) {
+              shiny::showModal(shiny::modalDialog(
+                title = "Error Loading File",
+                paste("Could not load state table:", e$message),
+                footer = shiny::modalButton("OK")
+              ))
             }
-            state_table(loaded_data)
-            shiny::removeModal()
-            shiny::showNotification(paste("State table loaded from", basename(input$load_file_input$name)), type = "message")
-          },
-          error = function(e) {
-            shiny::removeModal()
-            shiny::showModal(shiny::modalDialog(
-              title = "Error Loading File",
-              paste("Could not load state table:", e$message),
-              footer = shiny::modalButton("OK")
-            ))
-          }
-        )
+          )
+        } else {
+          shiny::showModal(shiny::modalDialog(
+            title = "File Not Found",
+            paste("State table file", current_save_filename(), "not found in states directory."),
+            footer = shiny::modalButton("OK")
+          ))
+        }
       })
 
       # --- File Save Operations ---
-      observeEvent(input$save_state_modal_trigger, {
+      observeEvent(input$select_table_trigger, {
+        states_dir <- ensure_states_dir()
+        files <- list.files(states_dir, pattern = "\\.mv$", full.names = FALSE)
+        if (length(files) == 0) {
+          shiny::showModal(shiny::modalDialog(
+            title = "Select Table",
+            "No .mv files found in states directory.",
+            footer = shiny::modalButton("OK")
+          ))
+          return()
+        }
+
         shiny::showModal(shiny::modalDialog(
-          title = "Save State Table As...",
-          shiny::textInput(ns("save_filename_input"),
-            label = "Filename:",
-            value = isolate(current_save_filename())
+          title = "Select Table",
+          shiny::selectInput(ns("select_file_input"),
+            label = "Choose a file:",
+            choices = files,
+            selected = isolate(current_save_filename())
           ),
-          shiny::HTML("<p><small>The table will be saved to your browser's default download location. <br>Ensure the name ends with <code>.state</code> (it will be added if missing).</small></p>"),
+          shiny::HTML("<p><small>Select a file from the states directory</small></p>"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
-            shiny::downloadButton(ns("execute_save_from_modal"), "Save")
+            shiny::actionButton(ns("confirm_select_table"), "Select")
           ),
           easyClose = TRUE
         ))
       })
 
-      output$execute_save_from_modal <- shiny::downloadHandler(
-        filename = function() {
-          req(input$save_filename_input)
-          fname <- input$save_filename_input
-          if (is.null(fname) || trimws(fname) == "") {
-            fname <- "mview_states_unnamed.state"
-          }
-          if (!grepl("\\.state$", fname, ignore.case = TRUE)) {
-            fname <- paste0(fname, ".state")
-          }
-          current_save_filename(fname)
-          return(basename(fname))
-        },
-        content = function(file) {
-          tryCatch({
-            saveRDS(state_table(), file)
-            shiny::showNotification("State table saved.", type = "message")
-          }, error = function(e) {
+      observeEvent(input$confirm_select_table, {
+        req(input$select_file_input)
+        fname <- input$select_file_input
+        current_save_filename(fname)
+        shiny::updateTextInput(session, "states_file_input", value = fname)
+        shiny::removeModal()
+        shiny::showNotification(paste("Selected table:", fname), type = "message")
+      })
+
+      observeEvent(input$save_table_trigger, {
+        states_dir <- ensure_states_dir()
+        file_path <- file.path(states_dir, current_save_filename())
+        tryCatch(
+          {
+            saveRDS(state_table(), file_path)
+            shiny::showNotification(paste("State table saved to", current_save_filename()), type = "message")
+          },
+          error = function(e) {
             shiny::showNotification(paste("Error saving state table:", e$message), type = "error")
-          }, finally = {
-            shiny::removeModal()
-          })
-        }
+          }
+        )
+      })
+
+      # Save the current state table when file input changes
+      observeEvent(input$states_file_input,
+        {
+          states_dir <- ensure_states_dir()
+          file_path <- file.path(states_dir, input$states_file_input)
+          tryCatch(
+            {
+              saveRDS(state_table(), file_path)
+              current_save_filename(input$states_file_input)
+              shiny::showNotification("State table saved.", type = "message")
+            },
+            error = function(e) {
+              shiny::showNotification(paste("Error saving state table:", e$message), type = "error")
+            }
+          )
+        },
+        ignoreInit = TRUE
       )
 
       # --- Table Display ---
@@ -323,7 +357,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           display_table,
           rownames = FALSE,
           selection = "single",
-          options = list(pageLength = 5, lengthMenu = c(5, 10, 20))
+          options = list(pageLength = 15, lengthMenu = c(5, 10, 20))
         )
       })
 

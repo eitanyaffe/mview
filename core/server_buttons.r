@@ -45,13 +45,3 @@ observeEvent(input$removeContigsBtn, {
     addLog(paste("Del:", paste(removed_cids, collapse = ",")))
   }
 })
-
-
-# Help button shows keyboard shortcuts
-observeEvent(input$helpBtn, {
-  showModal(modalDialog(
-    title = "Help",
-    keyboard_summary(),
-    easyClose = TRUE
-  ))
-})

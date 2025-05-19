@@ -36,6 +36,10 @@ ui <- fluidPage(
       tabsetPanel(
         id = "mainTabs",
         tabPanel(
+          "States",
+          states_ui("states_module")
+        ),
+        tabPanel(
           "Contigs",
           actionButton("addContigsBtn", "Add selected contigs"),
           DTOutput("contigTable")
@@ -65,10 +69,6 @@ ui <- fluidPage(
         tabPanel(
           "Parameters",
           uiOutput("parameters_ui")
-        ),
-        tabPanel(
-          "States",
-          states_ui("states_module")
         )
       )
     )
