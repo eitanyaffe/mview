@@ -44,5 +44,6 @@ register_contig_map_f(function(assembly = NULL) {
   data.frame(contig = df$contig, gid = df$contig)
 })
 
-# Register views
-view_register("long_view", "views/long_view.r")
+# Register one or more views
+view_register("long_view1", "views/long_view1.r")
+view_register("long_view2", "views/long_view2.r")

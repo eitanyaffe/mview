@@ -16,6 +16,9 @@
 view_register <- function(id, filename) {
   stopifnot(is.character(id) && length(id) == 1 && nzchar(id))
   stopifnot(is.character(filename) && length(filename) == 1 && nzchar(filename))
+  if (!file.exists(filename)) {
+    stop(sprintf("view_register: file not found: %s", filename))
+  }
   .view_env$registered_views[[id]] <- list(id = id, filename = filename)
   cat(sprintf("registering view: %s, filename: %s\n", id, filename))
   invisible(NULL)
