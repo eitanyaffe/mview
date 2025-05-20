@@ -29,14 +29,14 @@ ui <- fluidPage(
       ),
       actionButton("clearLog", "Clear Log"),
       verbatimTextOutput("log"),
-      h4("Last Key Press"), # Label for the new output
-      verbatimTextOutput("last_key_output"), # New output for last key press
+      h4("Last Key Press"),
+      verbatimTextOutput("last_key_output"),
       actionButton("helpBtn", "Help")
     ),
     column(
       width = 10,
       uiOutput("viewSelect"),
-      uiOutput("profilePlots"), # Plot area with zoom brush
+      uiOutput("profilePlots"),
       hr(),
       tabsetPanel(
         id = "mainTabs",

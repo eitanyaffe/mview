@@ -31,8 +31,6 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
-  # print zoom range, number of contigs
-  cat(sprintf("zoom: %s, contigs: %s\n", jsonlite::toJSON(zoom), length(state_contigs)))
   list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly)
 }
 

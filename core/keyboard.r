@@ -20,6 +20,16 @@ keyboard_shortcuts <- list(
       # This will be implemented later
       print("Zoom to current region action triggered")
     }
+  ),
+  "Shift+z" = list(
+    description = "Update zoom from selected range",
+    type = "general",
+    action = function(states_module_output) {
+      # Get main_state_rv from the states module output
+      if (update_zoom_from_plotly(states_module_output$main_state_rv)) {
+        states_module_output$push_state()
+      }
+    }
   )
 )
 
