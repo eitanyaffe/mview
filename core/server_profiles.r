@@ -48,8 +48,6 @@ observe({
 
 # Handle plotly zoom/relayout events to update state$zoom
 observeEvent(eventExpr = plotly::event_data("plotly_relayout"), {
-  return()
-
   req(state$plotly_registered)
   event_data <- suppressWarnings(plotly::event_data("plotly_relayout"))
   req(event_data)
@@ -57,11 +55,11 @@ observeEvent(eventExpr = plotly::event_data("plotly_relayout"), {
   print(event_data)
   if (!is.null(event_data[["xaxis.range[0]"]]) && !is.null(event_data[["xaxis.range[1]"]])) {
     # Zoom event with defined range
-    new_zoom <- c(event_data[["xaxis.range[0]"]], event_data[["xaxis.range[1]"]])
-    # Check if zoom has actually changed to avoid infinite loops
-    if (!isTRUE(all.equal(state$zoom, new_zoom))) {
-      state$zoom <- new_zoom
-      cat(sprintf("zoom set by plotly: %.1f - %.1f\n", new_zoom[1], new_zoom[2]))
+    new_xlim <- c(event_data[["xaxis.range[0]"]], event_data[["xaxis.range[1]"]])
+    # Check if xlim has actually changed
+    if (!isTRUE(all.equal(state$current_xlim, new_xlim))) {
+      state$current_xlim <- new_xlim
+      cat(sprintf("current_xlim set by plotly: %.1f - %.1f\n", new_xlim[1], new_xlim[2]))
     }
   }
 })

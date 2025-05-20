@@ -17,6 +17,7 @@ get_server <- function() {
             input = input,
             output = output,
             session = session,
+            main_state_rv = state,
             states_module_output = states_module_output
         )
     }

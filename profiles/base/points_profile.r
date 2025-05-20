@@ -47,7 +47,7 @@ points_profile <- function(id, name, height = 1,
 
     # Prepare description for hover text
     if (!is.null(desc_col) && desc_col %in% names(df)) {
-      df$hover_text <- df[[desc_col]]
+      df$hover_text <- paste0(df[[desc_col]], ": ", df$gcoord, ", ", round(df[[y_col]], 2))
     } else {
       df$hover_text <- paste0(name, ": ", round(df[[y_col]], 2))
     }

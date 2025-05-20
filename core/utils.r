@@ -22,7 +22,22 @@ verify_color <- function(color_val, default_color = "black") {
   return(if (valid) color_val else default_color)
 }
 
-print_state <- function(state, title = "State") {
+format_bp <- function(bp) {
+  rr <- function(x) round(x, 1)
+  result <- ifelse(bp < 1000,
+    paste0(bp, " bp"),
+    ifelse(bp < 1000000,
+      paste0(rr(bp / 1000), " kb"),
+      ifelse(bp < 1000000000,
+        paste0(rr(bp / 1000000), " mb"),
+        paste0(rr(bp / 1000000000), " gb")
+      )
+    )
+  )
+  return(result)
+}
+
+print_state <- function(state, title = "State", show_title = TRUE) {
   # Format contig display based on count
   contig_display <- if (length(state$contigs) == 0) {
     "None"
@@ -42,7 +57,16 @@ print_state <- function(state, title = "State") {
   zoom_display <- if (is.null(state$zoom) || length(state$zoom) != 2) {
     "Full range"
   } else {
-    paste(state$zoom[1], "–", state$zoom[2])
+    dd <- round(state$zoom[2]) - round(state$zoom[1])
+    format_bp(dd)
   }
-  cat(title, ":", assembly_display, contig_display, zoom_display, "\n")
+  basic_info <- paste0(
+    "Subject: ", assembly_display, ", Contigs: ",
+    contig_display, ", Zoom: ", zoom_display
+  )
+  if (show_title) {
+    cat(title, ":", basic_info, "\n")
+  } else {
+    cat(basic_info, "\n")
+  }
 }

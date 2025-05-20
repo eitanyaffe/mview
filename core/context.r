@@ -1,8 +1,13 @@
 build_context <- function(state_contigs, contig_table, zoom, assembly) {
   req(state_contigs)
   req(contig_table)
-  valid_contigs <- intersect(state_contigs, contig_table$contig)
+  valid_contigs <- state_contigs[state_contigs %in% contig_table$contig]
+  if (length(valid_contigs) == 0) {
+    return(NULL)
+  }
+
   cdf <- contig_table[match(valid_contigs, contig_table$contig), ]
+
   if (nrow(cdf) == 0) {
     return(NULL)
   }
@@ -31,6 +36,7 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
+
   list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly)
 }
 
@@ -53,7 +59,7 @@ filter_coords <- function(df, cxt, xlim = NULL) {
   }
 
   # Add global coordinates
-  df$gcoord <- cxt$mapper$cdf$start + df$coord
+  df$gcoord <- cxt$mapper$l2g(df)
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {
@@ -86,8 +92,8 @@ filter_segments <- function(df, cxt, xlim = NULL) {
   }
 
   # Add global coordinates
-  df$gstart <- cxt$mapper$cdf$start + df$start
-  df$gend <- cxt$mapper$cdf$start + df$end
+  df$gstart <- cxt$mapper$l2g(df$start)
+  df$gend <- cxt$mapper$l2g(df$end)
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {

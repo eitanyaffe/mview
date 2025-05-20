@@ -15,6 +15,14 @@ ui <- fluidPage(
       background: #cccccc;
       cursor: ns-resize;
     }
+    .state-info-box {
+      border: 1px solid #ddd;
+      padding: 8px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-family: monospace;
+    }
   ")),
   fluidRow(
     column(
@@ -35,7 +43,10 @@ ui <- fluidPage(
     ),
     column(
       width = 10,
-      uiOutput("viewSelect"),
+      fluidRow(
+        column(width = 6, uiOutput("viewSelect")),
+        column(width = 6, div(class = "state-info-box", verbatimTextOutput("current_state_display")))
+      ),
       uiOutput("profilePlots"),
       hr(),
       tabsetPanel(

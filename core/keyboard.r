@@ -13,21 +13,24 @@ keyboard_shortcuts <- list(
     }
   ),
   "Shift+X" = list(
-    description = "Zoom to current region",
-    type = "general", # Added type for dispatch
-    action = function(states_module_output) {
-      # Code to zoom to current region
-      # This will be implemented later
-      print("Zoom to current region action triggered")
+    description = "Reset zoom to full range",
+    type = "zoom", # Changed from general to zoom type for direct state access
+    action = function(states_module_output, main_state_rv) {
+      states_module_output$push_state()
+      main_state_rv$zoom <- NULL
+      cat("zoom reset to NULL by Shift+X\n")
     }
   ),
-  "Shift+z" = list(
+  "Shift+Z" = list(
     description = "Update zoom from selected range",
-    type = "general",
-    action = function(states_module_output) {
-      # Get main_state_rv from the states module output
-      if (update_zoom_from_plotly(states_module_output$main_state_rv)) {
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      if (!is.null(main_state_rv$current_xlim)) {
         states_module_output$push_state()
+        main_state_rv$zoom <- main_state_rv$current_xlim
+        cat("Zoom updated by Shift+Z (main_state_rv accessed)\n")
+      } else {
+        cat("Shift+Z: main_state_rv or main_state_rv$current_xlim is null\n")
       }
     }
   )
@@ -83,7 +86,7 @@ keyboard_initialize <- function() {
 }
 
 # Server-side handler for keyboard shortcuts
-keyboard_server <- function(input, output, session, states_module_output) {
+keyboard_server <- function(input, output, session, main_state_rv, states_module_output) {
   # Create a reactive value to track keyboard events
   keyboard_events <- reactiveVal(0)
 
@@ -101,9 +104,13 @@ keyboard_server <- function(input, output, session, states_module_output) {
           # Dispatch action based on type
           if (!is.null(shortcut_details$type) && shortcut_details$type == "tab_switch") {
             shortcut_details$action(session) # Pass session for tab switching
-          } else {
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "general") {
             # Default for "general" type or if type is not specified
             shortcut_details$action(states_module_output)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "zoom") {
+            shortcut_details$action(states_module_output, main_state_rv)
+          } else {
+            cat("Unknown shortcut type:", shortcut_details$type, "\n")
           }
 
           keyboard_events(keyboard_events() + 1)

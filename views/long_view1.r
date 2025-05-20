@@ -7,7 +7,7 @@ get_contigs_f <- function(cxt) {
   if (is.null(df)) {
     return(NULL)
   }
-  data.frame(contig = df$contig, coord = df$length / 2, value = df$length, desc = df$contig)
+  data.frame(contig = df$contig, coord = df$length / 2, value = df$length, desc = paste0(df$contig, " (", format_bp(df$length), ")"))
 }
 
 ########################################################

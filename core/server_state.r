@@ -3,6 +3,7 @@
 state <- reactiveValues(
   contigs = character(),
   zoom = NULL,
+  current_xlim = NULL,
   assembly = get_assemblies()[1]
 )
 
@@ -43,4 +44,15 @@ output$contig_count <- renderUI({
     tags$div(style = "white-space: pre-wrap;", paste("  ", paste(state$contigs, collapse = ", "))),
     tags$div(style = "margin-top: 6px;", zoom_text)
   )
+})
+
+# Add a new output renderer for the current state display box
+output$current_state_display <- renderText({
+  # Capture output from print_state in a string
+  output_text <- capture.output({
+    print_state(state, show_title = FALSE)
+  })
+
+  # Return the captured output as a single string
+  paste(output_text, collapse = "\n")
 })
