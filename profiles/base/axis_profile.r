@@ -37,7 +37,7 @@ axis_profile <- function(id = "coord_axis",
     tick_labels_list <- list()
     contig_names_list <- list() # list to store contig name labels
 
-    for (i in 1:nrow(contig_df)) {
+    for (i in seq_len(nrow(contig_df))) {
       contig_info <- contig_df[i, ]
       # Adjust global start/end to be within the zoom window for drawing, but use original for local coord calculation
       draw_start <- max(contig_info$start, zoom_xlim[1])
@@ -63,7 +63,8 @@ axis_profile <- function(id = "coord_axis",
 
       if (length(tick_positions_global_visible) > 0) {
         # Determine a sensible tick height, e.g., based on a small fraction of the y-range or a fixed value
-        # Since y-range is not explicitly defined for axis, let's use a small absolute value or relative to x-axis range if dynamic
+        # Since y-range is not explicitly defined for axis,
+        # let's use a small absolute value or relative to x-axis range if dynamic
         # For simplicity, using a small fixed proportion of the x-axis zoom range. This might need adjustment.
         tick_height <- (zoom_xlim[2] - zoom_xlim[1]) * 0.005
         if (tick_height == 0) tick_height <- 0.1 # Prevent zero height if xlim range is tiny or zero
@@ -108,7 +109,7 @@ axis_profile <- function(id = "coord_axis",
     final_axis_lines_df <- if (length(axis_lines_list) > 0) do.call(rbind, axis_lines_list) else NULL
     final_tick_marks_df <- if (length(tick_marks_list) > 0) do.call(rbind, tick_marks_list) else NULL
     final_tick_labels_df <- if (length(tick_labels_list) > 0) do.call(rbind, tick_labels_list) else NULL
-    final_contig_names_df <- if (length(contig_names_list) > 0) do.call(rbind, contig_names_list) else NULL # Combine contig names
+    final_contig_names_df <- if (length(contig_names_list) > 0) do.call(rbind, contig_names_list) else NULL
 
     if (!is.null(final_axis_lines_df) && nrow(final_axis_lines_df) > 0) {
       gg <- gg + ggplot2::geom_segment(

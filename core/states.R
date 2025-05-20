@@ -23,7 +23,10 @@ states_ui <- function(id = "states_module") {
         # UI for adding state with inline text input
         shiny::div(
           style = "display: flex; align-items: center; margin-bottom: 10px;",
-          shiny::textInput(ns("add_state_description_input"), label = NULL, placeholder = "Enter state description", width = "300px"),
+          shiny::textInput(ns("add_state_description_input"),
+            label = NULL,
+            placeholder = "Enter state description", width = "300px"
+          ),
           shiny::actionButton(ns("confirm_add_state_from_input"), "Add Current State", style = "margin-left: 10px;")
         ),
         shiny::actionButton(ns("delete_state"), "Delete Selected State"),
@@ -121,9 +124,11 @@ states_server <- function(id = "states_module", main_state_rv, session) {
       observeEvent(main_state_rv$assembly,
         {
           current_selection <- shiny::isolate(input$assembly_select)
-          if (!is.null(main_state_rv$assembly) && main_state_rv$assembly != "" && main_state_rv$assembly != current_selection) {
+          if (!is.null(main_state_rv$assembly) && main_state_rv$assembly != "" &&
+            main_state_rv$assembly != current_selection) {
             shiny::updateSelectInput(session, "assembly_select", selected = main_state_rv$assembly)
-          } else if ((is.null(main_state_rv$assembly) || main_state_rv$assembly == "") && !is.null(current_selection) && current_selection != "") {
+          } else if ((is.null(main_state_rv$assembly) || main_state_rv$assembly == "") &&
+            !is.null(current_selection) && current_selection != "") {
             # If main state assembly becomes NULL (e.g. new table), clear selection
             shiny::updateSelectInput(session, "assembly_select", selected = "")
           }
@@ -208,13 +213,19 @@ states_server <- function(id = "states_module", main_state_rv, session) {
       observeEvent(input$delete_state, {
         selected_rows <- input$state_table_display_rows_selected
         if (length(selected_rows) == 0) {
-          shiny::showModal(shiny::modalDialog(title = "Delete State", "Please select a state to delete.", footer = shiny::modalButton("OK")))
+          shiny::showModal(shiny::modalDialog(
+            title = "Delete State",
+            "Please select a state to delete.", footer = shiny::modalButton("OK")
+          ))
           return()
         }
         row_to_delete_id <- state_table()[selected_rows[1], "ID"]
         shiny::showModal(shiny::modalDialog(
           title = "Delete State",
-          paste("Are you sure you want to delete state: ", state_table()[state_table()$ID == row_to_delete_id, "Description"], "?"),
+          paste("Are you sure you want to delete state: ", state_table()[
+            state_table()$ID == row_to_delete_id,
+            "Description"
+          ], "?"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
             shiny::actionButton(ns("confirm_delete_state"), "Delete")
@@ -236,7 +247,10 @@ states_server <- function(id = "states_module", main_state_rv, session) {
       observeEvent(input$goto_state, {
         selected_rows <- input$state_table_display_rows_selected
         if (length(selected_rows) == 0) {
-          shiny::showModal(shiny::modalDialog(title = "Go to State", "Please select a state to go to.", footer = shiny::modalButton("OK")))
+          shiny::showModal(shiny::modalDialog(
+            title = "Go to State", "Please select a state to go to.",
+            footer = shiny::modalButton("OK")
+          ))
           return()
         }
         push_state()
@@ -256,7 +270,10 @@ states_server <- function(id = "states_module", main_state_rv, session) {
             {
               loaded_data <- readRDS(file_path)
               if (!is.data.frame(loaded_data) ||
-                !all(c("ID", "Description", "Contigs", "Zoom", "Assembly", ".Contigs_Data", ".Zoom_Data", ".Assembly_Data") %in% names(loaded_data))) {
+                !all(c(
+                  "ID", "Description", "Contigs", "Zoom", "Assembly", ".Contigs_Data",
+                  ".Zoom_Data", ".Assembly_Data"
+                ) %in% names(loaded_data))) {
                 stop("Invalid state file format.")
               }
               state_table(loaded_data)

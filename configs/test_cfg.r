@@ -23,7 +23,7 @@ test_contigs_f <- function(N, M) {
 test_genomes_f <- function(contigs) {
   ss <- split(contigs, contigs$assembly)
   rr <- NULL
-  for (i in 1:length(ss)) {
+  for (i in seq_along(ss)) {
     rr <- rbind(rr, data.frame(
       gid = paste0("g", i),
       length = sum(ss[[i]]$length)
