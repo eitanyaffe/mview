@@ -41,11 +41,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
     alignments$hover_text <- paste0(
       "Read: ", alignments$read_id, "\n",
-      "Contig: ", alignments$contig_id, " (local 1-based): ",
       alignments$start, "-", alignments$end, "\n",
-      "Global (0-based): ", alignments$gstart, "-", alignments$gend, "\n",
-      "Mutations: ", alignments$mutation_count, "\n",
-      "Height: ", alignments$height
+      "Mutations: ", alignments$mutation_count
     )
 
     gg <- gg + ggplot2::geom_rect(
@@ -73,11 +70,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     # Add hover text for mutations
     mutations$hover_text <- paste0(
       "Read: ", mutations$read_id, "\n",
-      "Contig: ", mutations$contig_id, "\n",
       "Position: ", mutations$coord, "\n",
-      "Global: ", mutations$gcoord, "\n",
-      "Type: ", mutations$desc, "\n",
-      "Height: ", mutations$height
+      "Type: ", mutations$desc
     )
 
     # Plot vertical segments of length 1 instead of points

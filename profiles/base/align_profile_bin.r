@@ -15,7 +15,7 @@ get_current_bin_size <- function(xlim, bin_type) {
     return(100)
   }
 
-  target_bins <- 1000
+  target_bins <- 512
   raw_bin_size <- range_bp / target_bins
 
   if (raw_bin_size <= 10) {
@@ -27,14 +27,17 @@ get_current_bin_size <- function(xlim, bin_type) {
   if (raw_bin_size <= 1000) {
     return(1000)
   }
-
-  return(10000)
+  if (raw_bin_size <= 10000) {
+    return(10000)
+  }
+  return(100000)
 }
 
 align_query_bin_mode <- function(aln, cxt, bin_type) {
   bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type)
-  df <- aln_query_bin(aln, cxt$intervals, bin_size)
 
+  df <- aln_query_bin(aln, cxt$intervals, bin_size)
+  cat(sprintf("bin_size: %d, bin_count: %d\n", bin_size, nrow(df)))
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
     df$end <- df$end
@@ -49,7 +52,6 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }
-
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$read_count / df$length, 0)
   df$mut_density <- ifelse(df$length > 0, df$mutation_count / df$length, 0)

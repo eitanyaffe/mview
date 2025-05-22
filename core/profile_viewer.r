@@ -121,6 +121,6 @@ plot_profiles <- function(cxt) {
     xaxis = list(title = ""),
     margin = list(l = 50, r = 20, t = 30, b = 30) # Adjust margins as needed
   )
-
+  cat(sprintf("plotting done\n"))
   return(combined_plot)
 }

@@ -4,7 +4,7 @@
 align_profile <- function(id, name, height = 1,
                           aln_f = NULL,
                           bin_type = "auto",
-                          thresholds = list(full = 20000, pileup = 20000),
+                          thresholds = list(full = 100000, pileup = 100000),
                           params = list(),
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -32,10 +32,16 @@ align_profile <- function(id, name, height = 1,
   }
 
   plot_f <- function(profile, cxt, gg) {
+    # Check that intervals dataframe has at least one row
+    if (is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
+      warning("intervals dataframe is empty")
+      return(gg)
+    }
+
     aln <- if (is.function(aln_f)) aln_f(cxt) else aln_f
     if (is.null(aln) || !inherits(aln, "externalptr")) {
       warning(sprintf("align_profile '%s': Invalid AlignmentStore pointer.", name))
-      return(NULL)
+      return(gg)
     }
 
     mode <- get_display_mode(cxt$mapper$xlim, profile$thresholds)
@@ -55,9 +61,9 @@ align_profile <- function(id, name, height = 1,
   profile_create(
     id = id, name = name, type = "align", height = height,
     params = params, plot_f = plot_f,
+    auto_register = auto_register,
     aln_f = aln_f,
     bin_type = bin_type,
-    thresholds = thresholds,
-    auto_register = auto_register
+    thresholds = thresholds
   )
 }

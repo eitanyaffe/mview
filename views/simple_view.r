@@ -11,15 +11,27 @@ get_contigs_f <- function(cxt) {
 }
 
 ########################################################
+# Align code
+########################################################
+
+library(Rcpp)
+
+alntools_dir <- paste0(Sys.getenv("MAKESHIFT_ROOT"), "/tools/alntools/cpp")
+cdir <- ".Rcpp_dir"
+rebuild <- F
+sourceCpp(paste0(alntools_dir, "/aln_R.cpp"), verbose = T, cacheDir = cdir, rebuild = rebuild)
+
+########################################################
 # Register profiles
 ########################################################
 
-# Register a test points profile with minimal data
-points_profile(
-  id = "contig_length",
-  name = "Contig Length",
-  data = get_contigs_f,
-  params = list(color = list(type = "string", default = "red"))
+align_profile(
+  id = "aln_L1",
+  name = "Align L1",
+  aln_f = make_get_data_f(
+    id = "MINIMAP_LIB_ALN", tag = "BAM_L1",
+    read_f = aln_load
+  )
 )
 
 axis_profile()

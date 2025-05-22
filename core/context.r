@@ -1,8 +1,13 @@
-get_intervals <- function(cdf, zoom) {
+get_intervals <- function(mapper, zoom) {
+  cdf <- mapper$cdf
   if (!is.null(zoom)) {
     cdf <- cdf[cdf$start <= zoom[2] & cdf$end >= zoom[1], ]
+    cdf$start <- pmax(cdf$start, zoom[1])
+    cdf$end <- pmin(cdf$end, zoom[2])
   }
-  data.frame(contig = cdf$contig, start = cdf$start + 1, end = cdf$end + 1)
+  start_rr <- mapper$g2l(cdf$start + 1)
+  end_rr <- mapper$g2l(cdf$end)
+  rr <- data.frame(contig = cdf$contig, start = start_rr$coord, end = end_rr$coord)
 }
 
 build_context <- function(state_contigs, contig_table, zoom, assembly) {
@@ -45,7 +50,7 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
-  intervals <- get_intervals(cdf, zoom)
+  intervals <- get_intervals(mapper, zoom)
   list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly, intervals = intervals)
 }
 

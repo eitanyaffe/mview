@@ -70,3 +70,18 @@ print_state <- function(state, title = "State", show_title = TRUE) {
     cat(basic_info, "\n")
   }
 }
+
+# print intervals in a human readable format
+print_intervals <- function(intervals) {
+  if (is.null(intervals) || nrow(intervals) == 0) {
+    cat("no intervals\n")
+    return()
+  }
+
+  for (i in 1:nrow(intervals)) {
+    cat(sprintf(
+      "interval %d: contig=%s, start=%d, end=%d\n",
+      i, intervals$contig[i], intervals$start[i], intervals$end[i]
+    ))
+  }
+}
