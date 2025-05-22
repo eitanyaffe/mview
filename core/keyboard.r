@@ -84,6 +84,15 @@ keyboard_shortcuts <- list(
         cat("Shift+<: zoom is null, cannot move zoom area\n")
       }
     }
+  ),
+  "Shift+C" = list(
+    description = "Clear selected contigs",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      states_module_output$push_state()
+      main_state_rv$contigs <- character()
+      cat("cleared selected contigs by Shift+C\n")
+    }
   )
 )
 

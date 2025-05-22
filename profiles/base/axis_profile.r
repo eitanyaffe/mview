@@ -83,7 +83,7 @@ axis_profile <- function(id = "coord_axis",
         # Since y-range is not explicitly defined for axis,
         # let's use a small absolute value or relative to x-axis range if dynamic
         # For simplicity, using a small fixed proportion of the x-axis zoom range. This might need adjustment.
-        tick_height <- (zoom_xlim[2] - zoom_xlim[1]) * 0.005
+        tick_height <- (zoom_xlim[2] - zoom_xlim[1]) * 0.0025
         if (tick_height == 0) tick_height <- 0.1 # Prevent zero height if xlim range is tiny or zero
 
         # Tick mark segments
@@ -151,11 +151,20 @@ axis_profile <- function(id = "coord_axis",
     }
     # Add contig names to the plot
     if (!is.null(final_contig_names_df) && nrow(final_contig_names_df) > 0) {
+      # Calculate the minimum y value to determine proper ylim
+      min_y_value <- min(final_contig_names_df$y, na.rm = TRUE)
+      # Add padding to ensure text isn't clipped
+      padding_factor <- 1.5
+
       gg <- gg + ggplot2::geom_text(
         data = final_contig_names_df,
         ggplot2::aes(x = x, y = y, label = label),
         color = "black", size = 3.5, vjust = 1, fontface = "bold" # Adjust appearance as needed
-      )
+      ) +
+        # Set ylim to ensure enough space for labels
+        ggplot2::ylim(min_y_value * padding_factor, y_baseline) +
+        # Disable clipping to allow text to extend beyond plot boundaries
+        ggplot2::coord_cartesian(clip = "off")
     }
     return(gg)
   }
