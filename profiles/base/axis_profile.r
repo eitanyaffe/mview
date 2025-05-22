@@ -7,7 +7,7 @@
 #' @return Profile object
 axis_profile <- function(id = "coord_axis",
                          name = "coordinate axis",
-                         height = 0.5,
+                         height = 0.2,
                          attr = list(),
                          auto_register = TRUE) {
   # data_f: no data needed for axis

@@ -18,6 +18,7 @@ pre_plot <- function(cxt, profile) {
       axis.title.x = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_blank(),
       axis.ticks.x = ggplot2::element_blank(),
+      panel.background = ggplot2::element_rect(fill = "white", colour = "white"),
       plot.margin = ggplot2::margin(2, 2, 2, 2)
     )
   if (isTRUE(profile$attr$should_plot_grid)) {

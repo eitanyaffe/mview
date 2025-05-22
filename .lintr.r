@@ -5,5 +5,6 @@ linters <- linters_with_defaults(
     assignment_linter = NULL,
     object_usage_linter = NULL,
     object_name_linter = NULL,
-    return_linter = NULL
+    return_linter = NULL,
+    trailing_whitespace_linter = NULL
 )

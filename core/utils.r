@@ -54,10 +54,10 @@ print_state <- function(state, title = "State", show_title = TRUE) {
   }
 
   # Format zoom display based on available values
-  zoom_display <- if (is.null(state$zoom) || length(state$zoom) != 2) {
+  zoom_display <- if (is.null(state$current_xlim) || length(state$current_xlim) != 2) {
     "Full range"
   } else {
-    dd <- round(state$zoom[2]) - round(state$zoom[1])
+    dd <- round(state$current_xlim[2]) - round(state$current_xlim[1])
     format_bp(dd)
   }
   basic_info <- paste0(

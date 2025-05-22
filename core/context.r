@@ -1,3 +1,10 @@
+get_intervals <- function(cdf, zoom) {
+  if (!is.null(zoom)) {
+    cdf <- cdf[cdf$start <= zoom[2] & cdf$end >= zoom[1], ]
+  }
+  data.frame(contig = cdf$contig, start = cdf$start + 1, end = cdf$end + 1)
+}
+
 build_context <- function(state_contigs, contig_table, zoom, assembly) {
   req(state_contigs)
   req(contig_table)
@@ -19,25 +26,27 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
       if (any(ii <= 0 | ii > nrow(cdf))) stop("Some coordinate indices are out of range")
       data.frame(contig = cdf$contig[ii], coord = gcoords - cdf$start[ii], gcoord = gcoords)
     },
-    l2g = function(df) {
-      idx <- match(df$contig, cdf$contig)
+    l2g = function(contigs, coords) {
+      idx <- match(contigs, cdf$contig)
       if (any(is.na(idx))) {
         stop(sprintf(
           "Some contigs are not found in the contig table: %s",
-          paste(df$contig[is.na(idx)], collapse = ", ")
+          paste(contigs[is.na(idx)], collapse = ", ")
         ))
       }
-      cdf$start[idx] + df$coord
+      cdf$start[idx] + coords
     },
     cdf = cdf
   )
+
   if (!is.null(zoom)) {
     mapper$xlim <- range(zoom)
+    cdf <- cdf[cdf$start <= zoom[2] & cdf$end >= zoom[1], ]
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
-
-  list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly)
+  intervals <- get_intervals(cdf, zoom)
+  list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly, intervals = intervals)
 }
 
 # Safely filters point data and adds global coordinates
@@ -59,7 +68,7 @@ filter_coords <- function(df, cxt, xlim = NULL) {
   }
 
   # Add global coordinates
-  df$gcoord <- cxt$mapper$l2g(df)
+  df$gcoord <- cxt$mapper$l2g(df$contig, df$coord)
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {
@@ -92,8 +101,8 @@ filter_segments <- function(df, cxt, xlim = NULL) {
   }
 
   # Add global coordinates
-  df$gstart <- cxt$mapper$l2g(df$start)
-  df$gend <- cxt$mapper$l2g(df$end)
+  df$gstart <- cxt$mapper$l2g(df$contig, df$start)
+  df$gend <- cxt$mapper$l2g(df$contig, df$end)
 
   # Filter by xlim if provided
   if (!is.null(xlim)) {

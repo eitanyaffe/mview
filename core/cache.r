@@ -23,35 +23,32 @@ cache_clear <- function() {
 }
 
 # Get full key with project prefix
-get_full_key <- function(key) {
+make_full_key <- function(key) {
   paste0(g.project_id, "_", key)
 }
 
 # Check if a key exists in the cache
 cache_exists <- function(key) {
-  full_key <- get_full_key(key)
-  is.element(full_key, names(g.cache))
+  is.element(make_full_key(key), names(g.cache))
 }
 
 # Get a value from the cache
 cache_get <- function(key) {
-  full_key <- get_full_key(key)
   if (!cache_exists(key)) {
     stop(sprintf("key %s not found in cache\n", key))
   }
-  g.cache[[full_key]]
+  g.cache[[make_full_key(key)]]
 }
 
 # Set a value in the cache
 cache_set <- function(key, value) {
-  full_key <- get_full_key(key)
-  g.cache[[full_key]] <<- value
+  cat(sprintf("setting cache for key: %s\n", key))
+  g.cache[[make_full_key(key)]] <<- value
 }
 
 # Remove a value from the cache
 cache_unset <- function(key) {
-  full_key <- get_full_key(key)
-  g.cache[[full_key]] <<- NULL
+  g.cache[[make_full_key(key)]] <<- NULL
 }
 
 # Main cache function: evaluates expression or retrieves cached result
@@ -61,7 +58,7 @@ cache <- function(key, expr) {
   }
 
   # Evaluate the expression
-  result <- eval(expr)
+  result <- eval(substitute(expr), parent.frame())
 
   # Store in cache
   cache_set(key, result)

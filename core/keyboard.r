@@ -33,6 +33,23 @@ keyboard_shortcuts <- list(
         cat("Shift+Z: main_state_rv or main_state_rv$current_xlim is null\n")
       }
     }
+  ),
+  "Shift+_" = list(
+    description = "Zoom out (double the view range)",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      if (!is.null(main_state_rv$zoom)) {
+        states_module_output$push_state()
+        zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        main_state_rv$zoom <- c(
+          main_state_rv$zoom[1] - zoom_range * 0.5,
+          main_state_rv$zoom[2] + zoom_range * 0.5
+        )
+        cat("zoomed out by Shift+-\n")
+      } else {
+        cat("Shift+-: zoom is null, cannot zoom out\n")
+      }
+    }
   )
 )
 

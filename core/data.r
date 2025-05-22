@@ -49,31 +49,29 @@ get_data <- function(id, tag = "", read_f = read.delim) {
   }
 
   id <- if (tag != "") paste(id, tag, sep = ":") else id
-  cache_key <- paste0("DATA_", id)
+
+  # Check if ID exists in lookup table
+  if (!id %in% .data_env$lookups$id) {
+    stop(sprintf("data id not found: %s", id))
+  }
+
+  # Get path from lookup table
+  path <- .data_env$lookups$path[.data_env$lookups$id == id]
 
   # Use the cache module to load or retrieve from cache
-  cache(cache_key, {
-    # Check if ID exists in lookup table
-    if (!id %in% .data_env$lookups$id) {
-      return(NULL)
-    }
-
-    # Get path from lookup table
-    path <- .data_env$lookups$path[.data_env$lookups$id == id]
-
+  cache(path, {
     # Check if file exists
     if (!file.exists(path)) {
       stop(sprintf("data file not found: %s", path))
     }
-
-    # Load the data
-    read_f(path, stringsAsFactors = FALSE)
+    read_f(path)
   })
 }
 
-# List all data entries in cache with their sizes
-list_data <- function() {
-  cache_list(prefix = "DATA_")
+make_get_data_f <- function(id, tag = "", read_f = read.delim) {
+  function(cxt) {
+    get_data(id, tag, read_f)
+  }
 }
 
 # Clear data from cache
@@ -115,8 +113,6 @@ get_contigs <- function(assembly = NULL) {
   rr <- cache(key, {
     .data_env$register_contigs_f(assembly)
   })
-  # print number of rows
-  cat(sprintf("number of contigs: %d\n", nrow(rr)))
   rr
 }
 
