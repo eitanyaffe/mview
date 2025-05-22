@@ -64,6 +64,7 @@ get_data <- function(id, tag = "", read_f = read.delim) {
     if (!file.exists(path)) {
       stop(sprintf("data file not found: %s", path))
     }
+    cat(sprintf("reading %s data from %s\n", id, path))
     read_f(path)
   })
 }

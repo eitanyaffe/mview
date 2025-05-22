@@ -25,13 +25,22 @@ sourceCpp(paste0(alntools_dir, "/aln_R.cpp"), verbose = T, cacheDir = cdir, rebu
 # Register profiles
 ########################################################
 
-align_profile(
-  id = "aln_L1",
-  name = "Align L1",
-  aln_f = make_get_data_f(
-    id = "MINIMAP_LIB_ALN", tag = "BAM_L1",
-    read_f = aln_load
+get_map_tag <- function(assembly) {
+  switch(assembly,
+    "BAM" = "L1",
+    "EBP" = "L2",
+    "EBI" = "L9",
+    "EBC" = "L11"
   )
+}
+
+align_profile(
+  id = "align",
+  name = "Align",
+  aln_f = function(cxt) {
+    tag <- paste0(cxt$assembly, "_", get_map_tag(cxt$assembly))
+    get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
+  }
 )
 
 gene_profile(

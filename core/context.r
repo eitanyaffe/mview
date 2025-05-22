@@ -51,7 +51,7 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
     mapper$xlim <- range(cdf$start, cdf$end)
   }
   intervals <- get_intervals(mapper, zoom)
-  list(mapper = mapper, zoom = zoom, contigs = state_contigs, assembly = assembly, intervals = intervals)
+  list(mapper = mapper, zoom = zoom, contigs = valid_contigs, assembly = assembly, intervals = intervals)
 }
 
 # Safely filters point data and adds global coordinates

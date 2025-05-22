@@ -1,6 +1,6 @@
 gene_profile <- function(id, name, height = 0.1,
                          gene_f = NULL,
-                         threshold = 100000,
+                         threshold = 200000,
                          params = list(),
                          auto_register = TRUE) {
   # Determine display mode based on view range

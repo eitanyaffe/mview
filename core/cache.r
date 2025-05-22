@@ -42,7 +42,6 @@ cache_get <- function(key) {
 
 # Set a value in the cache
 cache_set <- function(key, value) {
-  cat(sprintf("setting cache for key: %s\n", key))
   g.cache[[make_full_key(key)]] <<- value
 }
 

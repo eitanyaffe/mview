@@ -22,7 +22,7 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   # Generate colors based on taxonomy
   if (!is.null(df$tax)) {
     # Get unique taxonomies and assign colors
-    unique_tax <- unique(df$tax)
+    unique_tax <- sort(unique(df$tax))
     color_palette <- grDevices::rainbow(length(unique_tax))
     tax_colors <- setNames(color_palette, unique_tax)
 
@@ -44,23 +44,25 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     # Simple mode - efficient rendering for large ranges
 
     # Sample genes if there are too many
-    if (nrow(df) > 1000) {
+    if (nrow(df) > 5000) {
       set.seed(42) # For consistent sampling
-      df <- df[sample(nrow(df), 1000), ]
-      cat("sampled to 1000 genes for efficiency\n")
+      df <- df[sample(nrow(df), 5000), ]
+      cat("sampled to 5000 genes for efficiency\n")
     }
 
     # Plot genes as simple horizontal lines without strand indicators
+    # draw genes as vertical segments with color based on taxonomy
     gg <- gg + ggplot2::geom_segment(
       data = df,
       ggplot2::aes(
-        x = gstart, xend = gend,
-        y = 0.5, yend = 0.5,
+        x = gstart, xend = gstart,
+        y = 0.45, yend = 0.55,
         color = tax,
         text = hover_text
       ),
       size = 3
     ) +
+      # scale_color_discrete maps taxonomy values to distinct colors
       ggplot2::scale_color_discrete(name = "Taxonomy") +
       ggplot2::theme(legend.position = "none")
   } else {
