@@ -1,6 +1,6 @@
 # Bin mode for alignment profile
 
-get_current_bin_size <- function(xlim, bin_type) {
+get_current_bin_size <- function(xlim, bin_type, target_bins = 1024) {
   if (bin_type != "auto") {
     bs <- as.numeric(bin_type)
     return(max(1, bs, na.rm = TRUE))
@@ -15,26 +15,15 @@ get_current_bin_size <- function(xlim, bin_type) {
     return(100)
   }
 
-  target_bins <- 512
+  # Calculate raw bin size to get close to target_bins
   raw_bin_size <- range_bp / target_bins
 
-  if (raw_bin_size <= 10) {
-    return(10)
-  }
-  if (raw_bin_size <= 100) {
-    return(100)
-  }
-  if (raw_bin_size <= 1000) {
-    return(1000)
-  }
-  if (raw_bin_size <= 10000) {
-    return(10000)
-  }
-  return(100000)
+  # Ensure minimum bin size of 1
+  return(max(1, round(raw_bin_size)))
 }
 
-align_query_bin_mode <- function(aln, cxt, bin_type) {
-  bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type)
+align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024) {
+  bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type, target_bins = target_bins)
 
   df <- aln_query_bin(aln, cxt$intervals, bin_size)
   cat(sprintf("bin_size: %d, bin_count: %d\n", bin_size, nrow(df)))
@@ -48,27 +37,27 @@ align_query_bin_mode <- function(aln, cxt, bin_type) {
 }
 
 align_profile_bin <- function(profile, cxt, aln, gg) {
-  df <- align_query_bin_mode(aln, cxt, profile$bin_type)
+  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins)
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$read_count / df$length, 0)
-  df$mut_density <- ifelse(df$length > 0, df$mutation_count / df$length, 0)
+  df$mut_density <- ifelse(df$read_count > 0, df$mutation_count / df$read_count, 0)
 
   # Calculate colors based on mutation density
-  max_density <- 0.01
-  intensity <- pmin(df$mut_density / max_density, 1.0)
-  intensity[is.na(intensity) | !is.finite(intensity)] <- 0
+  # Gray for 0 mutations per 100bp, red for 1 mutation per 100bp
+  mutations_per_100bp <- df$mut_density * 100
+  max_mutations_per_100bp <- 1.0
 
-  gray_rgb <- grDevices::col2rgb("lightgray") / 255
-  red_rgb <- grDevices::col2rgb("red") / 255
-
-  r_val <- gray_rgb[1, ] * (1 - intensity) + red_rgb[1, ] * intensity
-  g_val <- gray_rgb[2, ] * (1 - intensity) + red_rgb[2, ] * intensity
-  b_val <- gray_rgb[3, ] * (1 - intensity) + red_rgb[3, ] * intensity
-
-  df$fill_color <- grDevices::rgb(r_val, g_val, b_val)
+  # Use the general color scale function
+  df$fill_color <- get_color_scale(
+    values = mutations_per_100bp,
+    colors = c("lightgray", "red"),
+    min_val = 0,
+    max_val = max_mutations_per_100bp,
+    num_steps = 20
+  )
 
   # Hover text
   df$hover_text <- paste0(
@@ -87,8 +76,10 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
       xmin = gstart, xmax = gend,
       ymin = 0, ymax = cov,
       fill = fill_color, text = hover_text
-    ), size = 0.2
-  )
+    ), size = 0.2, color = NA
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::theme_minimal()
 
   return(gg)
 }

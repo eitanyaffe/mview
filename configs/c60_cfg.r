@@ -48,5 +48,5 @@ register_contig_map_f(function(assembly = NULL) {
 })
 
 # Register one or more views
-view_register("simple_view", "views/simple_view.r")
 view_register("full_view", "views/full_view.r")
+view_register("simple_view", "views/simple_view.r")

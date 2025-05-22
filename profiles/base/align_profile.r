@@ -5,6 +5,7 @@ align_profile <- function(id, name, height = 1,
                           aln_f = NULL,
                           bin_type = "auto",
                           thresholds = list(full = 100000, pileup = 100000),
+                          target_bins = 600,
                           params = list(),
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -64,6 +65,7 @@ align_profile <- function(id, name, height = 1,
     auto_register = auto_register,
     aln_f = aln_f,
     bin_type = bin_type,
-    thresholds = thresholds
+    thresholds = thresholds,
+    target_bins = target_bins
   )
 }

@@ -6,6 +6,7 @@ get_server <- function() {
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
+        source("core/server_genes.r", local = TRUE)
 
         states_module_output <- states_server(
             id = "states_module",
@@ -28,6 +29,7 @@ rl_core <- function(project_id) {
 
     # utils
     source("core/utils.r", local = FALSE)
+    source("core/plot_utils.r", local = FALSE)
 
     # cache
     source("core/cache.r", local = FALSE)

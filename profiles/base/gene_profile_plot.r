@@ -5,6 +5,10 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     return(gg)
   }
 
+  unique_tax <- cache(paste("gene_profile_unique_tax", cxt$assembly, sep = "_"), {
+    sort(unique(genes$tax))
+  })
+
   # Process genes for plotting
   df <- genes
   df$contig <- as.character(df$contig)
@@ -17,12 +21,16 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     return(gg)
   }
 
+  # clip so that genes are not plotted outside of the visible range
+  df$gstart <- pmax(df$gstart, cxt$mapper$xlim[1])
+  df$gend <- pmin(df$gend, cxt$mapper$xlim[2])
+
   cat(sprintf("plotting %d genes in %s mode\n", nrow(df), mode))
 
   # Generate colors based on taxonomy
   if (!is.null(df$tax)) {
     # Get unique taxonomies and assign colors
-    unique_tax <- sort(unique(df$tax))
+
     color_palette <- grDevices::rainbow(length(unique_tax))
     tax_colors <- setNames(color_palette, unique_tax)
 

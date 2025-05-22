@@ -112,7 +112,8 @@ get_contigs <- function(assembly = NULL) {
   key <- sprintf("global.contigs.%s", if (is.null(assembly)) "default" else assembly)
   cat(sprintf("getting contigs for assembly: %s\n", key))
   rr <- cache(key, {
-    .data_env$register_contigs_f(assembly)
+    df <- .data_env$register_contigs_f(assembly)
+    df <- df[order(df$length, decreasing = TRUE), ]
   })
   rr
 }

@@ -75,6 +75,15 @@ ui <- fluidPage(
           DTOutput("selectedTable")
         ),
         tabPanel(
+          "Genes",
+          div(
+            style = "margin-bottom: 10px;",
+            actionButton("showGeneDetailsBtn", "Show Details"),
+            actionButton("zoomToGeneBtn", "Zoom to Gene")
+          ),
+          DTOutput("genesTable")
+        ),
+        tabPanel(
           "Options",
           numericInput("log.length", "Max log messages:",
             value = 10,
