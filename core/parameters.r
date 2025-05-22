@@ -14,7 +14,8 @@ param_ui_trigger <- shiny::reactiveVal(0)
 #    - id (character): The unique ID for the parameter within its group.
 #    - type (character): "string", "integer", "double", "boolean".
 #    - default_value: The default value, matching the specified type.
-register_param <- function(group, id, type, default_value) {
+#    - choices: A vector of choices for select parameters.
+register_param <- function(group, id, type, default_value, choices = NULL) {
   cat(sprintf("register_param: %s_%s\n", group, id))
 
   param_key_registry <- paste0(group, "_", id) # Key for the param_registry
@@ -25,7 +26,7 @@ register_param <- function(group, id, type, default_value) {
   }
 
   # Validate type and default_value
-  if (!type %in% c("string", "integer", "double", "boolean")) {
+  if (!type %in% c("string", "integer", "double", "boolean", "select")) {
     stop(sprintf("invalid parameter type: %s for %s_%s", type, group, id))
   }
 
@@ -46,6 +47,7 @@ register_param <- function(group, id, type, default_value) {
     id = id,
     type = type,
     default_value = default_value,
+    choices = choices,
     reactive_accessor = current_rv,
     cache_key = param_key_cache
   )

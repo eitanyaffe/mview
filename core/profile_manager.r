@@ -97,7 +97,8 @@ profile_create <- function(
         group = id,
         id = param_id,
         type = param$type,
-        default_value = param$default
+        default_value = param$default,
+        choices = param$choices
       )
     }
   }

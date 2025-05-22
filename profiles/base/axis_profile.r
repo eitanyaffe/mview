@@ -7,9 +7,18 @@
 #' @return Profile object
 axis_profile <- function(id = "coord_axis",
                          name = "coordinate axis",
-                         height = 0.2,
+                         height = 0.1,
                          attr = list(),
                          auto_register = TRUE) {
+  # Set axis-specific attributes
+  axis_attr <- list(
+    hide_y_label = TRUE, # Hide y-label for axis profile
+    hide_y_ticks = TRUE # Hide y-ticks for axis profile
+  )
+
+  # Merge with user-provided attributes, keeping axis-specific overrides
+  attr <- c(axis_attr, attr)
+
   # data_f: no data needed for axis
   data_f <- function(cxt) {
     NULL
@@ -50,13 +59,21 @@ axis_profile <- function(id = "coord_axis",
         x = draw_start, y = y_baseline, xend = draw_end, yend = y_baseline
       )
 
-      # Generate ticks for local coordinates, but only draw those within the zoom window
-      # Base tick positions on the original contig length and start for correct local coordinates
-      tick_positions_local <- pretty(c(0, contig_length), n = 5) # n=5 is a suggestion, can be dynamic
-      tick_positions_local <- tick_positions_local[tick_positions_local >= 0 & tick_positions_local <= contig_length]
+      # Calculate local coordinates for the visible portion
+      local_start <- max(0, zoom_xlim[1] - contig_info$start)
+      local_end <- min(contig_length, zoom_xlim[2] - contig_info$start)
+
+      # Generate ticks based on the visible region in local coordinates
+      # Use more ticks for small regions to ensure visibility
+      n_ticks <- ifelse(local_end - local_start < 1000, 10, 5)
+      tick_positions_local <- pretty(c(local_start, local_end), n = n_ticks)
+      tick_positions_local <- tick_positions_local[tick_positions_local >= local_start &
+        tick_positions_local <= local_end]
+
+      # Convert back to global coordinates
       tick_positions_global <- contig_info$start + tick_positions_local
 
-      # Filter ticks to be within the draw_start and draw_end of the current contig segment
+      # Filter ticks to be within the draw_start and draw_end
       visible_ticks_idx <- tick_positions_global >= draw_start & tick_positions_global <= draw_end
       tick_positions_global_visible <- tick_positions_global[visible_ticks_idx]
       tick_positions_local_visible <- tick_positions_local[visible_ticks_idx]

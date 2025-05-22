@@ -55,6 +55,12 @@ output$parameters_ui <- renderUI({
           label = param$id,
           value = current_val
         ),
+        "select" = radioButtons(
+          inputId = input_id,
+          label = param$id,
+          choices = param$choices,
+          selected = current_val
+        ),
         # Default case
         shiny::p(paste("Unknown parameter type:", param$type))
       )
