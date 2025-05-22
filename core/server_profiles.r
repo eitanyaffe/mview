@@ -13,7 +13,7 @@ output$profilePlots <- renderUI({
   }
   plotlyOutput(
     outputId = "combined_plot",
-    height = "500px" # Adjust height as needed, or make dynamic
+    height = "800px" # Adjust height as needed, or make dynamic
   )
 })
 

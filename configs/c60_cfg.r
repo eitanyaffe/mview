@@ -13,6 +13,9 @@ set_lookup(fns)
 
 aids <- get_data("ASSEMBLY_TABLE")$ASSEMBLY_ID
 
+# Sort assembly IDs to prioritize EBC
+aids <- aids[order(aids != "EBC")]
+
 # Set assemblies (as a vector of string IDs)
 set_assemblies(aids)
 

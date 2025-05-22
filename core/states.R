@@ -81,7 +81,7 @@ states_server <- function(id = "states_module", main_state_rv, session) {
         if (is.null(zoom_vector) || length(zoom_vector) != 2) {
           return("Full range")
         }
-        return(paste(zoom_vector[1], "–", zoom_vector[2]))
+        return(paste(round(zoom_vector[1]), "–", round(zoom_vector[2])))
       }
 
       format_assembly_for_display <- function(assembly_value) {
@@ -347,25 +347,6 @@ states_server <- function(id = "states_module", main_state_rv, session) {
           }
         )
       })
-
-      # Save the current state table when file input changes
-      observeEvent(input$states_file_input,
-        {
-          states_dir <- ensure_states_dir()
-          file_path <- file.path(states_dir, input$states_file_input)
-          tryCatch(
-            {
-              saveRDS(state_table(), file_path)
-              current_save_filename(input$states_file_input)
-              shiny::showNotification("State table saved.", type = "message")
-            },
-            error = function(e) {
-              shiny::showNotification(paste("Error saving state table:", e$message), type = "error")
-            }
-          )
-        },
-        ignoreInit = TRUE
-      )
 
       # --- Table Display ---
       output$state_table_display <- DT::renderDT({

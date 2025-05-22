@@ -34,6 +34,7 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
     l2g = function(contigs, coords) {
       idx <- match(contigs, cdf$contig)
       if (any(is.na(idx))) {
+        browser()
         stop(sprintf(
           "Some contigs are not found in the contig table: %s",
           paste(contigs[is.na(idx)], collapse = ", ")

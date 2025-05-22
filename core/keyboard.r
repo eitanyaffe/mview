@@ -50,6 +50,40 @@ keyboard_shortcuts <- list(
         cat("Shift+-: zoom is null, cannot zoom out\n")
       }
     }
+  ),
+  "Shift+>" = list(
+    description = "Move zoom area one window to the right",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      if (!is.null(main_state_rv$zoom)) {
+        states_module_output$push_state()
+        zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        main_state_rv$zoom <- c(
+          main_state_rv$zoom[1] + zoom_range,
+          main_state_rv$zoom[2] + zoom_range
+        )
+        cat("moved zoom area right by Shift+>\n")
+      } else {
+        cat("Shift+>: zoom is null, cannot move zoom area\n")
+      }
+    }
+  ),
+  "Shift+<" = list(
+    description = "Move zoom area one window to the left",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      if (!is.null(main_state_rv$zoom)) {
+        states_module_output$push_state()
+        zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        main_state_rv$zoom <- c(
+          main_state_rv$zoom[1] - zoom_range,
+          main_state_rv$zoom[2] - zoom_range
+        )
+        cat("moved zoom area left by Shift+<\n")
+      } else {
+        cat("Shift+<: zoom is null, cannot move zoom area\n")
+      }
+    }
   )
 )
 

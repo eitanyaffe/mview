@@ -40,7 +40,8 @@ align_profile(
   aln_f = function(cxt) {
     tag <- paste0(cxt$assembly, "_", get_map_tag(cxt$assembly))
     get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
-  }
+  },
+  params = list(height_style = list(type = "string", default = "by_mutations"))
 )
 
 gene_profile(

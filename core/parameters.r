@@ -15,6 +15,8 @@ param_ui_trigger <- shiny::reactiveVal(0)
 #    - type (character): "string", "integer", "double", "boolean".
 #    - default_value: The default value, matching the specified type.
 register_param <- function(group, id, type, default_value) {
+  cat(sprintf("register_param: %s_%s\n", group, id))
+
   param_key_registry <- paste0(group, "_", id) # Key for the param_registry
   param_key_cache <- paste0("param_", group, "_", id) # Key for the cache module
 
