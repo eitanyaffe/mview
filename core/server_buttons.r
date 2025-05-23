@@ -23,6 +23,19 @@ observeEvent(input$addContigsBtn, {
   }
 })
 
+observeEvent(input$setContigsBtn, {
+  rows <- input$contigTable_rows_selected
+  if (length(rows) > 0) {
+    contigs_data <- get_contigs(state$assembly)
+    selected_contigs <- contigs_data$contig[rows]
+    if (!identical(selected_contigs, state$contigs)) {
+      states_module_output$push_state()
+      state$contigs <- selected_contigs
+      addLog(paste("Set:", paste(selected_contigs, collapse = ",")))
+    }
+  }
+})
+
 observeEvent(input$addGenomesBtn, {
   rows <- input$genomeTable_rows_selected
   if (length(rows) > 0) {

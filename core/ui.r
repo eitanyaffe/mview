@@ -58,6 +58,7 @@ ui <- fluidPage(
         tabPanel(
           "Contigs",
           actionButton("addContigsBtn", "Add selected contigs"),
+          actionButton("setContigsBtn", "Set selected contigs"),
           DTOutput("contigTable")
         ),
         tabPanel(

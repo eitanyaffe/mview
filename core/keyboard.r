@@ -12,13 +12,12 @@ keyboard_shortcuts <- list(
       states_module_output$undo_state()
     }
   ),
-  "Shift+X" = list(
+  "Shift+)" = list(
     description = "Reset zoom to full range",
     type = "zoom", # Changed from general to zoom type for direct state access
     action = function(states_module_output, main_state_rv) {
       states_module_output$push_state()
       main_state_rv$zoom <- NULL
-      cat("zoom reset to NULL by Shift+X\n")
     }
   ),
   "Shift+Z" = list(
@@ -28,9 +27,6 @@ keyboard_shortcuts <- list(
       if (!is.null(main_state_rv$current_xlim)) {
         states_module_output$push_state()
         main_state_rv$zoom <- main_state_rv$current_xlim
-        cat("Zoom updated by Shift+Z (main_state_rv accessed)\n")
-      } else {
-        cat("Shift+Z: main_state_rv or main_state_rv$current_xlim is null\n")
       }
     }
   ),
@@ -45,9 +41,6 @@ keyboard_shortcuts <- list(
           main_state_rv$zoom[1] - zoom_range * 0.5,
           main_state_rv$zoom[2] + zoom_range * 0.5
         )
-        cat("zoomed out by Shift+-\n")
-      } else {
-        cat("Shift+-: zoom is null, cannot zoom out\n")
       }
     }
   ),
@@ -62,9 +55,6 @@ keyboard_shortcuts <- list(
           main_state_rv$zoom[1] + zoom_range,
           main_state_rv$zoom[2] + zoom_range
         )
-        cat("moved zoom area right by Shift+>\n")
-      } else {
-        cat("Shift+>: zoom is null, cannot move zoom area\n")
       }
     }
   ),
