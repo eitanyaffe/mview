@@ -36,6 +36,9 @@ observe({
   # Register the relayout event for the plot so zoom events can be captured with the correct source ID
   if (!is.null(combined_plotly_obj)) {
     combined_plotly_obj <- plotly::event_register(combined_plotly_obj, "plotly_relayout")
+    # Register click for alignment details (source is implicitly the plot's outputId "combined_plot")
+    # combined_plotly_obj <- plotly::event_register(combined_plotly_obj, "plotly_selected")
+
     # add a reactive flag to indicate that the plotly object has been registered
     state$plotly_registered <- TRUE
   }

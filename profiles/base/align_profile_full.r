@@ -60,7 +60,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       ggplot2::aes(
         xmin = gstart, xmax = gend,
         ymin = rect_ymin, ymax = rect_ymax,
-        text = hover_text
+        text = hover_text,
+        key = read_id # Add key aesthetic
       ),
       fill = "lightgray", color = NA
     )
@@ -95,7 +96,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
   }
 
   # Plot mutations
-  if (!is.null(df$mutations) && nrow(df$mutations) > 0) {
+  if (!is.null(df$mutations) && nrow(df$mutations) > 0 && profile$plot_mutations) {
     cat(sprintf("plotting %d mutations\n", nrow(df$mutations)))
     mutations <- df$mutations
 

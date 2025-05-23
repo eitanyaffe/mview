@@ -4,7 +4,8 @@ state <- reactiveValues(
   contigs = character(),
   zoom = NULL,
   current_xlim = NULL,
-  assembly = get_assemblies()[1]
+  assembly = get_assemblies()[1],
+  clicked_read_alignments = NULL
 )
 
 log_messages <- reactiveVal(character())

@@ -85,6 +85,10 @@ ui <- fluidPage(
           DTOutput("genesTable")
         ),
         tabPanel(
+          "Alignments",
+          DTOutput("alignmentDetailsTable")
+        ),
+        tabPanel(
           "Options",
           numericInput("log.length", "Max log messages:",
             value = 10,

@@ -6,6 +6,7 @@ align_profile <- function(id, name, height = 1,
                           bin_type = "auto",
                           thresholds = list(full = 50000, pileup = 50000),
                           target_bins = 600,
+                          plot_mutations = TRUE,
                           params = list(),
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -40,6 +41,7 @@ align_profile <- function(id, name, height = 1,
     }
 
     aln <- if (is.function(aln_f)) aln_f(cxt) else aln_f
+    cache_set("aln_obj", aln)
     if (is.null(aln) || !inherits(aln, "externalptr")) {
       warning(sprintf("align_profile '%s': Invalid AlignmentStore pointer.", name))
       return(gg)
@@ -66,6 +68,7 @@ align_profile <- function(id, name, height = 1,
     aln_f = aln_f,
     bin_type = bin_type,
     thresholds = thresholds,
-    target_bins = target_bins
+    target_bins = target_bins,
+    plot_mutations = plot_mutations
   )
 }

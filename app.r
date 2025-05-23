@@ -7,6 +7,7 @@ get_server <- function() {
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
         source("core/server_genes.r", local = TRUE)
+        source("core/alignment_panel.r", local = TRUE)
 
         states_module_output <- states_server(
             id = "states_module",
