@@ -5,7 +5,7 @@ align_profile <- function(id, name, height = 1,
                           aln_f = NULL,
                           bin_type = "auto",
                           thresholds = list(full = 50000, pileup = 50000),
-                          target_bins = 600,
+                          target_bins = 400,
                           plot_mutations = TRUE,
                           params = list(),
                           auto_register = TRUE) {

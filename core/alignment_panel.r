@@ -2,7 +2,6 @@
 
 # Handle plotly click events from the combined plot to display alignment details
 observeEvent(eventExpr = plotly::event_data("plotly_click"), {
-  cat("plotly_click event detected\n")
   event_data <- plotly::event_data("plotly_click")
   req(event_data)
   req(event_data$key)

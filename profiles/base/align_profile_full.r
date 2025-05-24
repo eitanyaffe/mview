@@ -61,7 +61,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         xmin = gstart, xmax = gend,
         ymin = rect_ymin, ymax = rect_ymax,
         text = hover_text,
-        key = read_id # Add key aesthetic
+        key = read_id
       ),
       fill = "lightgray", color = NA
     )
@@ -74,7 +74,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         ggplot2::aes(
           x = gstart, xend = gstart,
           y = rect_ymin, yend = rect_ymax,
-          text = hover_text
+          text = hover_text,
+          key = read_id
         ),
         color = "black", size = 1
       )
@@ -88,7 +89,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         ggplot2::aes(
           x = gend, xend = gend,
           y = rect_ymin, yend = rect_ymax,
-          text = hover_text
+          text = hover_text,
+          key = read_id
         ),
         color = "black", size = 1
       )
@@ -119,8 +121,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       ggplot2::aes(
         x = gcoord, xend = gcoord,
         y = height, yend = height + 1,
-        color = desc,
-        text = hover_text
+        color = desc
       ),
       size = 0.5
     ) +

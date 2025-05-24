@@ -2,8 +2,11 @@
 # Register lookup files
 ########################################################
 
+project_name <- "pb4"
+# project_name <- "pb-pilot2"
+
 # search for files under MAKESHIFT_ROOT/export/long/pb4/
-dir <- paste(Sys.getenv("MAKESHIFT_ROOT"), "export", "long", "pb4", "default", sep = "/")
+dir <- paste(Sys.getenv("MAKESHIFT_ROOT"), "export", "long", project_name, "default", sep = "/")
 fns <- list.files(dir, full.names = TRUE, pattern = "*.txt")
 set_lookup(fns)
 
@@ -25,7 +28,7 @@ register_contigs_f(function(assembly = NULL) {
   if (is.null(df)) {
     return(NULL)
   }
-  data.frame(contig = df$contig, length = df$length)
+  data.frame(contig = df$contig, length = df$length, circular = df$circular)
 })
 
 # Register genomes function
