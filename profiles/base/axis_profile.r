@@ -95,7 +95,7 @@ axis_profile <- function(id = "coord_axis",
         # Tick labels
         tick_labels_list[[length(tick_labels_list) + 1]] <- data.frame(
           x = tick_positions_global_visible, y = y_baseline - tick_height * 2,
-          label = tick_positions_local_visible
+          label = format_bp(tick_positions_local_visible)
         )
       }
 
