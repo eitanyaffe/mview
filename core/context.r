@@ -47,7 +47,6 @@ build_context <- function(state_contigs, contig_table, zoom, assembly) {
 
   if (!is.null(zoom)) {
     mapper$xlim <- range(zoom)
-    cdf <- cdf[cdf$start <= zoom[2] & cdf$end >= zoom[1], ]
   } else {
     mapper$xlim <- range(cdf$start, cdf$end)
   }

@@ -8,14 +8,8 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
   }
 
   # Get contigs data and build context
-  contigs_data <- get_contigs(assembly)
-  if (is.null(contigs_data)) {
-    return(NULL)
-  }
-
-  # Build context for filtering
-  cxt <- build_context(contigs, contigs_data, zoom, assembly)
-  if (is.null(cxt)) {
+  contigs_table <- get_contigs(assembly)
+  if (is.null(contigs_table)) {
     return(NULL)
   }
 
@@ -52,6 +46,12 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
   genes$contig <- as.character(genes$contig)
   genes$start <- as.numeric(genes$start)
   genes$end <- as.numeric(genes$end)
+
+  # Build context for filtering
+  cxt <- build_context(contigs, contigs_table, zoom, assembly)
+  if (is.null(cxt)) {
+    return(NULL)
+  }
 
   # Filter to visible range using the context
   filtered_genes <- filter_segments(genes, cxt, cxt$mapper$xlim)
