@@ -119,6 +119,7 @@ plot_profiles <- function(cxt) {
     heights <- rep(1 / length(heights), length(heights))
   }
 
+  cat(sprintf("combining %d profiles using plotly\n", length(plotly_list)))
 
   # Combine plots
   # Need to handle the case where plotly_list is empty or has only one plot
@@ -136,6 +137,8 @@ plot_profiles <- function(cxt) {
   } else {
     return(NULL) # Should not happen if profiles list was not empty initially
   }
+
+  cat(sprintf("configuring combined plot\n"))
 
   # Configure the combined plot
   combined_plot <- plotly::layout(combined_plot,

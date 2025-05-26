@@ -45,6 +45,7 @@ observe({
 
   # Render the combined plot
   output$combined_plot <- renderPlotly({
+    cat(sprintf("rendering combined plot\n"))
     combined_plotly_obj
   })
 })
