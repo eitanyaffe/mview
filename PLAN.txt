@@ -1,0 +1,43 @@
+==========================
+=== A New module: tabs ===
+==========================
+
+1. add register_tab function
+register_tab=function(tab_id, tab_label, tab_code, ...)
+  example: register_tab(tab_id="genes", tab_label="Genes", tab_code="tabs/genet_tab.r", get_genes_f)
+
+2. go over registered tabs in ui and add tab
+
+3. go over registered tabs in server and source code
+
+4. custom tab variables can be used such as get_gene_f
+
+5. make tab for genes and alignment table
+
+======================
+=== Alignment gaps ===
+======================
+
+1. In alntools, create read_interval table that is the superset of all read alignments to the region
+
+2. Use the read_intervals to determine alignment heights
+
+3. add a gap table (type is insert or delete):
+ fields: read / contig / type / contig_start / contig_end / read_start / read_end
+ if type is insertion then the read has an extra sequence and contig_start == contig_end
+
+4. plot gaps
+
+====================================
+=== Alignment plotting efficieny ===
+====================================
+
+1. By default, plot only colors for alignments. Allow detailed mutations upon request
+
+2. Test pre-compute bins (10kb) for all assembly 
+
+==============================
+=== Documentation and test ===
+==============================
+
+Create basic README and simple test example with actual assembly (and genes)
