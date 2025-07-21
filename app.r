@@ -6,8 +6,10 @@ get_server <- function() {
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
-        source("core/server_genes.r", local = TRUE)
-        source("core/alignment_panel.r", local = TRUE)
+
+        # load tabs
+        load_tabs()
+        source("core/server_tabs.r", local = TRUE)
 
         states_module_output <- states_server(
             id = "states_module",
@@ -47,6 +49,9 @@ rl_core <- function(project_id) {
     # parameters
     source("core/parameters.r", local = FALSE)
 
+    # tabs system
+    source("core/tabs.r", local = FALSE)
+
     # state table
     source("core/states.R", local = FALSE)
 
@@ -62,6 +67,7 @@ rl_core <- function(project_id) {
     for (profile_file in profile_files) {
         source(profile_file, local = FALSE)
     }
+
 }
 
 rl <- function(project_id = "c60") {

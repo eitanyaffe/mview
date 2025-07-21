@@ -49,58 +49,7 @@ ui <- fluidPage(
       ),
       uiOutput("profilePlots"),
       hr(),
-      tabsetPanel(
-        id = "mainTabs",
-        tabPanel(
-          "States",
-          states_ui("states_module")
-        ),
-        tabPanel(
-          "Contigs",
-          actionButton("addContigsBtn", "Add selected contigs"),
-          actionButton("setContigsBtn", "Set selected contigs"),
-          DTOutput("contigTable")
-        ),
-        tabPanel(
-          "Genomes",
-          actionButton("addGenomesBtn", "Add contigs of selected genomes"),
-          DTOutput("genomeTable")
-        ),
-        tabPanel(
-          "Contig Map",
-          DTOutput("mapTable")
-        ),
-        tabPanel(
-          "Selected Contigs",
-          actionButton("removeContigsBtn", "Remove selected contigs"),
-          DTOutput("selectedTable")
-        ),
-        tabPanel(
-          "Genes",
-          div(
-            style = "margin-bottom: 10px;",
-            actionButton("showGeneDetailsBtn", "Show Details"),
-            actionButton("zoomToGeneBtn", "Zoom to Gene")
-          ),
-          DTOutput("genesTable")
-        ),
-        tabPanel(
-          "Alignments",
-          DTOutput("alignmentDetailsTable")
-        ),
-        tabPanel(
-          "Options",
-          numericInput("log.length", "Max log messages:",
-            value = 10,
-            min = 1,
-            max = 1000
-          )
-        ),
-        tabPanel(
-          "Parameters",
-          uiOutput("parameters_ui")
-        )
-      )
+      uiOutput("mainTabsPanel")
     )
   )
 )

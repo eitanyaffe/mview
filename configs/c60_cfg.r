@@ -53,3 +53,39 @@ register_contig_map_f(function(assembly = NULL) {
 # Register one or more views
 view_register("full_view", "views/full_view.r")
 view_register("simple_view", "views/simple_view.r")
+
+########################################################
+# Register tabs
+########################################################
+
+# genes tab with custom gene function
+get_genes_f <- function(cxt) {
+  cache(paste0(cxt$assembly, "_genes"), {
+    genes <- get_data("PRODIGAL_GENE_TABLE", tag = cxt$assembly)
+    uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = cxt$assembly)
+    ix <- match(genes$gene, uniref$gene)
+    fields <- c("uniref", "identity", "coverage", "evalue", "bitscore", "prot_desc", "tax", "uniref_count")
+    for (field in fields) {
+      # set default value based on field type
+      if (is.numeric(uniref[[field]])) {
+        genes[[field]] <- ifelse(is.na(ix), 0, uniref[[field]][ix])
+      } else {
+        genes[[field]] <- ifelse(is.na(ix), "none", uniref[[field]][ix])
+      }
+    }
+    genes
+  })
+}
+
+register_tab(
+  tab_id = "genes",
+  tab_label = "Genes", 
+  tab_code = "tabs/gene_tab.r",
+  get_genes_f = get_genes_f
+)
+
+register_tab(
+  tab_id = "alignments",
+  tab_label = "Alignments",
+  tab_code = "tabs/alignment_tab.r"
+)

@@ -4,7 +4,7 @@
 
 1. add register_tab function
 register_tab=function(tab_id, tab_label, tab_code, ...)
-  example: register_tab(tab_id="genes", tab_label="Genes", tab_code="tabs/genet_tab.r", get_genes_f)
+  example: register_tab(tab_id="genes", tab_label="Genes", tab_code="tabs/genes_tab.r", get_genes_f)
 
 2. go over registered tabs in ui and add tab
 

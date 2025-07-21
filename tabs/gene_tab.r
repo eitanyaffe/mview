@@ -1,40 +1,47 @@
 # ---- Gene Table Functions ----
 
-# Function to get genes for the current context (assembly, contigs, zoom)
+# get current tab configuration
+tab <- get_loaded_tab()
+
+# set the tab panel UI
+set_tab_panel_f(function() {
+  tabPanel(
+    "Genes",
+    div(
+      style = "margin-bottom: 10px;",
+      actionButton("showGeneDetailsBtn", "Show Details"),
+      actionButton("zoomToGeneBtn", "Zoom to Gene")
+    ),
+    DTOutput("genesTable")
+  )
+})
+
+# function to get genes for the current context (assembly, contigs, zoom)
 get_genes_for_context <- function(assembly, contigs, zoom) {
-  # Early return if no assembly or contigs
+  # early return if no assembly or contigs
   if (is.null(assembly) || length(contigs) == 0) {
     return(NULL)
   }
 
-  # Get contigs data and build context
+  # get contigs data and build context
   contigs_table <- get_contigs(assembly)
   if (is.null(contigs_table)) {
     return(NULL)
   }
 
-  # Get gene data for current assembly
-  genes <- cache(paste0(assembly, "_genes"), {
-    genes <- get_data("PRODIGAL_GENE_TABLE", tag = assembly)
-    uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = assembly)
-    ix <- match(genes$gene, uniref$gene)
-    fields <- c("uniref", "identity", "coverage", "evalue", "bitscore", "prot_desc", "tax", "uniref_count")
-    for (field in fields) {
-      # Set default value based on field type
-      if (is.numeric(uniref[[field]])) {
-        genes[[field]] <- ifelse(is.na(ix), 0, uniref[[field]][ix])
-      } else {
-        genes[[field]] <- ifelse(is.na(ix), "none", uniref[[field]][ix])
-      }
-    }
-    genes
-  })
+  if (is.null(tab$get_genes_f)) {
+    stop("get_genes_f is not defined for tab ", tab$tab_id)
+  }
+  # get gene data using the tab's gene function if provided
+  cxt <- build_context(contigs, contigs_table, zoom, assembly)
+  if (is.null(cxt)) return(NULL)
+  genes <- tab$get_genes_f(cxt)
 
   if (is.null(genes) || nrow(genes) == 0) {
     return(NULL)
   }
 
-  # Ensure required columns exist
+  # ensure required columns exist
   required_cols <- c("contig", "start", "end")
   missing_cols <- required_cols[!required_cols %in% names(genes)]
   if (length(missing_cols) > 0) {
@@ -42,21 +49,21 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
     return(NULL)
   }
 
-  # Process genes for filtering
+  # process genes for filtering
   genes$contig <- as.character(genes$contig)
   genes$start <- as.numeric(genes$start)
   genes$end <- as.numeric(genes$end)
 
-  # Build context for filtering
+  # build context for filtering
   cxt <- build_context(contigs, contigs_table, zoom, assembly)
   if (is.null(cxt)) {
     return(NULL)
   }
 
-  # Filter to visible range using the context
+  # filter to visible range using the context
   filtered_genes <- filter_segments(genes, cxt, cxt$mapper$xlim)
 
-  # Verify we have the expected columns after filtering
+  # verify we have the expected columns after filtering
   if (!is.null(filtered_genes)) {
     expected_cols <- c("gstart", "gend")
     missing_after_filter <- expected_cols[!expected_cols %in% names(filtered_genes)]
