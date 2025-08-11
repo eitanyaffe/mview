@@ -1,13 +1,13 @@
 # Server-side logic for parameter UI and observation
 
-# Create UI tab for parameters
-output$parameters_ui <- renderUI({
+# Create UI for parameter tabs in right panel
+output$parameter_tabs_ui <- renderUI({
   param_ui_trigger() # Establish reactive dependency on the counter
 
   all_params <- get_registered_parameters()
 
   if (length(all_params) == 0) {
-    return(shiny::tagList(shiny::p("No parameters registered.")))
+    return(NULL) # Display nothing if no parameters
   }
 
   # Group parameters for UI organization
@@ -22,8 +22,8 @@ output$parameters_ui <- renderUI({
     grouped_params[[group]][[param$id]] <- param
   }
 
-  # Create UI elements for each group
-  ui_elements <- lapply(names(grouped_params), function(group_name) {
+  # Create tab panels for each group
+  tab_panels <- lapply(names(grouped_params), function(group_name) {
     group_params <- grouped_params[[group_name]]
 
     # Create inputs for each parameter in this group
@@ -68,17 +68,21 @@ output$parameters_ui <- renderUI({
       return(input_element)
     })
 
-    # Create a section for this group
-    shiny::div(
-      shiny::h4(group_name),
-      param_inputs,
-      shiny::hr()
+    # Create a tab panel for this group
+    shiny::tabPanel(
+      title = group_name,
+      shiny::div(
+        class = "parameter-group-content",
+        param_inputs
+      )
     )
   })
 
-  # Return all UI elements
-  return(shiny::tagList(ui_elements))
+  # Create tabset panel with all parameter groups
+  do.call(shiny::tabsetPanel, c(list(id = "parameterTabs"), tab_panels))
 })
+
+
 
 # Observe parameter inputs and update values
 observe({
@@ -102,4 +106,29 @@ observe({
       ignoreInit = TRUE
     )
   })
+})
+
+# Server logic for collapsible parameter panel
+parameter_panel_collapsed <- reactiveVal(FALSE)
+
+observeEvent(input$toggleParameterPanel, {
+  current_state <- parameter_panel_collapsed()
+  parameter_panel_collapsed(!current_state)
+  
+  # toggle CSS classes and update button icon
+  if (!current_state) {
+    # collapsing
+    shinyjs::addClass(id = "parameter-panel", class = "collapsed")
+    shinyjs::addClass(id = "parameter-panel-column", class = "collapsed")
+    shinyjs::addClass(id = "profile-plots-column", class = "expanded")
+    shinyjs::html(id = "toggleParameterPanel", 
+                  html = '<i class="fa fa-chevron-right"></i>')
+  } else {
+    # expanding
+    shinyjs::removeClass(id = "parameter-panel", class = "collapsed")
+    shinyjs::removeClass(id = "parameter-panel-column", class = "collapsed")
+    shinyjs::removeClass(id = "profile-plots-column", class = "expanded")
+    shinyjs::html(id = "toggleParameterPanel", 
+                  html = '<i class="fa fa-chevron-left"></i>')
+  }
 })

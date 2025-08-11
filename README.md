@@ -1,3 +1,3 @@
 ## Prerequisites
 
-Install R packages: `shiny`, `DT`, `plotly`, `shinyjqui`
+Install R packages: `shiny`, `DT`, `plotly`, `shinyjqui`, `shinyjs`

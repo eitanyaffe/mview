@@ -56,12 +56,12 @@ register_contig_map_f(function(assembly = NULL) {
 ########################################################
 
 view_file <- "configs/c60/c60_main_view.r"
-view_register("aln_early", view_file, timepoints = c("early"))
-view_register("aln_pre", view_file, timepoints = c("pre"))
-view_register("aln_post", view_file, timepoints = c("post"))
-view_register("aln_late", view_file, timepoints = c("late"))
-view_register("aln_pre_post", view_file, timepoints = c("pre", "post"))
-view_register("aln_all", view_file, timepoints = c("early", "pre", "post", "late"))
+view_register("early", view_file, timepoints = c("early"))
+view_register("pre", view_file, timepoints = c("pre"))
+view_register("post", view_file, timepoints = c("post"))
+view_register("late", view_file, timepoints = c("late"))
+view_register("pre vs. post", view_file, timepoints = c("pre", "post"))
+view_register("all", view_file, timepoints = c("early", "pre", "post", "late"))
 
 ########################################################
 # register gene tab
