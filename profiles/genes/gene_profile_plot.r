@@ -1,5 +1,56 @@
 # gene profile plot function
 
+# Helper function to classify and color genes based on profile settings
+classify_and_color_genes <- function(df, profile, unique_tax) {
+
+  # Handle coloring based on color_style
+  if (profile$color_style == "by_regex") {
+      # Initialize group assignment
+    df$group <- NA
+      
+    # Check each gene against regex patterns
+    for (group_name in names(profile$select_groups)) {
+      patterns <- profile$select_groups[[group_name]]
+        
+      for (pattern in patterns) {
+        # Find genes matching this pattern that haven't been assigned yet
+        matches <- grepl(pattern, df$prot_desc, ignore.case = TRUE) & is.na(df$group)
+        df$group[matches] <- group_name
+      }
+    }
+      
+    # Filter to only keep genes that matched a pattern
+    df <- df[!is.na(df$group), , drop = FALSE]
+      
+    if (nrow(df) == 0) {
+      return(list(df = df, filtered_out = TRUE))
+    }
+
+    # Assign colors based on select_colors
+    if (is.null(profile$select_colors)) {
+        cat("no select_colors provided, skipping rainbow colors\n")
+        return(list(df = df, filtered_out = TRUE))
+    }
+    scolors = unlist(profile$select_colors)
+    ix = match(df$group, names(profile$select_groups))
+    df$color <- scolors[ix]
+    
+  } else if (profile$color_style == "by_taxonomy") {
+    # Default taxonomy-based coloring
+    if (is.null(df$tax)) {
+      cat("warning: no tax provided\n")
+      return(list(df = df, filtered_out = TRUE))
+    }
+    ucolors = rainbow(length(unique_tax))
+    # Assign colors to genes
+    df$color <- ucolors[match(df$tax, unique_tax)]
+  } else {
+    df$color <- "steelblue"
+  }
+  
+  return(list(df = df, filtered_out = FALSE))
+}
+
 plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   if (is.null(genes) || nrow(genes) == 0) {
     return(gg)
@@ -25,21 +76,16 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   df$gstart <- pmax(df$gstart, cxt$mapper$xlim[1])
   df$gend <- pmin(df$gend, cxt$mapper$xlim[2])
 
-  cat(sprintf("plotting %d genes in %s mode\n", nrow(df), mode))
-
-  # Generate colors based on taxonomy
-  if (!is.null(df$tax)) {
-    # Get unique taxonomies and assign colors
-
-    color_palette <- grDevices::rainbow(length(unique_tax))
-    tax_colors <- setNames(color_palette, unique_tax)
-
-    # Assign colors to genes
-    df$color <- tax_colors[df$tax]
-  } else {
-    # Default color if taxonomy not available
-    df$color <- "steelblue"
+  # Classify and color genes
+  classification_result <- classify_and_color_genes(df, profile, unique_tax)
+  df <- classification_result$df
+  
+  # Return if all genes were filtered out
+  if (classification_result$filtered_out || nrow(df) == 0) {
+    return(gg)
   }
+
+  cat(sprintf("plotting %d genes in %s mode\n", nrow(df), mode))
 
   # Create hover text
   df$hover_text <- paste0(
@@ -59,19 +105,18 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     }
 
     # Plot genes as simple horizontal lines without strand indicators
-    # draw genes as vertical segments with color based on taxonomy
+    # draw genes as vertical segments with color based on grouping variable
     gg <- gg + ggplot2::geom_segment(
       data = df,
       ggplot2::aes(
         x = gstart, xend = gstart,
         y = 0.45, yend = 0.55,
-        color = tax,
+        color = .data$color,
         text = hover_text
       ),
-      size = 3
+      size = 0.5
     ) +
-      # scale_color_discrete maps taxonomy values to distinct colors
-      ggplot2::scale_color_discrete(name = "Taxonomy") +
+      ggplot2::scale_color_discrete(name = "Group") +
       ggplot2::theme(legend.position = "none")
   } else {
     # Full mode - detailed view for zoomed in ranges
@@ -86,13 +131,11 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
       ggplot2::aes(
         xmin = gstart, xmax = gend,
         ymin = rect_ymin, ymax = rect_ymax,
-        fill = tax,
+        fill = I(color),
         text = hover_text
       ),
-      color = NA,
       size = 0.5
     ) +
-      ggplot2::scale_fill_discrete(name = "Taxonomy") +
       ggplot2::theme(legend.position = "none")
 
     # Create data for promoter indicators

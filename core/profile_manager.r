@@ -11,15 +11,17 @@
 # global list of registered views
 .view_env <- new.env(parent = emptyenv())
 .view_env$registered_views <- list()
+.view_env$current_view <- NULL
 
 # register a view with id and filename
-view_register <- function(id, filename) {
+view_register <- function(id, filename, ...) {
   stopifnot(is.character(id) && length(id) == 1 && nzchar(id))
   stopifnot(is.character(filename) && length(filename) == 1 && nzchar(filename))
   if (!file.exists(filename)) {
     stop(sprintf("view_register: file not found: %s", filename))
   }
-  .view_env$registered_views[[id]] <- list(id = id, filename = filename)
+  params <- list(...)
+  .view_env$registered_views[[id]] <- list(id = id, filename = filename, params = params)
   cat(sprintf("registering view: %s, filename: %s\n", id, filename))
   invisible(NULL)
 }
@@ -34,6 +36,7 @@ set_view <- function(id) {
   profiles_clear_all()
   clear_parameters(clear_cache = FALSE)
 
+  .view_env$current_view <- views[[id]]
   view_file <- views[[id]]$filename
   cat(sprintf("Sourcing view file: %s\n", view_file))
   # source the view file to register its profiles
@@ -47,6 +50,28 @@ set_view <- function(id) {
 
 get_view_ids <- function() {
   names(.view_env$registered_views)
+}
+
+# return the current view parameters list
+get_current_view_parameters <- function() {
+  if (is.null(.view_env$current_view)) {
+    return(list())
+  }
+  params <- .view_env$current_view$params
+  if (is.null(params)) {
+    return(list())
+  }
+  params
+}
+
+# return a specific parameter for the current view
+get_current_view_parameter <- function(id) {
+  stopifnot(is.character(id) && length(id) == 1 && nzchar(id))
+  params <- get_current_view_parameters()
+  if (!(id %in% names(params))) {
+    stop(sprintf("get_current_view_parameter: parameter '%s' not defined for current view", id))
+  }
+  params[[id]]
 }
 
 # ---- Profile Creation ----
@@ -93,8 +118,9 @@ profile_create <- function(
     for (i in seq_along(params)) {
       param_id <- names(params)[i]
       param <- params[[i]]
+      group_id <- if (is.null(param$group_id)) id else param$group_id
       register_param(
-        group = id,
+        group = group_id,
         id = param_id,
         type = param$type,
         default_value = param$default,

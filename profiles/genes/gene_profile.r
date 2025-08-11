@@ -1,5 +1,8 @@
 gene_profile <- function(id, name, height = 0.1,
                          gene_f = NULL,
+                         color_style = "by_taxonomy",
+                         select_groups = NULL,
+                         select_colors = NULL,
                          threshold = 200000,
                          params = list(),
                          auto_register = TRUE) {
@@ -34,6 +37,9 @@ gene_profile <- function(id, name, height = 0.1,
     params = params, plot_f = plot_f,
     threshold = threshold,
     gene_f = gene_f,
+    color_style = color_style,
+    select_groups = select_groups,
+    select_colors = select_colors,
     auto_register = auto_register
   )
 }

@@ -1,0 +1,2 @@
+id  path
+ASSEMBLY_TABLE examples/assembly_table.txt

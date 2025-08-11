@@ -2,16 +2,17 @@
 # Register lookup files
 ########################################################
 
-project_name <- "pb4"
+# project_name <- "pb4"
+project_name <- "pb-b20"
 # project_name <- "pb-pilot2"
 
-# search for files under MAKESHIFT_ROOT/export/long/pb4/
+# search for lookup files under MAKESHIFT_ROOT/export/long/pb4/
 dir <- paste(Sys.getenv("MAKESHIFT_ROOT"), "export", "long", project_name, "default", sep = "/")
 fns <- list.files(dir, full.names = TRUE, pattern = "*.txt")
 set_lookup(fns)
 
 ########################################################
-# Register functions
+# Register assemblies, genomes and contigs
 ########################################################
 
 aids <- get_data("ASSEMBLY_TABLE")$ASSEMBLY_ID
@@ -50,15 +51,23 @@ register_contig_map_f(function(assembly = NULL) {
   data.frame(contig = df$contig, gid = df$contig)
 })
 
-# Register one or more views
-view_register("full_view", "views/full_view.r")
-view_register("simple_view", "views/simple_view.r")
-
 ########################################################
-# Register tabs
+# register views
 ########################################################
 
-# genes tab with custom gene function
+view_file <- "configs/c60/c60_main_view.r"
+view_register("aln_early", view_file, timepoints = c("early"))
+view_register("aln_pre", view_file, timepoints = c("pre"))
+view_register("aln_post", view_file, timepoints = c("post"))
+view_register("aln_late", view_file, timepoints = c("late"))
+view_register("aln_pre_post", view_file, timepoints = c("pre", "post"))
+view_register("aln_all", view_file, timepoints = c("early", "pre", "post", "late"))
+
+########################################################
+# register gene tab
+########################################################
+
+# get_genes_f used by gene profile and the gene tab
 get_genes_f <- function(cxt) {
   cache(paste0(cxt$assembly, "_genes"), {
     genes <- get_data("PRODIGAL_GENE_TABLE", tag = cxt$assembly)
@@ -83,6 +92,10 @@ register_tab(
   tab_code = "tabs/gene_tab.r",
   get_genes_f = get_genes_f
 )
+
+########################################################
+# register alignment tab
+########################################################
 
 register_tab(
   tab_id = "alignments",

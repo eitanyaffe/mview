@@ -22,8 +22,8 @@ verify_color <- function(color_val, default_color = "black") {
   return(if (valid) color_val else default_color)
 }
 
-format_bp <- function(bp) {
-  rr <- function(x) round(x, 1)
+format_bp <- function(bp, digits = 1) {
+  rr <- function(x) round(x, digits)
   result <- ifelse(bp < 1000,
     paste0(bp, " bp"),
     ifelse(bp < 1000000,

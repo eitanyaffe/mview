@@ -30,11 +30,6 @@ register_tab <- function(tab_id, tab_label, tab_code, ...) {
   invisible(NULL)
 }
 
-# Get the currently loading tab (for use within tab code files)
-get_loaded_tab <- function() {
-  .tabs_env$current_loading_tab
-}
-
 # Set the tab panel function for the currently loading tab
 set_tab_panel_f <- function(tab_panel_f) {
   current_tab <- .tabs_env$current_loading_tab
@@ -51,6 +46,18 @@ set_tab_panel_f <- function(tab_panel_f) {
 # Get all registered tabs
 get_registered_tabs <- function() {
   .tabs_env$registered_tabs
+}
+
+# Get a specific tab by its ID
+get_tab_by_id <- function(tab_id) {
+  stopifnot(is.character(tab_id) && length(tab_id) == 1 && nzchar(tab_id))
+  
+  tabs <- .tabs_env$registered_tabs
+  if (tab_id %in% names(tabs)) {
+    return(tabs[[tab_id]])
+  }
+  
+  NULL
 }
 
 # Load all registered tab code files

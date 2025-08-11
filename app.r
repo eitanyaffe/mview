@@ -75,7 +75,7 @@ rl <- function(project_id = "c60") {
     rl_core(project_id = "c60")
 
     # load specific config
-    cfg_file <- paste0("configs/", project_id, "_cfg.r")
+    cfg_file <- paste0("configs/", project_id, "/", project_id, "_cfg.r")
     source(cfg_file, local = FALSE)
 
     # shiny app

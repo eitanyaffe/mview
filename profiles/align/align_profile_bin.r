@@ -7,7 +7,7 @@ get_current_bin_size <- function(xlim, bin_type, target_bins = 1024) {
   }
 
   if (is.null(xlim) || length(xlim) != 2) {
-    return(1000)
+    return(500)
   }
 
   range_bp <- (xlim[2] + 1) - xlim[1]
@@ -50,14 +50,8 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   mutations_per_100bp <- df$mut_density * 100
   max_mutations_per_100bp <- 1.0
 
-  # Use the general color scale function
-  df$fill_color <- get_color_scale(
-    values = mutations_per_100bp,
-    colors = c("lightgray", "red"),
-    min_val = 0,
-    max_val = max_mutations_per_100bp,
-    num_steps = 20
-  )
+  # Use the shared mutation color function
+  df$fill_color <- get_mutation_colors(mutations_per_100bp)
 
   # Hover text
   df$hover_text <- paste0(

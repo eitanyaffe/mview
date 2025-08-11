@@ -1,8 +1,5 @@
 # ---- Gene Table Functions ----
 
-# get current tab configuration
-tab <- get_loaded_tab()
-
 # set the tab panel UI
 set_tab_panel_f(function() {
   tabPanel(
@@ -29,6 +26,7 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
     return(NULL)
   }
 
+  tab <- get_tab_by_id("genes")
   if (is.null(tab$get_genes_f)) {
     stop("get_genes_f is not defined for tab ", tab$tab_id)
   }

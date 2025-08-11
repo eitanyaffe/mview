@@ -1,8 +1,5 @@
 # ---- Alignment Tab Functions ----
 
-# get current tab configuration
-tab <- get_loaded_tab()
-
 # set the tab panel UI
 set_tab_panel_f(function() {
   tabPanel(
@@ -18,12 +15,18 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
   event_data <- plotly::event_data("plotly_click")
   req(event_data)
   req(event_data$key)
-
+  
+  # !!!
+  # reads = cache_get("alns")
+  # read_ids <- unique(reads$read_id)
   read_ids <- event_data$key[[1]]
+
+  # !!! we have multiple alignments, we need to get the correct one
   aln <- cache_get("aln_obj")
   cat(sprintf("read_ids: %s\n", paste(read_ids, collapse = ", ")))
 
   df <- aln_alignments_from_read_ids(aln, read_ids)
+  
   if (!is.null(df) && nrow(df) > 0) {
     state$clicked_read_alignments <- df
   } else {

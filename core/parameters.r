@@ -22,12 +22,12 @@ register_param <- function(group, id, type, default_value, choices = NULL) {
   param_key_cache <- paste0("param_", group, "_", id) # Key for the cache module
 
   if (is.element(param_key_registry, names(param_registry))) {
-    stop(sprintf("parameter %s in group %s already registered.", id, group))
+    cat(sprintf("parameter %s in group %s already registered.", id, group))
   }
 
   # Validate type and default_value
   if (!type %in% c("string", "integer", "double", "boolean", "select")) {
-    stop(sprintf("invalid parameter type: %s for %s_%s", type, group, id))
+    stop(sprintf("invalid parameter type: %s for %s_%s, allowed types are: string, integer, double, boolean, select", type, group, id))
   }
 
   # Create the reactive value for this parameter
