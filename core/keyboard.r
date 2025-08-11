@@ -181,7 +181,7 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
 
   # Output for the last key pressed
   output$last_key_output <- renderText({
-    paste("Pressed:", input$key_pressed)
+    paste(input$key_pressed, " ")
   })
 
   return(list(

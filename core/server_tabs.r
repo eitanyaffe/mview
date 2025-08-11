@@ -31,11 +31,7 @@ output$mainTabsPanel <- renderUI({
     ),
     tabPanel(
       "Options",
-      numericInput("log.length", "Max log messages:",
-        value = 10,
-        min = 1,
-        max = 1000
-      )
+      p("No options currently available.")
     )
   )
   

@@ -18,7 +18,7 @@ observeEvent(input$addContigsBtn, {
     if (length(new_contigs) > 0) {
       states_module_output$push_state()
       state$contigs <- c(state$contigs, new_contigs)
-      addLog(paste("Add:", paste(new_contigs, collapse = ",")))
+  
     }
   }
 })
@@ -31,7 +31,7 @@ observeEvent(input$setContigsBtn, {
     if (!identical(selected_contigs, state$contigs)) {
       states_module_output$push_state()
       state$contigs <- selected_contigs
-      addLog(paste("Set:", paste(selected_contigs, collapse = ",")))
+  
     }
   }
 })
@@ -47,7 +47,7 @@ observeEvent(input$addGenomesBtn, {
     if (length(new_contigs) > 0) {
       states_module_output$push_state()
       state$contigs <- c(state$contigs, new_contigs)
-      addLog(paste("From genome:", paste(selected_gids, collapse = ",")))
+  
     }
   }
 })
@@ -59,6 +59,6 @@ observeEvent(input$removeContigsBtn, {
   if (length(removed_contigs) > 0) {
     states_module_output$push_state()
     state$contigs <- setdiff(state$contigs, removed_contigs)
-    addLog(paste("Del:", paste(removed_contigs, collapse = ",")))
+
   }
 })

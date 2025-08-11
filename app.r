@@ -67,7 +67,6 @@ rl_core <- function(project_id) {
     for (profile_file in profile_files) {
         source(profile_file, local = FALSE)
     }
-
 }
 
 rl <- function(project_id = "c60") {

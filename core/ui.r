@@ -107,17 +107,15 @@ ui <- fluidPage(
         width = "100%"
       ),
       uiOutput("viewSelect"),
-      actionButton("clearLog", "Clear Log"),
-      verbatimTextOutput("log"),
+      h4("Basic Info"),
+      verbatimTextOutput("basic_info"),
       h4("Last Key Press"),
       verbatimTextOutput("last_key_output"),
       actionButton("helpBtn", "Help")
     ),
     column(
       width = 10,
-      fluidRow(
-        column(width = 12, div(class = "state-info-box", verbatimTextOutput("current_state_display")))
-      ),
+
       # Profile plots area with collapsible parameter panel
       fluidRow(
         column(

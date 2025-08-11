@@ -210,9 +210,7 @@ observeEvent(input$zoomToGeneBtn, {
       state$zoom <- c(
         selected_gene$gstart - padding,
         selected_gene$gend + padding
-      )
-
-      addLog(paste("zoomed to gene:", selected_gene$gene))
+      )      
     }
   }
 })

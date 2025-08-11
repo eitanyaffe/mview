@@ -8,21 +8,23 @@ state <- reactiveValues(
   clicked_read_alignments = NULL
 )
 
-log_messages <- reactiveVal(character())
+# Basic info output with same font as top state display
+output$basic_info <- renderText({
+  assembly_text <- if (is.null(state$assembly) || state$assembly == "") {
+    "Assembly: none selected"
+  } else {
+    sprintf("Assembly: %s", state$assembly)
+  }
 
-addLog <- function(msg) {
-  n <- input$log.length
-  if (is.null(n) || n <= 0) n <- 20
-  current <- log_messages()
-  log_messages(c(msg, head(current, n - 1)))
-}
+  contig_len = length(state$contigs)
+  contig_text <- sprintf("Contigs: n=%d", contig_len)
+  
+  contig_list <- if (contig_len > 0 && contig_len <= 10) {
+    paste(paste(" ", state$contigs, collapse = "\n"))
+  }
 
-output$log <- renderText({
-  paste(rev(log_messages()), collapse = "\n")
-})
-
-observeEvent(input$clearLog, {
-  log_messages(character())
+  # Combine all text with newlines
+  paste(c(assembly_text, contig_text, contig_list), collapse = "\n")
 })
 
 output$contig_count <- renderUI({
