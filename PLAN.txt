@@ -41,3 +41,6 @@ register_tab=function(tab_id, tab_label, tab_code, ...)
 ==============================
 
 Create basic README and simple test example with actual assembly (and genes)
+
+cat `find /makeshift-mnt/output/minimap/v1.08/map-hifi/lib/BAH -name align.paf` | grep -P '\t(ctg1212|ctg3177|ctg520|ctg6585|ctg4261|ctg4393|ctg2302|ctg5193|ctg6760|ctg5008)\t' > /tmp/BAH.paf
+cat `find /makeshift-mnt/output/minimap/v1.08/map-hifi/lib/BAA -name align.paf` | grep -P '\t(ctg965|ctg2477|ctg1325|ctg1360|ctg404|ctg923|ctg1331|ctg986|ctg1956|ctg1384)\t' > /tmp/BAA.paf

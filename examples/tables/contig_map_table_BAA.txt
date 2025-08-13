@@ -1,0 +1,11 @@
+contig	gid
+ctg965	BAA_genome1
+ctg2477	BAA_genome1
+ctg1325	BAA_genome1
+ctg965	BAA_genome2
+ctg2477	BAA_genome2
+ctg1325	BAA_genome2
+ctg1360	BAA_genome2
+ctg404	BAA_genome2
+ctg923	BAA_genome2
+ctg1331	BAA_genome2

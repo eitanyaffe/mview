@@ -185,6 +185,9 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     }
   }
 
+  # baseline at y=0
+  gg <- gg + ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
+
   # Plot mutations
   if (!is.null(df$mutations) && nrow(df$mutations) > 0 && profile$full_style == "show_mutations") {
     cat(sprintf("plotting %d mutations\n", nrow(df$mutations)))

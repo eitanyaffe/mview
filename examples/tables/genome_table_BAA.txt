@@ -1,0 +1,3 @@
+gid	length
+BAA_genome1	30171
+BAA_genome2	70639

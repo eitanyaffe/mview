@@ -1,0 +1,11 @@
+contig	gid
+ctg1212	BAH_genome1
+ctg3177	BAH_genome1
+ctg520	BAH_genome1
+ctg1212	BAH_genome2
+ctg3177	BAH_genome2
+ctg520	BAH_genome2
+ctg6585	BAH_genome2
+ctg4261	BAH_genome2
+ctg4393	BAH_genome2
+ctg2302	BAH_genome2

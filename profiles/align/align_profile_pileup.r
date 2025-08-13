@@ -19,5 +19,7 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }
+  # baseline at y=0
+  gg <- gg + ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
   return(gg)
 }

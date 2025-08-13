@@ -90,7 +90,7 @@ get_current_view_parameter <- function(id) {
 #' @return A profile object (list).
 profile_create <- function(
     id, name, type, height,
-    attr = list(), params = list(), plot_f = NULL, auto_register = FALSE, ...) {
+    attr = list(), params = list(), plot_f = NULL, get_annotations = NULL, auto_register = FALSE, ...) {
   # Basic validation
   stopifnot(
     is.character(id) && length(id) == 1 && nzchar(id),
@@ -100,6 +100,11 @@ profile_create <- function(
     is.list(attr),
     is.function(plot_f)
   )
+  
+  # Validate height is specified in pixels (positive integer)
+  if (height <= 0) {
+    stop(sprintf("profile_create: height must be > 0 pixels, got: %s", height))
+  }
 
   cat(sprintf("registering profile: %s\n", id))
   profile <- list(
@@ -109,6 +114,7 @@ profile_create <- function(
     height = height,
     attr = attr,
     plot_f = plot_f,
+    get_annotations = get_annotations,
     params = params,
     ...
   )

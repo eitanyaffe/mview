@@ -34,7 +34,7 @@ register_contigs_f(function(assembly = NULL) {
 
 # Register genomes function
 register_genomes_f(function(assembly = NULL) {
-  df <- get_data("ASSEMBLY_GENOME_TABLE", tag = assembly)
+  df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
   if (is.null(df)) {
     return(NULL)
   }

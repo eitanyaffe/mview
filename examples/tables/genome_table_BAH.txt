@@ -1,0 +1,3 @@
+gid	length
+BAH_genome1	30195
+BAH_genome2	70664

@@ -1,11 +1,48 @@
 # ---- State and Logging Management ----
 
+# Get mouse coordinate info for display
+get_mouse_info <- function(state) {
+  if (is.null(state$mouse_coords)) {
+    return(NULL)
+  }
+  
+  plot_x <- state$mouse_coords$plot_x
+  plot_y <- state$mouse_coords$plot_y
+  
+  if (is.null(plot_x) || is.null(plot_y)) {
+    return(NULL)
+  }
+  
+  # build context for coordinate mapping
+  cxt <- build_context(
+    state_contigs = state$contigs,
+    contig_table = get_contigs(state$assembly),
+    zoom = state$zoom,
+    assembly = state$assembly
+  )
+  
+  if (is.null(cxt) || is.null(cxt$mapper)) {
+    return(sprintf("plot(%.1f,%.1f)", plot_x, plot_y))
+  }
+  
+  # convert to contig coordinates
+  tryCatch({
+    local_info <- cxt$mapper$g2l(plot_x)
+    sprintf("%s: %d", 
+            local_info$contig[1], 
+            round(local_info$coord[1]))
+  }, error = function(e) {
+    sprintf("out of range, y:%.1f", plot_y)
+  })
+}
+
 state <- reactiveValues(
   contigs = character(),
   zoom = NULL,
   current_xlim = NULL,
   assembly = get_assemblies()[1],
-  clicked_read_alignments = NULL
+  clicked_read_alignments = NULL,
+  mouse_coords = NULL
 )
 
 # Basic info output with same font as top state display
@@ -16,15 +53,50 @@ output$basic_info <- renderText({
     sprintf("Assembly: %s", state$assembly)
   }
 
-  contig_len = length(state$contigs)
-  contig_text <- sprintf("Contigs: n=%d", contig_len)
-  
-  contig_list <- if (contig_len > 0 && contig_len <= 10) {
-    paste(paste(" ", state$contigs, collapse = "\n"))
+  # zoom region information
+  zoom_info <- if (is.null(state$zoom)) {
+    "Zoom: full range"
+  } else {
+    window_size <- round(state$zoom[2]) - round(state$zoom[1])
+    window_size_text <- format_bp(window_size)
+    cxt <- build_context(
+      state_contigs = state$contigs,
+      contig_table = get_contigs(state$assembly),
+      zoom = state$zoom,
+      assembly = state$assembly)
+    
+    if (!is.null(cxt) && !is.null(cxt$mapper)) {
+      # find which contigs are covered by zoom using mapper$cdf
+      cdf <- cxt$mapper$cdf
+      zoom_contigs <- cdf[cdf$start < state$zoom[2] & cdf$end > state$zoom[1], ]
+      
+      if (nrow(zoom_contigs) > 1) {
+        zoom_text <- "Zoom: multiple contigs"
+      } else if (nrow(zoom_contigs) == 1) {
+        # single contig - convert to local coordinates
+        contig_name <- zoom_contigs$contig[1]
+        contig_start <- zoom_contigs$start[1]
+        local_start <- round(state$zoom[1] - contig_start) + 1
+        local_end <- round(state$zoom[2] - contig_start)
+        zoom_text <- sprintf("%s: %d-%d", contig_name, local_start, local_end)
+      } else {
+        zoom_text <- sprintf("global: %d – %d", round(state$zoom[1]), round(state$zoom[2]))
+      }
+    } else {
+      zoom_text <- sprintf("global: %d – %d", round(state$zoom[1]), round(state$zoom[2]))
+    }
+    
+    c(zoom_text, sprintf("Range: %s", window_size_text))
   }
 
-  # Combine all text with newlines
-  paste(c(assembly_text, contig_text, contig_list), collapse = "\n")
+  mouse_info <- get_mouse_info(state)
+  
+  # combine all text with newlines, excluding NULL mouse_info
+  info_parts <- c(assembly_text, zoom_info)
+  if (!is.null(mouse_info)) {
+    info_parts <- c(info_parts, mouse_info)
+  }
+  paste(info_parts, collapse = "\n")
 })
 
 output$contig_count <- renderUI({

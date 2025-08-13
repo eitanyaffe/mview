@@ -9,7 +9,65 @@ ui <- fluidPage(
   titlePanel("mview"),
   useShinyjs(), # Enable shinyjs functionality
   tags$head(
-    keyboard_initialize() # Add the keyboard event listener
+    keyboard_initialize(), # Add the keyboard event listener
+    tags$script(HTML("
+      $(document).ready(function() {
+        var plotContainer = null;
+        var hoverTimeout = null;
+        var HOVER_DELAY = 30;
+        
+        function findPlotContainer() {
+          return $('#combined_plot').find('.plotly').first();
+        }
+        
+        function getPlotCoords(mouseX, mouseY) {
+          if (!plotContainer || !plotContainer.length) return null;
+          
+          var plotOffset = plotContainer.offset();
+          var plotWidth = plotContainer.width();
+          var plotHeight = plotContainer.height();
+          var relX = mouseX - plotOffset.left;
+          var relY = mouseY - plotOffset.top;
+          
+          if (relX < 0 || relX > plotWidth || relY < 0 || relY > plotHeight) {
+            return null;
+          }
+          
+          return {
+            x: mouseX,
+            y: mouseY,
+            plotX: relX,
+            plotY: relY,
+            plotWidth: plotWidth,
+            plotHeight: plotHeight
+          };
+        }
+        
+        function updateMouseCoords(e) {
+          if (!plotContainer) plotContainer = findPlotContainer();
+          
+          var coords = getPlotCoords(e.pageX, e.pageY);
+          Shiny.setInputValue('mouse_coords', coords, {priority: 'event'});
+        }
+        
+        $(document).on('mousemove', function(e) {
+          if (hoverTimeout) clearTimeout(hoverTimeout);
+          hoverTimeout = setTimeout(function() { updateMouseCoords(e); }, HOVER_DELAY);
+        });
+        
+        $(document).on('mouseleave', function() {
+          if (hoverTimeout) clearTimeout(hoverTimeout);
+        });
+        
+        $(document).on('shiny:value', function(event) {
+          if (event.target.id === 'combined_plot') {
+            plotContainer = null;
+            if (hoverTimeout) clearTimeout(hoverTimeout);
+            setTimeout(function() { plotContainer = findPlotContainer(); }, 100);
+          }
+        });
+      });
+    "))
   ),
   tags$style(HTML("
     .ui-resizable-s {
@@ -98,18 +156,17 @@ ui <- fluidPage(
   fluidRow(
     column(
       width = 2,
-      h4("State"),
       uiOutput("state_info"),
-      shiny::selectInput("states_module-assembly_select", "Select Assembly:",
+      shiny::selectInput("states_module-assembly_select", "Assembly:",
         choices = get_assemblies(),
         selected = get_assemblies()[1],
         multiple = FALSE,
         width = "100%"
       ),
       uiOutput("viewSelect"),
-      h4("Basic Info"),
+      h5("Info"),
       verbatimTextOutput("basic_info"),
-      h4("Last Key Press"),
+      h5("Last Key Press"),
       verbatimTextOutput("last_key_output"),
       actionButton("helpBtn", "Help")
     ),
@@ -119,12 +176,12 @@ ui <- fluidPage(
       # Profile plots area with collapsible parameter panel
       fluidRow(
         column(
-          width = 8,
+          width = 10,
           id = "profile-plots-column",
           uiOutput("profilePlots")
         ),
         column(
-          width = 4,
+          width = 2,
           id = "parameter-panel-column",
           div(
             id = "parameter-panel",

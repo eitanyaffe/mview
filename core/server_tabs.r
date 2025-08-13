@@ -31,7 +31,24 @@ output$mainTabsPanel <- renderUI({
     ),
     tabPanel(
       "Options",
-      p("No options currently available.")
+      h4("Plot Height Settings"),
+      numericInput(
+        inputId = "min_plot_height",
+        label = "Minimum total plot height (px)",
+        value = 200,
+        min = 100,
+        max = 1000,
+        step = 50
+      ),
+      numericInput(
+        inputId = "max_plot_height", 
+        label = "Maximum total plot height (px)",
+        value = 1200,
+        min = 500,
+        max = 3000,
+        step = 100
+      ),
+      p("These settings control the minimum and maximum allowed height for the combined profile plots.")
     )
   )
   

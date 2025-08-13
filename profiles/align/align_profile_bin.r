@@ -73,7 +73,10 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
     ), size = 0.2, color = NA
   ) +
     ggplot2::scale_fill_identity() +
-    ggplot2::theme_minimal()
+    ggplot2::theme_minimal() +
+    ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
 
+  # disable hover for bin profile
+  attr(gg, "disable_hover") <- TRUE
   return(gg)
 }

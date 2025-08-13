@@ -11,9 +11,21 @@ output$profilePlots <- renderUI({
   if (length(profiles) == 0) {
     return(NULL)
   }
+  
+  # Calculate total height from profile heights
+  total_height <- sum(sapply(profiles, function(p) p$height))
+  if (total_height <= 0) {
+    total_height <- 200  # Default fallback
+  }
+  
+  # Apply min/max constraints from options
+  min_height <- if (!is.null(input$min_plot_height)) input$min_plot_height else 200
+  max_height <- if (!is.null(input$max_plot_height)) input$max_plot_height else 1200
+  total_height <- max(min_height, min(max_height, total_height))
+  cat(sprintf("total_height: %dpx\n", total_height))
   plotlyOutput(
     outputId = "combined_plot",
-    height = "800px" # Adjust height as needed, or make dynamic
+    height = paste0(total_height, "px")
   )
 })
 
@@ -30,8 +42,9 @@ observe({
 
   state$plotly_registered <- FALSE
 
-  # Get combined plotly object
-  combined_plotly_obj <- plot_profiles(cxt)
+  # Get combined plotly object and height info
+  plot_result <- plot_profiles(cxt)
+  combined_plotly_obj <- if (!is.null(plot_result)) plot_result$plot else NULL
 
   # Register the relayout event for the plot so zoom events can be captured with the correct source ID
   if (!is.null(combined_plotly_obj)) {
@@ -63,4 +76,60 @@ observeEvent(eventExpr = plotly::event_data("plotly_relayout"), {
       state$current_xlim <- new_xlim
     }
   }
+})
+
+# Convert pixel coordinates to biological coordinates
+convert_mouse_coords <- function(mouse_data, state) {
+  if (is.null(mouse_data$plotX) || is.null(mouse_data$plotWidth)) {
+    return(list(x = NULL, y = NULL))
+  }
+  
+  # get current x-axis range
+  xlim <- get_current_xlim(state)
+  
+  # convert pixel position to biological coordinates
+  rel_x <- mouse_data$plotX / mouse_data$plotWidth
+  plot_x <- xlim[1] + rel_x * (xlim[2] - xlim[1])
+  
+  list(x = plot_x, y = mouse_data$plotY)
+}
+
+# Get current x-axis limits from state
+get_current_xlim <- function(state) {
+  if (!is.null(state$current_xlim)) {
+    return(state$current_xlim)
+  }
+  if (!is.null(state$zoom)) {
+    return(state$zoom)
+  }
+  
+  # build context to get full range
+  cxt <- build_context(
+    state_contigs = state$contigs,
+    contig_table = get_contigs(state$assembly),
+    zoom = NULL,
+    assembly = state$assembly
+  )
+  
+  if (!is.null(cxt) && !is.null(cxt$mapper)) {
+    return(cxt$mapper$xlim)
+  }
+  
+  c(0, 1000)  # fallback
+}
+
+# Handle JavaScript mouse coordinates from UI
+observeEvent(input$mouse_coords, {
+  mouse_data <- input$mouse_coords
+  req(mouse_data)
+  
+  plot_coords <- convert_mouse_coords(mouse_data, state)
+  
+  state$mouse_coords <- list(
+    screen_x = mouse_data$x,
+    screen_y = mouse_data$y,
+    plot_x = plot_coords$x,
+    plot_y = plot_coords$y,
+    timestamp = Sys.time()
+  )
 })

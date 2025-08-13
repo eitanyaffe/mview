@@ -1,4 +1,4 @@
-gene_profile <- function(id, name, height = 0.1,
+gene_profile <- function(id, name, height = 100,
                          gene_f = NULL,
                          color_style = "by_taxonomy",
                          select_groups = NULL,
@@ -34,6 +34,7 @@ gene_profile <- function(id, name, height = 0.1,
   # Create profile
   profile_create(
     id = id, name = name, type = "gene", height = height,
+    attr = list(hide_y_ticks = TRUE),
     params = params, plot_f = plot_f,
     threshold = threshold,
     gene_f = gene_f,

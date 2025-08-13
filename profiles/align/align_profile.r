@@ -66,7 +66,7 @@ default_alignment_params <- list(
   )
 )
 
-align_profile <- function(id, name, height = 1,
+align_profile <- function(id, name, height = 400,
                           aln_f = NULL,
                           bin_type = "auto",
                           plot_style = "auto",

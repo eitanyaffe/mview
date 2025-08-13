@@ -57,16 +57,18 @@ pre_plot <- function(cxt, profile) {
 #' @param profile The profile object
 #' @return The ggplot object with overlays added
 post_plot <- function(cxt, gg, profile) {
-  # Example: add vertical lines at contig starts
-  if (!is.null(cxt$mapper$cdf$start)) {
-    gg <- gg + ggplot2::geom_vline(xintercept = cxt$mapper$cdf$start, color = "gray")
+  # Add vertical lines between contigs (at contig ends, not starts)
+  if (!is.null(cxt$mapper$cdf) && nrow(cxt$mapper$cdf) > 1) {
+    # Only draw lines at the END of each contig (except the last one)
+    contig_ends <- cxt$mapper$cdf$end[-nrow(cxt$mapper$cdf)]  # all except last
+    gg <- gg + ggplot2::geom_vline(xintercept = contig_ends, color = "gray")
   }
   gg
 }
 
 #' Plot all registered profiles
 #' @param cxt The context object containing mapper and other dynamic info
-#' @return A plotly object combining all profile plots
+#' @return A list with plotly object and total height in pixels: list(plot = plotly_obj, total_height = numeric)
 plot_profiles <- function(cxt) {
   profiles <- profiles_get_all()
   if (length(profiles) == 0) {
@@ -103,9 +105,12 @@ plot_profiles <- function(cxt) {
     # Add overlays
     gg_final <- post_plot(cxt, pf_result, profile)
 
-    # Convert to plotly, ensuring 'text' aesthetic is available for hover
-    # The actual 'text' aesthetic should be defined in the profile's plot_f
+    # Convert to plotly, using 'text' aesthetic when provided
     p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
+    # disable hover if requested by the profile plot
+    if (isTRUE(attr(gg_final, "disable_hover"))) {
+      p_ly <- plotly::style(p_ly, hoverinfo = "skip")
+    }
 
     # Store in list
     plotly_list[[id]] <- p_ly
@@ -116,11 +121,12 @@ plot_profiles <- function(cxt) {
     return(NULL) # Return NULL if no plots were generated
   }
 
-  # Normalize heights to add up to 1 if there are any heights
-  if (sum(heights) > 0) {
-    heights <- heights / sum(heights)
-  } else if (length(heights) > 0) {
-    # if all heights are 0, distribute equally
+  # Heights are now in pixels - calculate proportions for plotly subplot
+  total_height <- sum(heights)
+  if (total_height > 0) {
+    heights <- heights / total_height
+  } else {
+    # This should not happen with validation, but fallback
     heights <- rep(1 / length(heights), length(heights))
   }
 
@@ -133,7 +139,7 @@ plot_profiles <- function(cxt) {
       plotly_list,
       nrows = length(plotly_list),
       shareX = TRUE,
-      titleY = TRUE,
+      titleY = FALSE,
       margin = 0.01,
       heights = if (length(heights) == length(plotly_list)) heights else NULL
     )
@@ -146,10 +152,71 @@ plot_profiles <- function(cxt) {
   cat(sprintf("configuring combined plot\n"))
 
   # Configure the combined plot
-  combined_plot <- plotly::layout(combined_plot,
+  layout_args <- list(
     xaxis = list(title = ""),
-    margin = list(l = 50, r = 20, t = 30, b = 30) # Adjust margins as needed
+    margin = list(l = 150, r = 20, t = 30, b = 30)
   )
-  cat(sprintf("plotting done\n"))
-  return(combined_plot)
+  
+  # Build horizontal y-labels using plotly annotations aligned to each subplot row
+  profiles <- profiles_get_all()
+  annotations <- list()
+  
+  # collect coordinate annotations via profile hooks
+  cat("collecting coordinate annotations\n")
+  for (i in seq_along(profiles)) {
+    profile <- profiles[[i]]
+    get_ann_f <- profile$get_annotations
+    if (is.null(get_ann_f) || !is.function(get_ann_f)) next
+
+    coord_data <- get_ann_f(profile, cxt)
+    if (is.null(coord_data) || nrow(coord_data) == 0) next
+
+    # target this subplot's y-axis for annotation placement
+    y_axis_ref <- if (i == 1) "y" else paste0("y", i)
+    y_val <- 0.52  # place below ticks (ticks at ~0.70)
+
+    cat("profile ", profile$id, " adding ", nrow(coord_data), " annotations\n")
+    for (j in seq_len(nrow(coord_data))) {
+      annotations[[length(annotations) + 1]] <- list(
+        x = coord_data$x[j], xref = "x", xanchor = "center",
+        y = y_val, yref = y_axis_ref, yanchor = "middle",
+        text = coord_data$label[j], textangle = 90,
+        showarrow = FALSE, font = list(size = 10)
+      )
+    }
+  }
+  cat("adding y-axis labels\n")
+  current_layout <- combined_plot$x$layout
+  for (i in seq_along(profiles)) {
+    profile <- profiles[[i]]
+    # Always clear default vertical y-axis title text
+    yaxis_name <- if (i == 1) "yaxis" else paste0("yaxis", i)
+    layout_args[[yaxis_name]] <- list(title = list(text = ""))
+
+    # Add horizontal annotation for y-label if not hidden
+    if (!isTRUE(profile$attr$hide_y_label) && !is.null(profile$attr$title)) {
+      axis_layout <- current_layout[[yaxis_name]]
+      domain <- NULL
+      if (!is.null(axis_layout) && !is.null(axis_layout$domain)) {
+        domain <- axis_layout$domain
+      }
+      if (!is.null(domain) && length(domain) == 2) {
+        y_mid <- mean(domain)
+        annotations[[length(annotations) + 1]] <- list(
+          x = 0.01, xref = "paper", xanchor = "right", xshift = -30,
+          y = y_mid, yref = "paper", yanchor = "middle",
+          text = profile$attr$title, textangle = 0,
+          showarrow = FALSE, align = "right", font = list(size = 12)
+        )
+      }
+    }
+  }
+  if (length(annotations) > 0) {
+    layout_args$annotations <- annotations
+    cat("adding annotations, length: ", length(annotations), "\n")
+  }
+  
+  combined_plot <- do.call(plotly::layout, c(list(combined_plot), layout_args))
+  cat(sprintf("plotting done, total height: %dpx\n", total_height))
+  return(list(plot = combined_plot, total_height = total_height))
 }
