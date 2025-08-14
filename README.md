@@ -78,8 +78,8 @@ The `rl()` function loads a configuration defined in `configs/minimal/minimal_cf
 
 Application layout:
 
-- **Left pnael**: Information about display region.
-- **Top region**: Profiles plots.
+- **Left panel**: Information about display region.
+- **Top region**: Profile plots.
 - **Right panel**: Profile parameter window.
 - **Bottom tabs**: Tables.
 
@@ -102,7 +102,7 @@ The bottom panel contains these tabs:
 - **Selected Contigs**: Displays currently selected contigs
 - **Options**: Display settings
 
-**Additinal tabs** (optional; shown only if registered in configuration):
+**Additional tabs** (optional; shown only if registered in configuration):
 - **Genes**: Gene table
 - **Alignments**: Read alignment table
 
