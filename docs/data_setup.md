@@ -6,8 +6,6 @@
 
 You need to create several tab-delimited text files that describe your assemblies and genomic features:
 
-### Required files
-
 **1. Assembly Table**
 ```
 assembly_id
@@ -90,7 +88,7 @@ Parameters explained:
 **Step 3: Convert to ALN format**
 ```bash
 # Convert PAF to ALN format for efficient querying in mview
-alntools construct -contigs contigs.fasta -paf alignment.paf -output alignment.aln
+alntools construct -ifn_paf alignment.paf -ofn alignment.aln
 ```
 
 **Step 4: Configure view**: Add alignment profile to your view file pointing to ALN files. The ALN format supports multiple visualization modes (full, bin, pileup) based on zoom level.

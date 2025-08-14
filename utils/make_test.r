@@ -150,18 +150,18 @@ write.table(final_gene_table, "examples/tables/gene_table.txt", sep = "\t", row.
 dir.create("configs/minimal", recursive = TRUE, showWarnings = FALSE)
 
 ########################################################
-# create example config file (no lookup; direct file reads with cache)
+# create example config file
 ########################################################
 
 config_content <- '########################################################
-# Example configuration for learning mview (no-lookup)
+# Minimal test configuration file
 ########################################################
 
 # example data directories
 example_dir <- "examples"
 tables_dir <- file.path(example_dir, "tables")
 
-# helper cached readers
+# helper function that caches tables
 read_cached <- function(key, path, read_f = read.delim) {
   cache(key, {
     if (identical(read_f, read.delim)) {
@@ -173,39 +173,66 @@ read_cached <- function(key, path, read_f = read.delim) {
 }
 
 ########################################################
-# register assemblies, genomes and contigs
+# get functions
 ########################################################
 
-atbl <- read_cached("assembly_table", file.path(tables_dir, "assembly_table.txt"))
-aids <- atbl$assembly_id
-set_assemblies(aids)
+get_assembly_f <- function() {
+  read_cached("assembly_table", file.path(tables_dir, "assembly_table.txt"))
+}
 
-# register contigs function
-register_contigs_f(function(assembly = NULL) {
+get_contigs_f <- function(assembly = NULL) {
   if (is.null(assembly)) return(NULL)
   path <- file.path(tables_dir, paste0("contig_table_", assembly, ".txt"))
   if (!file.exists(path)) return(NULL)
   df <- read_cached(paste0("contigs_", assembly), path)
   data.frame(contig = df$contig, length = df$length, circular = df$circular)
-})
+}
 
-# register genomes function  
-register_genomes_f(function(assembly = NULL) {
+get_genomes_f <- function(assembly = NULL) {
   if (is.null(assembly)) return(NULL)
   path <- file.path(tables_dir, paste0("genome_table_", assembly, ".txt"))
   if (!file.exists(path)) return(NULL)
   df <- read_cached(paste0("genomes_", assembly), path)
   data.frame(gid = df$gid, length = df$length)
-})
+}
 
-# register contig map function
-register_contig_map_f(function(assembly = NULL) {
+get_contig_map_f <- function(assembly = NULL) {
   if (is.null(assembly)) return(NULL)
   path <- file.path(tables_dir, paste0("contig_map_table_", assembly, ".txt"))
   if (!file.exists(path)) return(NULL)
   df <- read_cached(paste0("contigmap_", assembly), path)
   data.frame(contig = df$contig, gid = df$gid)
-})
+}
+
+get_aln_f <- function(assembly = NULL) {
+  if (is.null(assembly)) return(NULL)
+  path <- file.path("examples", "aln", paste0(assembly, ".aln"))
+  if (!file.exists(path)) return(NULL)
+  read_cached(paste0("aln_", assembly), path, read_f = aln_load)
+}
+
+get_genes_f <- function(cxt) {
+  gpath <- file.path(tables_dir, "gene_table.txt")
+  if (!file.exists(gpath)) return(NULL)
+  genes <- read_cached("gene_table", gpath)
+  genes <- genes[genes$assembly == cxt$assembly, ]
+  # select fields
+  fields <- c("gene","contig","start","end","strand","uniref","identity","coverage","evalue","bitscore","prot_desc","tax","uniref_count")
+  genes[, intersect(names(genes), fields)]
+}
+
+########################################################
+# register assemblies, genomes and contigs
+########################################################
+
+atbl <- get_assembly_f()
+aids <- atbl$assembly_id
+set_assemblies(aids)
+
+# register data functions
+register_contigs_f(get_contigs_f)
+register_genomes_f(get_genomes_f)
+register_contig_map_f(get_contig_map_f)
 
 ########################################################
 # register views
@@ -217,19 +244,6 @@ view_register("example", view_file)
 ########################################################
 # register gene tab
 ########################################################
-
-# get_genes_f used by gene profile and the gene tab
-get_genes_f <- function(cxt) {
-  cache(paste0(cxt$assembly, "_genes"), {
-    gpath <- file.path(tables_dir, "gene_table.txt")
-    if (!file.exists(gpath)) return(NULL)
-    genes <- read_cached("gene_table", gpath)
-    genes <- genes[genes$assembly == cxt$assembly, ]
-    # select fields
-    keep <- c("gene","contig","start","end","strand","uniref","identity","coverage","evalue","bitscore","prot_desc","tax","uniref_count")
-    genes[, intersect(names(genes), keep)]
-  })
-}
 
 register_tab(
   tab_id = "genes",
@@ -257,7 +271,7 @@ write(config_content, "configs/minimal/minimal_cfg.r")
 ########################################################
 
 view_content <- '########################################################
-# Example main view - genes, alignments and axis
+# Minimal view: genes, alignments and axis
 ########################################################
 
 ########################################################
@@ -280,17 +294,7 @@ align_profile(
   id = "alignments",
   name = "Alignments",
   aln_f = function(cxt) {
-    # get current assembly from context
-    assembly <- cxt$assembly
-    aln_path <- file.path("examples", "aln", paste0(assembly, ".aln"))
-    
-    if (!file.exists(aln_path)) {
-      warning(sprintf("alignment file not found for assembly %s: %s", assembly, aln_path))
-      return(NULL)
-    }
-    
-    cat(sprintf("loading alignment for assembly: %s\\n", assembly))
-    read_cached(paste0("aln_", assembly), aln_path, read_f = aln_load)
+    get_aln_f(cxt$assembly)
   },
   height = 400,
   params = default_alignment_params
@@ -321,8 +325,7 @@ gene_profile(
 # axis profile
 ########################################################
 
-axis_profile()
-'
+axis_profile()'
 
 cat("creating minimal view file: configs/minimal/minimal_view.r\n")
 write(view_content, "configs/minimal/minimal_view.r")

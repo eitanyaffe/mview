@@ -28,7 +28,7 @@ get_server <- function() {
 }
 
 rl_core <- function(project_id) {
-    source("app.r", local = FALSE)
+    source("mview.r", local = FALSE)
 
     # utils
     source("core/utils.r", local = FALSE)

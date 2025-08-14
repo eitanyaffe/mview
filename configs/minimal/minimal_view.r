@@ -1,5 +1,5 @@
 ########################################################
-# Example main view - genes, alignments and axis
+# Minimal view: genes, alignments and axis
 ########################################################
 
 ########################################################
@@ -22,17 +22,7 @@ align_profile(
   id = "alignments",
   name = "Alignments",
   aln_f = function(cxt) {
-    # get current assembly from context
-    assembly <- cxt$assembly
-    aln_path <- file.path("examples", "aln", paste0(assembly, ".aln"))
-    
-    if (!file.exists(aln_path)) {
-      warning(sprintf("alignment file not found for assembly %s: %s", assembly, aln_path))
-      return(NULL)
-    }
-    
-    cat(sprintf("loading alignment for assembly: %s\n", assembly))
-    read_cached(paste0("aln_", assembly), aln_path, read_f = aln_load)
+    get_aln_f(cxt$assembly)
   },
   height = 400,
   params = default_alignment_params
@@ -64,4 +54,3 @@ gene_profile(
 ########################################################
 
 axis_profile()
-
