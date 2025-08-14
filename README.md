@@ -110,7 +110,7 @@ The bottom panel contains these tabs:
 The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior.
 
 
-## Saving and loading states
+### Saving and loading states
 
 **Initialize state table**: Create a new table ("New Table") or load an existing state table ("Load Table").
 
