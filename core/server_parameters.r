@@ -10,6 +10,9 @@ output$parameter_tabs_ui <- renderUI({
     return(NULL) # Display nothing if no parameters
   }
 
+  # preserve currently selected parameter tab
+  selected_tab <- isolate(input$parameterTabs)
+
   # Group parameters for UI organization
   grouped_params <- list()
   for (param_key in names(all_params)) {
@@ -79,7 +82,7 @@ output$parameter_tabs_ui <- renderUI({
   })
 
   # Create tabset panel with all parameter groups
-  do.call(shiny::tabsetPanel, c(list(id = "parameterTabs"), tab_panels))
+  do.call(shiny::tabsetPanel, c(list(id = "parameterTabs", selected = selected_tab), tab_panels))
 })
 
 

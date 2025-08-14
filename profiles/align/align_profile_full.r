@@ -199,6 +199,16 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       mutations <- mutations[sample(nrow(mutations), profile$max_mutations), ]
       cat(sprintf("sampled to %d mutations\n", profile$max_mutations))
     }
+    
+    # get shared variant colors (consistent with pileup mode)
+    variant_colors <- get_variant_colors(aln, cxt)
+    mutations$fill_color <- variant_colors[mutations$desc]
+    
+    # handle unmapped variants with a default color
+    unmapped <- is.na(mutations$fill_color)
+    if (any(unmapped)) {
+      mutations$fill_color[unmapped] <- "#CCCCCC"
+    }
 
     mutations$hover_text <- paste0(
       "Read: ", mutations$read_id, "\n",
@@ -213,15 +223,14 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       gg <- gg + ggplot2::geom_rect(
         data = mutations,
         ggplot2::aes(
-          xmin = gcoord - 0.4, xmax = gcoord + 0.4,
+          xmin = gcoord - 0.5, xmax = gcoord + 0.5,
           ymin = height, ymax = height + 1,
-          fill = desc,
+          fill = fill_color,
           text = hover_text
         ),
         color = NA
       ) +
-        ggplot2::scale_fill_discrete(name = "Mutation") +
-        ggplot2::theme(legend.position = "top")
+        ggplot2::scale_fill_identity()
     } else {
       # plot mutation segments
       gg <- gg + ggplot2::geom_segment(
@@ -229,13 +238,12 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         ggplot2::aes(
           x = gcoord, xend = gcoord,
           y = height, yend = height + 1,
-          color = desc,
+          color = fill_color,
           text = hover_text
         ),
         size = 0.25
       ) +
-        ggplot2::scale_color_discrete(name = "Mutation") +
-        ggplot2::theme(legend.position = "top")
+        ggplot2::scale_color_identity()
     }
   }
   # !!!

@@ -32,12 +32,12 @@ align_profile(
 # basic gene profile
 ########################################################
 
-gene_params_std <- list(
-  color_style = list(
+gene_params <- list(
+  color_field = list(
     group_id = "gene",
     type = "select",
-    choices = c("by_taxonomy", "by_regex"),
-    default = "by_taxonomy"
+    choices = c("tax", "mge"),
+    default = "tax"
   )
 )
 
@@ -46,7 +46,8 @@ gene_profile(
   name = "Genes",
   height = 50,
   gene_f = get_genes_f,
-  params = gene_params_std
+  color_field = "tax",
+  params = gene_params
 )
 
 ########################################################

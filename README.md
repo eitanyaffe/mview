@@ -108,6 +108,13 @@ The Genes tab details all genes in view. Click on any gene in the table to selec
 #### Profile parameters
 The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior. The specific parameters shown here can be controlled through the configuration file.
 
+### Profiles
+
+- **alignment**: Display read alignments.
+- **gene**: Display gene segments.
+
+Hover shows element information in all profiles. Profile parameters can be set in code or adjusted interactively in the right panel. See the detailed profile guide: [profiles](docs/profiles.md).
+
 ### Saving and loading states
 
 **Initialize state table**: Create a new table ("New Table").

@@ -44,12 +44,12 @@ for (timepoint in timepoints) {
 # basic gene profile
 ########################################################
 
-gene_params_std <- list(
-  color_style = list(
+gene_params <- list(
+  color_field = list(
     group_id = "gene",
     type = "select",
-    choices = c("by_taxonomy", "by_regex"),
-    default = "by_taxonomy"
+    choices = c("tax", "mge"),
+    default = "tax"
   )
 )
 
@@ -58,44 +58,8 @@ gene_profile(
   name = "Genes",
   height = 50,
   gene_f = get_genes_f,
-  params = gene_params_std
-)
-
-########################################################
-# MGE profile
-########################################################
-
-gene_params_mge <- list(
-  color_style = list(
-    group_id = "mge_genes",
-    type = "select",
-    choices = c("by_taxonomy", "by_regex"),
-    default = "by_regex"
-  )
-)
-
-mge_gene_groups <- list(
-  plasmid = c("plasmid", "conjugation", "conjugative", "mobC"),
-  phage = c("tail", "head", "phage", "capsid"),
-  mobile = c("mobilization", "transposase", "integrase", "toxin"),
-  abx = c("mepA", "efflux", "MATE", "multidrug")
-)
-
-mge_gene_colors <- list(
-  plasmid = "#29e111", 
-  phage = "#ffb300", 
-  mobile = "#b1c5ec",
-  abx = "red"
-)
-
-gene_profile(
-  id = "mge_genes",
-  name = "MGE",
-  height = 50,
-  gene_f = get_genes_f,
-  select_groups = mge_gene_groups,
-  select_colors = mge_gene_colors,
-  params = gene_params_mge
+  color_field = "tax",
+  params = gene_params
 )
 
 ########################################################

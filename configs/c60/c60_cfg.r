@@ -64,8 +64,55 @@ view_register("pre vs. post", view_file, timepoints = c("pre", "post"))
 view_register("all", view_file, timepoints = c("early", "pre", "post", "late"))
 
 ########################################################
-# register gene tab
+# genes
 ########################################################
+
+# mge classification groups and colors
+mge_groups <- list(
+  plasmid = c("plasmid", "conjugation", "conjugative", "mobC"),
+  phage = c("tail", "head", "phage", "capsid"),
+  mobile = c("mobilization", "transposase", "integrase", "toxin"),
+  abx = c("mepA", "efflux", "MATE", "multidrug")
+)
+
+mge_colors <- list(
+  plasmid = "#29e111", 
+  phage = "#ffb300", 
+  mobile = "#b1c5ec",
+  abx = "red"
+)
+
+# helper function to generate taxonomy colors
+get_tax_color <- function(tax_values) {
+  unique_tax <- sort(unique(tax_values[!is.na(tax_values) & tax_values != "none"]))
+  if (length(unique_tax) > 0) {
+    tax_colors <- rainbow(length(unique_tax))
+    names(tax_colors) <- unique_tax
+    return(tax_colors)
+  }
+  return(NULL)
+}
+
+# helper function to generate mge colors based on gene descriptions (vectorized)
+get_mge_color <- function(prot_desc_vector, mge_groups, mge_colors) {
+  # initialize result vector with default color for non-mge genes
+  result <- rep("#E8E8E8", length(prot_desc_vector))
+  
+  # process each group and its patterns
+  for (group_name in names(mge_groups)) {
+    patterns <- mge_groups[[group_name]]
+    group_color <- mge_colors[[group_name]]
+    
+    # find genes matching any pattern in this group
+    for (pattern in patterns) {
+      matches <- grepl(pattern, prot_desc_vector, ignore.case = TRUE)
+      # assign color to matches (later matches can override earlier ones)
+      result[matches] <- group_color
+    }
+  }
+  
+  return(result)
+}
 
 # get_genes_f used by gene profile and the gene tab
 get_genes_f <- function(cxt) {
@@ -82,6 +129,14 @@ get_genes_f <- function(cxt) {
         genes[[field]] <- ifelse(is.na(ix), "none", uniref[[field]][ix])
       }
     }
+    
+    # add tax color
+    tax_color_map <- get_tax_color(genes$tax)
+    genes$tax_color <- tax_color_map[genes$tax]
+    
+    # add mge color
+    genes$mge_color <- get_mge_color(genes$prot_desc, mge_groups, mge_colors)
+    
     genes
   })
 }

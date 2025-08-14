@@ -1,6 +1,6 @@
-create_minimal_config:
+create_minimal:
 	mkdir -p configs/minimal
-	Rscript utils/make_test.r
+	Rscript utils/make_minimal.r	
 
 # commands used to generate paf files for BAH and BAA, run within pg20
 # cat `find /makeshift-mnt/output/minimap/v1.08/map-hifi/lib/BAH -name align.paf` | grep -P '\t(ctg1212|ctg3177|ctg520|ctg6585|ctg4261|ctg4393|ctg2302|ctg5193|ctg6760|ctg5008)\t' > /tmp/BAH.paf

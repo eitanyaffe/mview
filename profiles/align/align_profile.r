@@ -13,13 +13,66 @@ get_mutation_colors <- function(mutations_per_100bp) {
   )
   return(colors)
 }
+
+# Get variant colors (shared between full and pileup modes)
+get_variant_colors <- function(aln, cxt) {
+  # query both full and pileup to get all possible variants
+  all_variants <- character(0)
+  
+  # get variants from pileup data
+  tryCatch({
+    pileup_df <- aln_query_pileup(aln, cxt$intervals, report_mode_str = "all")
+    if (!is.null(pileup_df) && nrow(pileup_df) > 0) {
+      all_variants <- c(all_variants, unique(pileup_df$variant))
+    }
+  }, error = function(e) {
+    # continue if pileup query fails
+  })
+  
+  # get variants from full data mutations (if any)
+  tryCatch({
+    full_df <- aln_query_full(aln, cxt$intervals, "by_mutations", 1000, "all")
+    if (!is.null(full_df$mutations) && nrow(full_df$mutations) > 0) {
+      all_variants <- c(all_variants, unique(full_df$mutations$desc))
+    }
+  }, error = function(e) {
+    # continue if full query fails
+  })
+  
+  # get unique sorted variants
+  unique_variants <- sort(unique(all_variants))
+  
+  if (length(unique_variants) == 0) {
+    return(list())
+  }
+  
+  # create color palette
+  if (length(unique_variants) <= 8) {
+    # use predefined soft colors for small numbers of variants
+    soft_colors <- c("#E8F4FD", "#FFE6E6", "#E6F7E6", "#FFF2E6", 
+                     "#F0E6FF", "#E6F7FF", "#FFE6F7", "#F7FFE6")
+    variant_colors <- soft_colors[seq_along(unique_variants)]
+  } else {
+    # use soft pastel colors for larger numbers
+    variant_colors <- rainbow(length(unique_variants), s = 0.3, v = 0.9)
+  }
+  names(variant_colors) <- unique_variants
+  
+  # standardized gray for REF
+  if ("REF" %in% unique_variants) {
+    variant_colors["REF"] <- "#D3D3D3"  # lighter than dark gray, darker than light gray
+  }
+  
+  return(variant_colors)
+}
 default_alignment_params <- list(
   plot_style = list(
     group_id = "alignment",
     type = "select",
-    choices = c("auto", "full", "bin"),
-    default = "auto"
+    choices = c("auto_full", "auto_pileup", "bin", "full", "pileup"),
+    default = "auto_full"
   ),
+
   alignment_filter = list(
     group_id = "alignment",
     type = "select",
@@ -37,10 +90,15 @@ default_alignment_params <- list(
     type = "integer",
     default = 250
   ),
-  threshold = list(
+  full_threshold = list(
     group_id = "alignment",
     type = "integer",
     default = 50000
+  ),
+  pileup_threshold = list(
+    group_id = "alignment",
+    type = "integer",
+    default = 1000
   ),
   max_reads = list(
     group_id = "alignment",
@@ -69,8 +127,10 @@ default_alignment_params <- list(
 align_profile <- function(id, name, height = 400,
                           aln_f = NULL,
                           bin_type = "auto",
-                          plot_style = "auto",
-                          threshold = 50000,
+                          plot_style = "auto_full",
+
+                          full_threshold = 50000,
+                          pileup_threshold = 1000,
                           target_bins = 250,
                           height_style = "by_mutations",
                           max_mutations = 1000,
@@ -87,21 +147,20 @@ align_profile <- function(id, name, height = 400,
   }
 
   # Determine display mode based on view range
-  get_display_mode <- function(xlim, threshold, plot_style) {
+  get_display_mode <- function(xlim, full_threshold, pileup_threshold, plot_style) {
     if (is.null(xlim) || length(xlim) != 2) {
       return("bin")
     }
 
     range_bp <- (xlim[2] + 1) - xlim[1]
 
-    if (plot_style != "auto") {
-      return(plot_style)
+    if (plot_style == "auto_full") {
+      return(if (range_bp <= full_threshold) "full" else "bin")
+    } else if (plot_style == "auto_pileup") {
+      return(if (range_bp <= pileup_threshold) "pileup" else "bin")
     } else {
-      if (range_bp <= threshold) {
-        return("full")
-      } else {
-        return("bin")
-      }
+      # explicit mode: bin, full, or pileup
+      return(plot_style)
     }
   }
 
@@ -128,7 +187,7 @@ align_profile <- function(id, name, height = 400,
       return(gg)
     }
 
-    mode <- get_display_mode(cxt$mapper$xlim, profile$threshold, profile$plot_style)
+    mode <- get_display_mode(cxt$mapper$xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style)
     cat(sprintf("mode: %s\n", mode))
 
     # Call mode-specific plot function
@@ -148,7 +207,10 @@ align_profile <- function(id, name, height = 400,
     auto_register = auto_register,
     aln_f = aln_f,
     bin_type = bin_type,
-    threshold = threshold,
+    plot_style = plot_style,
+
+    full_threshold = full_threshold,
+    pileup_threshold = pileup_threshold,
     target_bins = target_bins,
     height_style = height_style,
     max_mutations = max_mutations,
