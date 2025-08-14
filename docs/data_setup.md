@@ -85,6 +85,43 @@ alntools construct -ifn_paf alignment.paf -ofn alignment.aln
 
 ## Step 2: Create your configuration
 
+### Setting up your configuration
+
+1. **Create project directory and copy configuration files**:
+```bash
+# Create your project directory
+mkdir -p /path/to/your/configs/my_project
+
+# Copy minimal configuration files
+cp configs/minimal/minimal_cfg.r /path/to/your/configs/my_project/my_project_cfg.r
+cp configs/minimal/minimal_view.r /path/to/your/configs/my_project/my_project_view.r
+```
+
+2. **Edit the configuration file** `/path/to/your/configs/my_project/my_project_cfg.r`:
+```r
+# Update data directories to point to your data
+example_dir <- "/path/to/your/data"
+tables_dir <- file.path(example_dir, "tables")
+
+# Modify get functions to match your data structure
+get_assembly_f <- function() {
+  # Point to your assembly table
+  read_cached("assembly_table", "/your/actual/path/assemblies.txt")
+}
+
+# Edit other get functions similarly, see more on get functions below
+
+# Update view registration to point to your view file
+view_file <- "/path/to/your/configs/my_project/my_project_view.r"
+view_register("example", view_file)
+```
+
+3. **Load your configuration**:
+```r
+source("mview.r")
+rl("my_project", cdir="/path/to/your/configs")
+```
+
 ### Understanding get functions
 
 The configuration file uses "get functions" that tell mview how to access your data. Your data can be stored anywhere and in any format. The get functions act as adapters between your actual data files and mview's expected format. You can transform field names, filter data, or compute required fields on the fly.
@@ -168,41 +205,4 @@ get_aln_f <- function(assembly = NULL) {
   path <- paste0("/your/path/alignments_", assembly, ".aln")
   aln_load(path)  # uses alntools to load ALN format
 }
-```
-
-### Setting up your configuration
-
-1. **Create project directory and copy configuration files**:
-```bash
-# Create your project directory
-mkdir -p /path/to/your/configs/my_project
-
-# Copy minimal configuration files
-cp configs/minimal/minimal_cfg.r /path/to/your/configs/my_project/my_project_cfg.r
-cp configs/minimal/minimal_view.r /path/to/your/configs/my_project/my_project_view.r
-```
-
-2. **Edit the configuration file** `/path/to/your/configs/my_project/my_project_cfg.r`:
-```r
-# Update data directories to point to your data
-example_dir <- "/path/to/your/data"
-tables_dir <- file.path(example_dir, "tables")
-
-# Modify get functions to match your data structure
-get_assembly_f <- function() {
-  # Point to your assembly table
-  read_cached("assembly_table", "/your/actual/path/assemblies.txt")
-}
-
-# Edit other get functions similarly...
-
-# Update view registration to point to your view file
-view_file <- "/path/to/your/configs/my_project/my_project_view.r"
-view_register("example", view_file)
-```
-
-3. **Load your configuration**:
-```r
-source("mview.r")
-rl("my_project", cdir="/path/to/your/configs")
 ```
