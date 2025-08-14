@@ -74,7 +74,7 @@ rl("minimal")
 
 The `rl()` function loads a configuration defined in `configs/minimal/minimal_cfg.r`
 
-### 3. Basic usage of mview
+## Using mview
 
 Application layout:
 
