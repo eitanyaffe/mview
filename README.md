@@ -4,35 +4,35 @@ A nimble metagenomic visualization tool for exploring genome assemblies.
 
 ## Description
 
-Mview provides a customizable R-based shiny application for visualizing genomic data. The tool is designed for researchers working with reference-based and reconstructed metagenomic assemblies.
+Mview provides a customizable R-based shiny application for visualizing genomic data. The tool is designed for researchers working with metagenomic assemblies.
 
 Mview is built around four key components that work together to create flexible genomic visualizations:
 
-- **Configurations**: Define data sources, assemblies, available tabs, and which views to load. These files specify how to read your genomic data tables and register visualization components.
+- **Configurations**: Define data sources and how to visualize them.
 
-- **Views**: Define a set profiles to display. Configurations define one or more views. 
+- **Views**: Define a set profiles to display. Each configuration defines one or more views. 
 
-- **Profiles**: Individual visualization components like gene tracks, alignment displays, and coordinate axes. Each profile handles a specific type of genomic data visualization.
+- **Profiles**: Individual visualization components like gene tracks, alignment displays, and coordinate axes.
 
-- **Tabs**: Optional bottom panel components that provide detailed data tables and interactive features for genes, alignments, and other data types.
+- **Tabs**: Contigs, genomes, genes, read alignments and other tables.
 
-Users visualize their data by creating configuration files that point to their tables while using existing profiles. Advanced users can implement custom profiles to create new visualizations.
+Users visualize their data by creating configuration files that point to their tables while using existing profiles. The architecture supports the implementation of new profiles.
 
 ## Prerequisites
 
 ### Installation
 
-Install all required packages at once:
+Install required packages in R:
 
 ```r
 install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
 ```
 
-### Installing alntools (Optional)
+### Installing alntools (required for the read alignment profile)
 
-Alntools is a C++ program that allows for efficient querying of alignments for real-time visualization.
+Alntools is a C++ program that allows for efficient querying of alignments for real-time visualization in mview.
 
-To visualize read alignments, you need to install **alntools** from GitHub:
+Install **alntools** from GitHub:
 
 ```bash
 # Clone and build from source
@@ -40,14 +40,18 @@ git clone https://github.com/eitanyaffe/alntools.git
 cd alntools
 make
 # Copy binary to user's local bin directory
-mkdir -p ~/bin
-cp bin/alntools ~/bin/
-export PATH="$HOME/bin:$PATH"
+mkdir -p ~/.local/bin
+cp bin/alntools ~/.local/bin
 ```
 
-Install required R package:
+Add local bin directory to path if not already part of the path:
+```
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Install R package:
 ```r
-install.packages(c("Rcpp"))
+install.packages("Rcpp")
 ```
 
 ## Quick Start
@@ -74,14 +78,14 @@ The `rl()` function loads a configuration defined in `configs/minimal/minimal_cf
 
 Application layout:
 
-- **Left**: Information about display region.
-- **Middle**: Profiles plots.
-- **Right**: Profile parameter window.
-- **Bottom**: Tables in tabs.
+- **Left pnael**: Information about display region.
+- **Top region**: Profiles plots.
+- **Right panel**: Profile parameter window.
+- **Bottom tabs**: Tables.
 
 #### Selecting the viewing region
 
-1. **Select contigs**: Use Contigs or Genomes tab to select one or more contigs
+1. **Select contigs**: Use State, Contigs or Genomes tab to select one or more contigs
 2. **Zoom**: Use mouse to select regions in the visualization
 3. **Lock zoom**: Press Shift+Z to set the selected region as zoom
 4. **Navigation**: Use Shift+Backspace for undo, press Help button for all shortcuts
@@ -106,7 +110,7 @@ The bottom panel contains these tabs:
 The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior.
 
 
-## Saving and loading state
+## Saving and loading states
 
 **Initialize state table**: Create a new table ("New Table") or load an existing state table ("Load Table").
 
@@ -127,6 +131,6 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 ## Customizing views and profiles
 
-**Views**: Create custom views by copying existing view files and modifying which profiles to display and their parameters. Each view defines a specific layout of gene tracks, alignment displays, and visualization settings.
+**Views**: Create custom views by copying existing view files and modifying which profiles to display and their parameters. Each view defines a specific layout of gene tracks, read alignments and other profiles.
 
-**Profiles**: Building custom profiles is straightforward - copy existing profile code from the `profiles/` directory and modify the plotting functions to handle your specific data types and visualization needs.
+**Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs.
