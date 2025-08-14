@@ -2,11 +2,11 @@
 
 **Quick overview**: Create your data tables, copy the minimal configuration, edit paths and field selections.
 
-> **Note:** The column names and file structures shown below are examples only. Your existing data can have different column names and structures - mview adapts to your data through configurable "get functions" that transform your data as needed. Read through the entire guide before creating new files to understand how the system works.
+> **Note:** The column names and file structures shown below are examples only. Your existing data can have different column names and structures. You can use your existing tables through configurable "get functions" that transform tables as needed. Read through the entire guide before creating new files to understand how the system works.
 
 ## Step 1: Prepare your data tables
 
-You need to create several tab-delimited text files that describe your assemblies and genomic features. The examples below show the required information, but your actual files can have different column names and structures:
+You need to have several tab-delimited text files that describe your assemblies and genomic features. The examples below show the required information, but your actual files can have different column names and structures:
 
 **1. Assembly Table**
 ```
@@ -26,7 +26,7 @@ ctg001	50000	FALSE
 ctg002	75000	FALSE
 ctg003	45000	TRUE
 ```
-Required information: contig identifier, sequence length, whether circular
+Required information: contig identifier, sequence length. The circular field is optional.
 
 **3. Genome Tables**
 ```
@@ -53,11 +53,9 @@ gene001	BAA	ctg001	100	1200	+	DNA polymerase	Bacteria	85.5	95.2
 **Required information**: gene identifier, assembly, contig, start position, end position  
 **Optional information**: strand, protein description, taxonomy, identity, coverage, etc.
 
-The exact column names don't matter - your get functions will handle the mapping.
-
 ### Creating alignment files
 
-To visualize read alignments in mview, you need to align your reads to the assembly and convert the results to ALN format for efficient querying.
+To visualize read alignments in mview, you need to align your reads to the assembly and convert the results to ALN format for efficient querying. Alntools is a C++ program that converts alignment files (PAF format) into a binary format optimized for real-time visualization ([github.com/eitanyaffe/alntools](https://github.com/eitanyaffe/alntools)). The R interface provides direct access to memory-stored alignments, enabling rapid interactive exploration of millions of reads without performance bottlenecks.
 
 **Step 1: Create minimap2 index**
 ```bash
@@ -85,15 +83,11 @@ Parameters explained:
 alntools construct -ifn_paf alignment.paf -ofn alignment.aln
 ```
 
-**Step 4: Configure view**: Add alignment profile to your view file pointing to ALN files. The ALN format supports multiple visualization modes (full, bin, pileup) based on zoom level.
-
 ## Step 2: Create your configuration
 
 ### Understanding get functions
 
-The configuration file uses "get functions" that tell mview how to access your data. Your data can be stored anywhere and in any format - the configuration simply needs to point to it and transform it as needed.
-
-**Key concept**: The get functions act as adapters between your actual data files and mview's expected format. You can transform field names, filter data, or compute required fields on the fly.
+The configuration file uses "get functions" that tell mview how to access your data. Your data can be stored anywhere and in any format. The get functions act as adapters between your actual data files and mview's expected format. You can transform field names, filter data, or compute required fields on the fly.
 
 **Example**: If your assembly table has a field called `subjects` instead of `assembly_id`, your get function can transform it:
 
@@ -134,7 +128,7 @@ get_genomes_f <- function(assembly = NULL) {
   # Must return: gid, length columns
   df <- read.delim(paste0("/your/path/genomes_", assembly, ".txt"))
   # Can compute length on the fly
-  df$length <- df$total_size * 1000  # example conversion
+  df$length <- df$length_kb * 1000  # example conversion
   df[, c("gid", "length")]
 }
 ```
@@ -178,12 +172,17 @@ get_aln_f <- function(assembly = NULL) {
 
 ### Setting up your configuration
 
-1. **Copy the minimal configuration**:
+1. **Create project directory and copy configuration files**:
 ```bash
-cp -r mview/configs/minimal /path/to/your/configs/my_project
+# Create your project directory
+mkdir -p /path/to/your/configs/my_project
+
+# Copy minimal configuration files
+cp configs/minimal/minimal_cfg.r /path/to/your/configs/my_project/my_project_cfg.r
+cp configs/minimal/minimal_view.r /path/to/your/configs/my_project/my_project_view.r
 ```
 
-2. **Edit the configuration file** `/path/to/your/configs/my_project/minimal_cfg.r`:
+2. **Edit the configuration file** `/path/to/your/configs/my_project/my_project_cfg.r`:
 ```r
 # Update data directories to point to your data
 example_dir <- "/path/to/your/data"
@@ -196,6 +195,10 @@ get_assembly_f <- function() {
 }
 
 # Edit other get functions similarly...
+
+# Update view registration to point to your view file
+view_file <- "/path/to/your/configs/my_project/my_project_view.r"
+view_register("example", view_file)
 ```
 
 3. **Load your configuration**:
