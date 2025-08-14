@@ -38,13 +38,10 @@ Install **alntools** from GitHub:
 # Clone and build from source
 git clone https://github.com/eitanyaffe/alntools.git
 cd alntools
-make
-# Copy binary to user's local bin directory
-mkdir -p ~/.local/bin
-cp bin/alntools ~/.local/bin
+make install
 ```
 
-Add local bin directory to path if not already part of the path:
+Add the local bin directory to your path if needed:
 ```
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -78,10 +75,10 @@ The `rl()` function loads a configuration defined in `configs/minimal/minimal_cf
 
 Application layout:
 
-- **Left panel**: Information about display region.
-- **Top region**: Profile plots.
-- **Right panel**: Profile parameter window.
-- **Bottom tabs**: Tables.
+- **Central region**: Plot region with genomic profiles (also called tracks).
+- **Left panel**: Information about the display window and cursor location.
+- **Right panel**: Window where user-defined profiles parameters can be customized.
+- **Bottom tabs**: Tables (states, contigs, genomes, genes, alignments).
 
 #### Selecting the viewing region
 
@@ -89,8 +86,6 @@ Application layout:
 2. **Zoom**: Use mouse to select regions in the visualization
 3. **Lock zoom**: Press Shift+Z to set the selected region as zoom
 4. **Navigation**: Use Shift+Backspace for undo, press Help button for all shortcuts
-
-**State management**: Use the States tab to save current view (contigs + zoom) and restore saved states.
 
 #### Tables
 
@@ -111,22 +106,22 @@ The Alignments tab shows all alignment of a selected read. A read can be selecte
 The Genes tab details all genes in view. Click on any gene in the table to select it for navigation. The "Navigate to Gene" button zooms the visualization to the selected gene's location with appropriate padding, making it easy to examine genes of interest in their genomic context.
 
 #### Profile parameters
-The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior.
+The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior. The specific parameters shown here can be controlled through the configuration file.
 
 ### Saving and loading states
 
-**Initialize state table**: Create a new table ("New Table") or load an existing state table ("Load Table").
+**Initialize state table**: Create a new table ("New Table").
 
 **To save current state**:
 1. Navigate to States tab
 2. Enter description in text field  
 3. Click "Add Current State"
+4. Click "Save Table" to save the state table
 
 **To restore a state**:
-1. Select state from table
-2. Click "Go to Selected State"
-
-**Additional actions**: "Delete Selected State", "Save Table" (to file), "Load Table" (from file)
+1. Load an existing state table by clicking "Load Table"
+2. Select state from table
+3. Click "Go to Selected State"
 
 ## Working with your data
 
