@@ -102,29 +102,16 @@ The bottom panel contains these tabs:
 - **Selected Contigs**: Displays currently selected contigs
 - **Options**: Display settings
 
-**Additional tabs** (optional; shown only if registered in configuration):
-- **Genes**: Gene table
-- **Alignments**: Read alignment table
+#### Read alignment tab
 
-#### Alignment panel
+The Alignments tab shows all alignment of a selected read. A read can be selected can be clicking on an alignment profile. The table shows all alignments for the selected read. Each alignment entry includes a "Go" button that navigates the view to the specific genomic location of that alignment, automatically setting the zoom and contig selection.
 
-The Alignments tab appears as a separate panel when read alignment data is available. This panel displays detailed information about read alignments and supports interactive exploration:
+#### Gene tab
 
-- **Read clicking**: Reads can be clicked directly in the alignment visualization. This functionality works only for the bottom alignment profile when multiple alignment profiles are displayed.
-- **Alignment details**: When a read is clicked, the panel shows all alignments for that specific read, including alignment position, quality metrics, and mapping information.
-- **Navigation**: Each alignment entry includes a "Go" button that navigates the view to the specific genomic location of that alignment, automatically setting the zoom and contig selection.
-
-#### Reads
-
-The Genes tab provides functionality for exploring gene annotations:
-
-- **Gene selection**: Click on any gene in the table to select it for detailed viewing or navigation.
-- **Navigate to Gene**: The "Navigate to Gene" button zooms the visualization to the selected gene's location with appropriate padding, making it easy to examine genes of interest in their genomic context.
-- **Gene details**: Use "Show Details" to view comprehensive information about the selected gene, including position, strand, description, and taxonomic annotation when available.
+The Genes tab details all genes in view. Click on any gene in the table to select it for navigation. The "Navigate to Gene" button zooms the visualization to the selected gene's location with appropriate padding, making it easy to examine genes of interest in their genomic context.
 
 #### Profile parameters
 The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior.
-
 
 ### Saving and loading states
 
