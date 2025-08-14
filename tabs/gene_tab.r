@@ -7,7 +7,7 @@ set_tab_panel_f(function() {
     div(
       style = "margin-bottom: 10px;",
       actionButton("showGeneDetailsBtn", "Show Details"),
-      actionButton("zoomToGeneBtn", "Zoom to Gene")
+      actionButton("zoomToGeneBtn", "Navigate to Gene")
     ),
     DTOutput("genesTable")
   )

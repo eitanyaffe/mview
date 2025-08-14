@@ -69,9 +69,9 @@ rl_core <- function(project_id) {
     }
 }
 
-rl <- function(project_id = "c60", cdir="configs") {
+rl <- function(project_id = "minimal", cdir = "configs") {
     # load core modules
-    rl_core(project_id = "c60")
+    rl_core(project_id = project_id)
 
     # load specific config
     cfg_file <- paste0(cdir, "/", project_id, "/", project_id, "_cfg.r")
