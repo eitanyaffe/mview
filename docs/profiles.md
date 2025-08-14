@@ -7,47 +7,15 @@ This page describes the built-in profiles and their parameters.
 - **In code (when defining views/profiles)**: pass constructor arguments and/or `params` to the profile factory functions (e.g., `align_profile(...)`, `gene_profile(...)`). Constructor arguments set defaults. The `params` list registers interactive controls in the right panel.
 - **Interactively (in the app)**: use the right panel to change parameters at runtime. Values persist for the session (via cache), and updates are applied immediately to the plots.
 
-Which parameters appear interactively is up to you: only parameters listed in a profile's `params` are exposed in the right panel. Include just the controls you want users to adjust for convenience; other parameters can remain constructor-only defaults.
+Parameters listed in a profile's `params` appear in the right panel. Users can use this list to select which parameters are interactive.
 
-Hover is available in profiles to reveal information about the plotted elements.
+Hover is available in all profiles to reveal information about the plotted elements.
 
 ---
 
-### alignment profile
+### axis profile
 
-The alignment profile adapts to zoom level and can also be forced to a specific mode.
-
-What is shown:
-- **bin mode**: per-bin coverage bars; fill color indicates mutation density (gray to red). Binning adapts to zoom unless a fixed bin size is selected.
-- **full mode**: read spans and alignment rectangles; optional mutation overlay when enabled; alignment coloring indicates mutation density.
-- **pileup mode**: stacked bars at each position showing per-variant counts; consistent variant colors across modes.
-
-Parameter details
-- **alignment_filter**:
-  - `all`: no filtering.
-  - `single`: include only reads that have exactly one alignment within the queried intervals.
-  - `single_complete`: like `single`, but the single alignment must span the entire read (no clipping; read_start = 0 and read_end = read_length).
-  - `only_multiple`: include only reads that have two or more alignments within the queried intervals.
-- **height_style**:
-  - `by_coord_left`: assign vertical lanes to minimize overlap by sorting reads by start coordinate.
-  - `by_coord_right`: assign vertical lanes to minimize overlap by sorting reads by end coordinate.
-  - `by_mutations`: sort reads by mutation density (highest first) and assign lanes while preventing overlaps.
-- **max_reads**: applied at query time as a cap on the number of alignments fetched per interval for full mode, effectively limiting the number of reads rendered.
-Main parameters
-- **plot_style**: display strategy: `auto_full`, `auto_pileup`, `bin`, `full`, `pileup`.
-- **alignment_filter**: subset alignments: `all`, `single`, `single_complete`, `only_multiple`.
-- **full_style**: coloring/overlay in full mode: `none`, `by_mutations`, `by_strand`, `show_mutations`.
-- **height_style**: how vertical stacking is determined in full mode: `by_mutations`, `by_coord_left`, `by_coord_right`.
-- **target_bins**: target number of bins for automatic bin sizing in bin mode (integer).
-- **full_threshold**: max visible range (bp) to use full mode with `auto_full` (integer bp).
-- **pileup_threshold**: max visible range (bp) to use pileup mode with `auto_pileup` (integer bp).
-- **max_reads**: cap on reads queried/rendered in full mode (integer).
-- **max_mutations**: cap on mutations displayed when `show_mutations` is used (integer).
-- **bin_type**: bin size selection in bin mode: `auto`, or fixed sizes like `10`, `100`, `1000`, `5000`, `10000`.
-
-Notes
-- Auto modes choose between bin/full or bin/pileup based on the current visible range and the corresponding thresholds.
-- Variant colors are consistent across full and pileup modes.
+Shows the contig name, axis line, and tick marks for orientation.
 
 ---
 
@@ -63,13 +31,44 @@ Main parameters
 - **height**: vertical size of the profile (pixels).
 
 Notes
-- If the color field is missing or all-NA, a default light gray is used.
 - When many genes are visible in simple mode, sampling may be applied for responsiveness.
+
+**Coloring by multiple fields**. Create a color column from multiple gene fields (e.g., combine fields and map to hex colors), then set `color_field` to that column name.
 
 ---
 
-### axis profile
+### alignment profile
 
-Shows the contig name, axis line, and tick marks for orientation.
+Plot read alignments. Depending on zoom or explicit settings, it renders coverage bins, full read alignments, or per-position pileups.
 
+#### General parameters
+- **plot_style**
+  - `bin`: aggregate coverage into bins and draw coverage bars.
+  - `full`: draw per-read alignments; can color by attributes or overlay per-read mutations.
+  - `pileup`: draw stacked per-variant counts at each genomic position.
+  - `auto_full`: use full when visible range ≤ `full_threshold`, otherwise bin.
+  - `auto_pileup`: use pileup when visible range ≤ `pileup_threshold`, otherwise bin.
+- **full_threshold**: bp cutoff for `auto_full`.
+- **pileup_threshold**: bp cutoff for `auto_pileup`.
 
+#### Bin mode parameters
+  - `bin_type`: `auto` or a fixed bin size (e.g., `1000`).
+  - `target_bins`: target number of bins when `bin_type=auto`.
+
+#### Full mode parameters
+  - `alignment_filter`:
+    - `all`: no filtering.
+    - `single`: include only reads with exactly one alignment in the queried intervals.
+    - `single_complete`: like `single`, and the single alignment must span the entire read (no clipping).
+    - `only_multiple`: include only reads with two or more alignments in the queried intervals.
+  - `full_style`:
+    - `none`: alignments gray; no mutation overlay.
+    - `by_mutations`: color alignments by mutation density.
+    - `by_strand`: color by strand orientation relative to the read.
+    - `show_mutations`: alignments gray; draw per-mutation markers (limited by `max_mutations`).
+  - `height_style`:
+    - `by_coord_left`: minimize overlap by start coordinate.
+    - `by_coord_right`: minimize overlap by end coordinate.
+    - `by_mutations`: order by mutation density while preventing overlaps.
+  - `max_reads`: cap alignments fetched per interval in full mode.
+  - `max_mutations`: cap mutations drawn when `full_style=show_mutations`.
