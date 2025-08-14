@@ -69,12 +69,15 @@ rl_core <- function(project_id) {
     }
 }
 
-rl <- function(project_id = "c60") {
+rl <- function(project_id = "c60", cdir="configs") {
     # load core modules
     rl_core(project_id = "c60")
 
     # load specific config
-    cfg_file <- paste0("configs/", project_id, "/", project_id, "_cfg.r")
+    cfg_file <- paste0(cdir, "/", project_id, "/", project_id, "_cfg.r")
+    if (!file.exists(cfg_file)) {
+        stop(paste0("Configuration file not found: ", cfg_file))
+    }
     source(cfg_file, local = FALSE)
 
     # shiny app

@@ -28,9 +28,7 @@ get_mouse_info <- function(state) {
   # convert to contig coordinates
   tryCatch({
     local_info <- cxt$mapper$g2l(plot_x)
-    sprintf("%s: %d", 
-            local_info$contig[1], 
-            round(local_info$coord[1]))
+    sprintf("Coord: %d", round(local_info$coord[1]))
   }, error = function(e) {
     sprintf("out of range, y:%.1f", plot_y)
   })
@@ -86,7 +84,7 @@ output$basic_info <- renderText({
       zoom_text <- sprintf("global: %d – %d", round(state$zoom[1]), round(state$zoom[2]))
     }
     
-    c(zoom_text, sprintf("Range: %s", window_size_text))
+    c(zoom_text, sprintf("Window: %s", window_size_text))
   }
 
   mouse_info <- get_mouse_info(state)

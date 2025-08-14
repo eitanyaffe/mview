@@ -1,10 +1,22 @@
-# Mview
+# mview
 
-A nimble interactive genomic data visualization tool built with R Shiny for exploring assemblies, contigs, genes, and genomic features.
+A nimble metagenomic visualization tool for exploring genome assemblies.
 
 ## Description
 
-Mview provides a highly customizable R-based platform for visualizing genomic data through user-defined interactive views. Mview allows to explore read alignments and gene annotations. The tool is designed for researchers working with reference-based and reconstructed metagenomic assemblies.
+Mview provides a customizable R-based shiny application for visualizing genomic data. The tool is designed for researchers working with reference-based and reconstructed metagenomic assemblies.
+
+Mview is built around four key components that work together to create flexible genomic visualizations:
+
+- **Configurations**: Define data sources, assemblies, available tabs, and which views to load. These files specify how to read your genomic data tables and register visualization components.
+
+- **Views**: Define a set profiles to display. Configurations define one or more views. 
+
+- **Profiles**: Individual visualization components like gene tracks, alignment displays, and coordinate axes. Each profile handles a specific type of genomic data visualization.
+
+- **Tabs**: Optional bottom panel components that provide detailed data tables and interactive features for genes, alignments, and other data types.
+
+Users visualize their data by creating configuration files that point to their tables while using existing profiles. Advanced users can implement custom profiles to create new visualizations.
 
 ## Prerequisites
 
@@ -14,165 +26,107 @@ Install all required packages at once:
 
 ```r
 install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
+```
 
-# Required to visualize read alignments using alntools
+### Installing alntools (Optional)
+
+Alntools is a C++ program that allows for efficient querying of alignments for real-time visualization.
+
+To visualize read alignments, you need to install **alntools** from GitHub:
+
+```bash
+# Clone and build from source
+git clone https://github.com/eitanyaffe/alntools.git
+cd alntools
+make
+# Copy binary to user's local bin directory
+mkdir -p ~/bin
+cp bin/alntools ~/bin/
+export PATH="$HOME/bin:$PATH"
+```
+
+Install required R package:
+```r
 install.packages(c("Rcpp"))
 ```
 
 ## Quick Start
 
-### 1. Start R and Launch Mview
+### 1. Start R and launch mview
 
 ```r
 # Start R in the mview directory
-source("app.r")
+source("mview.r")
 ```
 
-### 2. Load a Configuration
+### 2. Load a configuration
 
 Once the app starts, you need to load a configuration. In the R console, type:
 
 ```r
-# Load the simple example configuration
-rl("example_simple")
-
-# Or load your own custom configuration
-rl("my_config")
+# Load the minimal example configuration
+rl("minimal")
 ```
 
-### 3. Use the Application
+The `rl()` function loads a configuration defined in `configs/minimal/minimal_cfg.r`
 
-The app will open in your browser. You can then:
-- Select assemblies and contigs from the data tables
-- Explore gene annotations through interactive profiles
-- Use interactive plots to zoom and navigate genomic regions
-- Use keyboard shortcuts ('r' to reset zoom, 'q' to quit)
-- Adjust visualization parameters in the collapsible parameter panel
+### 3. Basic usage of mview
 
-### What `rl()` Does
+Application layout:
 
-The `rl()` function (reload) loads a configuration by:
-1. Clearing any existing cache and state
-2. Sourcing the configuration file from `configs/{config_id}/{config_id}_cfg.r`
-3. Registering all profiles, views, and tabs
-4. Updating the UI with the new configuration
+- **Left**: Information about display region.
+- **Middle**: Profiles plots.
+- **Right**: Profile parameter window.
+- **Bottom**: Tables in tabs.
 
-## UI Parameters
+#### Selecting the viewing region
 
-mview provides interactive parameters to customize how profiles are displayed. These parameters appear in a collapsible panel on the right side of the interface.
+1. **Select contigs**: Use Contigs or Genomes tab to select one or more contigs
+2. **Zoom**: Use mouse to select regions in the visualization
+3. **Lock zoom**: Press Shift+Z to set the selected region as zoom
+4. **Navigation**: Use Shift+Backspace for undo, press Help button for all shortcuts
 
-### Using Parameters
-- **Parameter Panel**: Click the toggle button to expand/collapse the parameter panel
-- **Profile-Specific Settings**: Each profile can define its own customizable parameters
-- **Real-Time Updates**: Changes to parameters immediately update the visualization
-- **Parameter Types**: 
-  - Select dropdowns (e.g., color schemes)
-  - Numeric inputs (e.g., thresholds, sizes)
-  - Boolean toggles (e.g., show/hide features)
+**State management**: Use the States tab to save current view (contigs + zoom) and restore saved states.
 
-### Example Parameters
-- **Gene Profile**: Color genes by taxonomy vs. regex patterns
-- **Custom Profiles**: Any parameter you define in your profile configuration
+#### Tables
 
-## Saving and Loading States
+The bottom panel contains these tabs:
+- **States**: Manage saved visualization states 
+- **Contigs**: Table for selecting individual contigs
+- **Genomes**: Table for selecting reconstructed genomes
+- **Contig Map**: Mapping between contigs and genomes
+- **Selected Contigs**: Displays currently selected contigs
+- **Options**: Display settings
 
-mview automatically manages session state and provides persistence across sessions.
+**Additinal tabs** (optional; shown only if registered in configuration):
+- **Genes**: Gene table
+- **Alignments**: Read alignment table
 
-### Automatic State Management
-- **Current Selection**: Assembly and contig selections are maintained
-- **Zoom Level**: Current genomic coordinate range is preserved
-- **Parameter Values**: All parameter settings are cached
-- **View State**: Active view and profile configurations are remembered
+#### Profile parameters
+The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior.
 
-### State Persistence
-- **Session Cache**: State is maintained within an R session
-- **Cross-Session**: Parameter values persist between app restarts through the cache system
-- **Configuration-Specific**: Each configuration maintains its own cached state
 
-### Manual State Control
-- **Reset**: Use 'r' keyboard shortcut to reset zoom to show all contigs
-- **Clear Cache**: Restart R session to completely clear all cached state
-- **Configuration Switch**: Use `rl("config_id")` to switch between different configurations
+## Saving and loading state
 
-## How Mview is Structured
+**Initialize state table**: Create a new table ("New Table") or load an existing state table ("Load Table").
 
-### State Management
-mview maintains application state through reactive variables:
-- **Assembly**: Currently selected assembly ID
-- **Contigs**: Selected contigs for visualization
-- **Zoom**: Current genomic coordinate range for detailed views
-- **Parameters**: Profile-specific display options
+**To save current state**:
+1. Navigate to States tab
+2. Enter description in text field  
+3. Click "Add Current State"
 
-### Profiles
-Profiles are the core visualization components that stack vertically:
-- **Gene Profile**: Displays annotated genes with taxonomy coloring
-- **Alignment Profile**: Shows read alignments with coverage and variants
-- **Axis Profile**: Provides coordinate reference scales
-- **Custom Profiles**: Advanced users can create profiles for any genomic data type
+**To restore a state**:
+1. Select state from table
+2. Click "Go to Selected State"
 
-Each profile includes customizable parameters for colors, filtering, and display options.
+**Additional actions**: "Delete Selected State", "Save Table" (to file), "Load Table" (from file)
 
-📖 **See [Available Profiles](docs/profiles.md) for detailed documentation and parameters**
+## Working with your data
 
-### Tabs
-Tabs provide data exploration interfaces:
-- **Genes Tab**: Browse and filter gene annotations
-- **Alignments Tab**: Explore read mapping data (when available)
+See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing data files and configuration.
 
-Data tables are interactive with sorting, filtering, and selection capabilities.
+## Customizing views and profiles
 
-## Keyboard Shortcuts
+**Views**: Create custom views by copying existing view files and modifying which profiles to display and their parameters. Each view defines a specific layout of gene tracks, alignment displays, and visualization settings.
 
-- **`r`**: Reset zoom to show all selected contigs
-- **`q`**: Quit application
-- **Arrow keys**: Navigate within tables and interface elements
-- **Mouse wheel**: Zoom in/out on plots
-- **Click + drag**: Pan across genomic regions
-
-## Configuration Files
-
-mview uses a modular configuration system:
-
-```
-configs/
-├── example_simple/           # Simple example for learning
-│   ├── example_simple_cfg.r  # Main configuration
-│   └── example_simple_main_view.r  # Profile definitions
-└── my_config/                # Your custom configuration
-    ├── my_config_cfg.r       # Your configuration
-    └── my_config_main_view.r # Your profiles
-```
-
-## Data Structure
-
-```
-examples/
-├── lookup.txt                # Data table registry
-└── tables/                   # Data files
-    ├── assembly_table.txt    # Assembly definitions
-    ├── contig_table_*.txt    # Contig information per assembly
-    ├── gene_table_*.txt      # Gene annotations per assembly
-    └── uniref_table_*.txt    # Protein annotations per assembly
-```
-
-## Advanced Topics
-
-For detailed information on customization and advanced usage, see:
-
-### [Understanding Views and Profiles](docs/advanced.md#understanding-views-and-profiles)
-Learn how mview's visualization system works with views and profiles.
-
-### [Importing Your Own Data](docs/advanced.md#importing-your-own-data)  
-Step-by-step guide to import and visualize your genomic data.
-
-### [Available Profiles](docs/profiles.md)
-Complete documentation of current profiles and their parameters.
-
-### [Building Custom Profiles](docs/advanced.md#building-a-profile)
-Advanced: Create custom visualization profiles for your specific data types.
-
-### [Data Requirements](docs/advanced.md#data-requirements)
-Required table formats and column specifications.
-
-### [Configuration Architecture](docs/advanced.md#configuration-architecture)
-Deep dive into mview's modular architecture and customization points.
+**Profiles**: Building custom profiles is straightforward - copy existing profile code from the `profiles/` directory and modify the plotting functions to handle your specific data types and visualization needs.
