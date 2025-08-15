@@ -114,17 +114,17 @@ ui <- fluidPage(
     }
     .parameter-panel-content {
       padding: 10px;
-      max-height: 6in;
+      max-height: 8in;
       overflow-y: auto;
       overflow-x: hidden;
     }
     #parameterTabs .tab-pane {
-      max-height: 5.5in;
+      max-height: 7.5in;
       overflow-y: auto;
       overflow-x: hidden;
     }
     .parameter-group-content {
-      max-height: 5.5in;
+      max-height: 7.5in;
       overflow-y: auto;
       overflow-x: hidden;
       padding-left: 10px;

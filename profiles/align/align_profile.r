@@ -1,16 +1,40 @@
 # Helper for creating an alignment-based profile
 # Supports bin/pileup/full modes based on zoom level
 
+# define the shared red color palette used across all mutation visualizations
+get_red_palette <- function() {
+  return(c("#fee0d2", "#fc9272", "#fb6a4a", "#cb181d", "#a50f15", "#67000d"))
+}
+
+# shared red color scale function for both continuous and discrete red colors
+get_shared_red_scale <- function(continuous = TRUE, num_colors = 6) {
+  red_palette <- get_red_palette()
+  
+  if (continuous) {
+    # return the base colors for continuous scale
+    return(c(red_palette[1], red_palette[6]))
+  } else {
+    # return discrete red colors from light to dark
+    return(red_palette[seq_len(min(num_colors, length(red_palette)))])
+  }
+}
+
 # Get mutation density colors (shared between bin and full modes)
 get_mutation_colors <- function(mutations_per_100bp) {
-  # use consistent scale: 0 to 1 mutation per 100bp
-  colors <- get_color_scale(
-    values = mutations_per_100bp,
-    colors = c("lightgray", "red"),
-    min_val = 0,
-    max_val = 1.0,
-    num_steps = 20
-  )
+  # convert from mutations per 100bp to mutations per bp for threshold comparison
+  mutations_per_bp <- mutations_per_100bp / 100
+  
+  # use shared red palette
+  red_palette <- get_red_palette()
+  
+  # apply same thresholds as discrete scale using vectorized ifelse for efficiency
+  colors <- ifelse(mutations_per_bp <= 0, red_palette[1],
+            ifelse(mutations_per_bp <= 0.0001, red_palette[2],
+            ifelse(mutations_per_bp <= 0.001, red_palette[3],
+            ifelse(mutations_per_bp <= 0.01, red_palette[4],
+            ifelse(mutations_per_bp <= 0.1, red_palette[5],
+                   red_palette[6])))))
+  
   return(colors)
 }
 
@@ -66,87 +90,91 @@ get_variant_colors <- function(aln, cxt) {
   return(variant_colors)
 }
 default_alignment_params <- list(
+  # align_general - parameters used across multiple modes
   plot_style = list(
-    group_id = "alignment",
+    group_id = "align_general",
     type = "select",
     choices = c("auto_full", "auto_pileup", "bin", "full", "pileup"),
     default = "auto_full"
   ),
-
   alignment_filter = list(
-    group_id = "alignment",
+    group_id = "align_general",
     type = "select",
     choices = c("all", "single", "single_complete", "only_multiple"),
     default = "all"
   ),
-  full_style = list(
-    group_id = "alignment",
-    type = "select",
-    choices = c("none", "by_mutations", "by_strand", "show_mutations"), 
-    default = "by_mutations"
-  ),
-  target_bins = list(
-    group_id = "alignment",
-    type = "integer",
-    default = 250
-  ),
-  bin_style = list(
-    group_id = "alignment",
-    type = "select",
-    choices = c("by_mut_density", "by_seg_density", "by_nonref_density", "by_genomic_distance"),
-    default = "by_mut_density"
-  ),
-  seg_threshold = list(
-    group_id = "alignment",
-    type = "double",
-    default = 0.2
-  ),
-  non_ref_threshold = list(
-    group_id = "alignment",
-    type = "double",
-    default = 0.9
-  ),
-  full_threshold = list(
-    group_id = "alignment",
-    type = "integer",
-    default = 50000
-  ),
-  pileup_threshold = list(
-    group_id = "alignment",
-    type = "integer",
-    default = 1000
-  ),
-  max_reads = list(
-    group_id = "alignment",
-    type = "integer",
-    default = 1000
-  ),
-  max_mutations = list(
-    group_id = "alignment",
-    type = "integer",
-    default = 1000
-  ),
   height_style = list(
-    group_id = "alignment",
+    group_id = "align_general",
     type = "select",
     choices = c("by_mutations", "by_coord_left", "by_coord_right"), 
     default = "by_mutations"
   ),
-  bin_type = list(
-    group_id = "alignment",
+
+  # align_full - parameters specific to full profile mode
+  full_style = list(
+    group_id = "align_full",
     type = "select",
-    choices = c("auto", "10", "100", "1000", "5000", "10000"),
-    default = "auto"
+    choices = c("none", "by_mutations", "by_strand", "show_mutations"), 
+    default = "by_mutations"
+  ),
+  full_threshold = list(
+    group_id = "align_full",
+    type = "integer",
+    default = 50000
+  ),
+  max_reads = list(
+    group_id = "align_full",
+    type = "integer",
+    default = 1000
+  ),
+  max_mutations = list(
+    group_id = "align_full",
+    type = "integer",
+    default = 1000
   ),
   full_min_mutations_density = list(
-    group_id = "alignment",
+    group_id = "align_full",
     type = "double",
     default = 0
   ),
   full_mutation_lwd = list(
-    group_id = "alignment", 
+    group_id = "align_full", 
     type = "double",
     default = 0.5
+  ),
+
+  # align_bin / align_pileup - parameters for bin and pileup modes
+  target_bins = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 250
+  ),
+  bin_style = list(
+    group_id = "align_bin",
+    type = "select",
+    choices = c("by_mut_density", "by_genomic_distance", "by_seg_density", "by_nonref_density"),
+    default = "by_mut_density"
+  ),
+  bin_type = list(
+    group_id = "align_bin",
+    type = "select",
+    choices = c("auto", "10", "100", "1000", "5000", "10000"),
+    default = "auto"
+  ),
+  seg_threshold = list(
+    group_id = "align_bin",
+    type = "double",
+    default = 0.2
+  ),
+  non_ref_threshold = list(
+    group_id = "align_bin",
+    type = "double",
+    default = 0.9
+  ),
+  pileup_threshold = list(
+    group_id = "align_pileup",
+    type = "integer",
+    default = 1000
   )
 )
 

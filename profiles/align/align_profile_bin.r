@@ -65,92 +65,185 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
 
 # Function to plot stacked mutation rates
 plot_stacked_mutation_rates <- function(gg, df) {
-  # Define colors for each mutation distance category (light to dark red)
-  mut_colors <- list(
-    dist_1_plus = "#67000d",       # darkest red (>1e-1 per bp)
-    dist_2 = "#a50f15",           # dark red (1e-2 to 1e-1 per bp)
-    dist_3 = "#cb181d",           # medium red (1e-3 to 1e-2 per bp)
-    dist_4 = "#fb6a4a",           # light red (1e-4 to 1e-3 per bp)
-    dist_5 = "#fc9272",           # lighter red (1e-5 to 1e-4 per bp)
-    dist_none = "#fee0d2"         # lightest red (no mutations)
-  )
+  if (nrow(df) == 0) return(gg)
   
-  # Create stacked data
+  # use shared red color scale for discrete mutation categories
+  red_colors <- get_shared_red_scale(continuous = FALSE, num_colors = 6)
+  
+  # define categories in stacking order (bottom to top)
+  categories <- c("dist_1_plus", "dist_2", "dist_3", "dist_4", "dist_5", "dist_none")
+  colors <- c(red_colors[6], red_colors[5], red_colors[4], red_colors[3], red_colors[2], red_colors[1])
+  
+  # descriptions for hover text
+  descriptions <- c(">10% per bp", "1% to 10% per bp", "0.1% to 1% per bp", 
+                   "0.01% to 0.1% per bp", "0.001% to 0.01% per bp", "0 mutations")
+  
+  # initialize bottom y values for each bin (start at 0)
+  bottom_y <- rep(0, nrow(df))
+  
+  # create stacked data by processing each category
   stacked_data <- data.frame()
   
-  for (i in 1:nrow(df)) {
-    row <- df[i, ]
+  for (i in seq_along(categories)) {
+    cat <- categories[i]
+    color <- colors[i]
+    desc <- descriptions[i]
     
-    # Calculate cumulative heights for stacking
-    cumulative_height <- 0
+    # get counts for this category, handle missing/NA values
+    counts <- df[[cat]]
+    if (is.null(counts)) counts <- rep(0, nrow(df))
+    counts[is.na(counts)] <- 0
     
-    # Add each mutation distance category (bottom to top: highest to lowest distances)
-    categories <- c("dist_1_plus", "dist_2", "dist_3", 
-                   "dist_4", "dist_5", "dist_none")
-    
-    for (cat in categories) {
-      count <- row[[cat]]
-      if (is.null(count) || length(count) == 0 || is.na(count)) {
-        count <- 0
-      }
-      if (count > 0) {
-        stacked_data <- rbind(stacked_data, data.frame(
-          gstart = row$gstart,
-          gend = row$gend,
-          ymin = cumulative_height,
-          ymax = cumulative_height + count,
-          category = cat,
-          fill_color = mut_colors[[cat]],
-          contig = row$contig,
-          start = row$start,
-          end = row$end,
-          length = row$length,
-          read_count = row$read_count,
-          cov = row$cov,
-          count = count,
-          stringsAsFactors = FALSE
-        ))
-        cumulative_height <- cumulative_height + count
-      }
+    # only create rectangles for non-zero counts
+    has_count <- counts > 0
+    if (any(has_count)) {
+      # create data for this category's rectangles
+      category_data <- data.frame(
+        gstart = df$gstart[has_count],
+        gend = df$gend[has_count],
+        ymin = bottom_y[has_count],
+        ymax = bottom_y[has_count] + counts[has_count],
+        fill_color = color,
+        category = cat,
+        description = desc,
+        count = counts[has_count],
+        contig = df$contig[has_count],
+        start = df$start[has_count],
+        end = df$end[has_count],
+        length = df$length[has_count],
+        read_count = df$read_count[has_count],
+        stringsAsFactors = FALSE
+      )
+      
+      # create hover text
+      category_data$hover_text <- paste0(
+        category_data$count, " out of ", category_data$read_count, "\n",
+        "Category: ", category_data$description
+      )
+      
+      stacked_data <- rbind(stacked_data, category_data)
     }
+    
+    # update bottom y values for next category
+    bottom_y <- bottom_y + counts
   }
   
   if (nrow(stacked_data) > 0) {
-    # Convert category names to descriptive text
-    category_descriptions <- sapply(stacked_data$category, function(cat) {
-      switch(cat,
-        "dist_none" = "0 mutations",
-        "dist_5" = "0.001% to 0.01% per bp",
-        "dist_4" = "0.01% to 0.1% per bp", 
-        "dist_3" = "0.1% to 1% per bp",
-        "dist_2" = "1% to 10% per bp",
-        "dist_1_plus" = ">10% per bp",
-        cat  # fallback to original name
-      )
-    })
-    
-    # Create hover text for each stack segment
-    stacked_data$hover_text <- paste0(
-      "Bin Contig: ", stacked_data$contig, "\n",
-      "Local (1-based): ", stacked_data$start, "-", stacked_data$end, "\n",
-      "Length: ", format_bp(stacked_data$length), "\n",
-      "Total Reads: ", stacked_data$read_count, "\n",
-      "Category: ", category_descriptions, "\n",
-      "Count: ", stacked_data$count
-    )
-    
-    # Add stacked rectangles that touch each other
+    # add stacked rectangles
     gg <- gg + ggplot2::geom_rect(
       data = stacked_data,
       ggplot2::aes(
         xmin = gstart, xmax = gend,
         ymin = ymin, ymax = ymax,
         fill = fill_color, color = fill_color, text = hover_text
-      ), size = 0.1  # thin border in matching color to eliminate gaps
+      ), size = 0.1
     ) +
       ggplot2::scale_fill_identity() +
       ggplot2::scale_color_identity()
   }
+  
+  return(gg)
+}
+
+# Plot mutation density bins with red color scale
+plot_mutation_density_bins <- function(gg, df) {
+  # mutation density visualization
+  mutations_per_100bp <- df$mut_density * 100
+  df$fill_color <- get_mutation_colors(mutations_per_100bp)
+  
+  # hover text
+  df$hover_text <- paste0(
+    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+    "Mutation density: ", sprintf("%.3f%%", df$mut_density * 100)
+  )
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color, text = hover_text
+    ), size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
+  
+  return(gg)
+}
+
+# Plot segregating sites bins with blue color scale
+plot_segregating_sites_bins <- function(gg, df) {
+  # segregating sites density visualization
+  seg_density_per_100bp <- df$seg_sites_density
+  max_seg_density <- max(seg_density_per_100bp, na.rm = TRUE)
+  if (is.na(max_seg_density) || max_seg_density == 0) {
+    max_seg_density <- 1  # set a default if no segregating sites found
+  }
+  df$fill_color <- get_color_scale(
+    values = seg_density_per_100bp,
+    colors = c("#c6dbef", "#08306b"),
+    min_val = 0,
+    max_val = max_seg_density,
+    num_steps = 20
+  )
+  
+  # hover text
+  seg_sites_count <- round(df$seg_sites_density * df$length)
+  df$hover_text <- paste0(
+    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+    "Segregating sites: ", seg_sites_count
+  )
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color, text = hover_text
+    ), size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
+  
+  return(gg)
+}
+
+# Plot non-reference sites bins with orange color scale
+plot_nonref_sites_bins <- function(gg, df) {
+  # non-reference sites density visualization
+  nonref_density_per_100bp <- df$non_ref_sites_density
+  max_nonref_density <- max(nonref_density_per_100bp, na.rm = TRUE)
+  if (is.na(max_nonref_density) || max_nonref_density == 0) {
+    max_nonref_density <- 1  # set a default if no non-ref sites found
+  }
+  df$fill_color <- get_color_scale(
+    values = nonref_density_per_100bp,
+    colors = c("#fff7bc", "#d94701"),
+    min_val = 0,
+    max_val = max_nonref_density,
+    num_steps = 20
+  )
+  
+  # hover text
+  nonref_sites_count <- round(df$non_ref_sites_density * df$length)
+  df$hover_text <- paste0(
+    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+    "Non-ref sites: ", nonref_sites_count
+  )
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color, text = hover_text
+    ), size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
   
   return(gg)
 }
@@ -165,113 +258,35 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
     return(gg)
   }
   
+  # eliminate gaps between bins by adjusting boundaries
+  if (nrow(df) > 1) {
+    # sort by gstart to ensure proper ordering
+    df <- df[order(df$gstart), ]
+    
+    # adjust gend of each bin to touch the start of the next bin
+    for (i in seq_len(nrow(df) - 1)) {
+      if (df$gend[i] < df$gstart[i + 1]) {
+        # extend current bin to touch next bin
+        df$gend[i] <- df$gstart[i + 1]
+      }
+    }
+  }
+  
   # Get bin style from profile parameters
   bin_style <- if (!is.null(profile$bin_style)) profile$bin_style else "by_mut_density"
   
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$read_count / df$length, 0)
-  df$mut_density <- ifelse(df$read_count > 0, df$mutation_count / df$read_count, 0)
+  df$mut_density <- ifelse(df$length > 0, df$mutation_count / df$length, 0)
 
+  # choose and call appropriate visualization function
   if (bin_style == "by_mut_density") {
-    # Original mutation density visualization
-    mutations_per_100bp <- df$mut_density * 100
-    df$fill_color <- get_mutation_colors(mutations_per_100bp)
-    
-    # Hover text
-    df$hover_text <- paste0(
-      "Bin Contig: ", df$contig, "\n",
-      "Local (1-based): ", df$start, "-", df$end, "\n",
-      "Global (0-based): ", df$gstart, "-", df$gend, "\n",
-      "Length: ", format_bp(df$length), "\n",
-      "Reads: ", df$read_count, " (Cov: ", sprintf("%.2f", df$cov), "x)\n",
-      "Muts: ", df$mutation_count, " (Dens: ", sprintf("%.4f", df$mut_density), " muts/bp)"
-    )
-    
-    # Plot bins
-    gg <- gg + ggplot2::geom_rect(
-      data = df,
-      ggplot2::aes(
-        xmin = gstart, xmax = gend,
-        ymin = 0, ymax = cov,
-        fill = fill_color, text = hover_text
-      ), size = 0.2, color = NA
-    ) +
-      ggplot2::scale_fill_identity()
-      
+    gg <- plot_mutation_density_bins(gg, df)
   } else if (bin_style == "by_seg_density") {
-    # Segregating sites density visualization with green colors
-    seg_density_per_100bp <- df$seg_sites_density
-    max_seg_density <- max(seg_density_per_100bp, na.rm = TRUE)
-    if (is.na(max_seg_density) || max_seg_density == 0) {
-      max_seg_density <- 1  # Set a default if no segregating sites found
-    }
-    df$fill_color <- get_color_scale(
-      values = seg_density_per_100bp,
-      colors = c("#c6dbef", "#08306b"),
-      min_val = 0,
-      max_val = max_seg_density,
-      num_steps = 20
-    )
-    
-    # Hover text
-    df$hover_text <- paste0(
-      "Bin Contig: ", df$contig, "\n",
-      "Local (1-based): ", df$start, "-", df$end, "\n",
-      "Global (0-based): ", df$gstart, "-", df$gend, "\n",
-      "Length: ", format_bp(df$length), "\n",
-      "Reads: ", df$read_count, " (Cov: ", sprintf("%.2f", df$cov), "x)\n",
-      "Seg Sites: ", sprintf("%.4f", df$seg_sites_density), " sites/bp"
-    )
-    
-    # Plot bins
-    gg <- gg + ggplot2::geom_rect(
-      data = df,
-      ggplot2::aes(
-        xmin = gstart, xmax = gend,
-        ymin = 0, ymax = cov,
-        fill = fill_color, text = hover_text
-      ), size = 0.2, color = NA
-    ) +
-      ggplot2::scale_fill_identity()
-      
+    gg <- plot_segregating_sites_bins(gg, df)
   } else if (bin_style == "by_nonref_density") {
-    # Non-reference sites density visualization with blue colors
-    nonref_density_per_100bp <- df$non_ref_sites_density
-    max_nonref_density <- max(nonref_density_per_100bp, na.rm = TRUE)
-    if (is.na(max_nonref_density) || max_nonref_density == 0) {
-      max_nonref_density <- 1  # Set a default if no non-ref sites found
-    }
-    df$fill_color <- get_color_scale(
-      values = nonref_density_per_100bp,
-      colors = c("#fff7bc", "#d94701"),
-      min_val = 0,
-      max_val = max_nonref_density,
-      num_steps = 20
-    )
-    
-    # Hover text
-    df$hover_text <- paste0(
-      "Bin Contig: ", df$contig, "\n",
-      "Local (1-based): ", df$start, "-", df$end, "\n",
-      "Global (0-based): ", df$gstart, "-", df$gend, "\n",
-      "Length: ", format_bp(df$length), "\n",
-      "Reads: ", df$read_count, " (Cov: ", sprintf("%.2f", df$cov), "x)\n",
-      "Non-ref Sites: ", sprintf("%.4f", df$non_ref_sites_density), " sites/bp"
-    )
-    
-    # Plot bins
-    gg <- gg + ggplot2::geom_rect(
-      data = df,
-      ggplot2::aes(
-        xmin = gstart, xmax = gend,
-        ymin = 0, ymax = cov,
-        fill = fill_color, text = hover_text
-      ), size = 0.2, color = NA
-    ) +
-      ggplot2::scale_fill_identity()
-      
+    gg <- plot_nonref_sites_bins(gg, df)
   } else if (bin_style == "by_genomic_distance") {
-    # Stacked mutation rate visualization
     gg <- plot_stacked_mutation_rates(gg, df)
   }
 
