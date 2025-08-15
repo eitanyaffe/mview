@@ -28,6 +28,7 @@ What is shown:
 Main parameters
 - **threshold**: range (bp) cutoff for switching simple vs full (integer bp).
 - **color_field**: column name that determines the color (e.g., `tax_color`). If the provided name lacks `_color`, the suffix is appended.
+- **label_field**: column used for tooltip text. If missing or not provided, a default label is used.
 - **height**: vertical size of the profile (pixels).
 
 Notes

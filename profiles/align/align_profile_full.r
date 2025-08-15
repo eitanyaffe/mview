@@ -218,7 +218,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
     # show rectangles when zoomed in under 100bp, otherwise segments
     xlim_range <- cxt$mapper$xlim[2] - cxt$mapper$xlim[1]
-    if (xlim_range < 500) {
+    if (xlim_range < 1000) {
       # plot mutation rectangles
       gg <- gg + ggplot2::geom_rect(
         data = mutations,
@@ -241,7 +241,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
           color = fill_color,
           text = hover_text
         ),
-        size = 0.25
+        size = 0.5
       ) +
         ggplot2::scale_color_identity()
     }

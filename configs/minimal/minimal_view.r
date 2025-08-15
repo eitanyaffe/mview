@@ -47,6 +47,7 @@ gene_profile(
   height = 50,
   gene_f = get_genes_f,
   color_field = "tax",
+  label_field = "label",
   params = gene_params
 )
 

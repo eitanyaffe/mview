@@ -70,12 +70,16 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
 
   cat(sprintf("plotting %d genes in %s mode\n", nrow(df), mode))
 
-  # Create hover text
-  df$hover_text <- paste0(
-    "Gene: ", df$gene, "\n",
-    if (!is.null(df$prot_desc)) paste0("Description: ", df$prot_desc, "\n") else "",
-    if (!is.null(df$tax)) paste0("Taxonomy: ", df$tax) else ""
-  )
+  # set hover text from label_field when provided, else use default
+  if (!is.null(profile$label_field) && profile$label_field %in% names(df)) {
+    df$hover_text <- as.character(df[[profile$label_field]])
+  } else {
+    df$hover_text <- paste0(
+      "Gene: ", df$gene, "\n",
+      if (!is.null(df$prot_desc)) paste0("Description: ", df$prot_desc, "\n") else "",
+      if (!is.null(df$tax)) paste0("Taxonomy: ", df$tax) else ""
+    )
+  }
 
   if (mode == "simple") {
     # Simple mode - efficient rendering for large ranges
@@ -97,7 +101,7 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
         text = hover_text
       ),
       color = df$color,
-      size = 0.5
+      size = 1
     )
   } else {
     # Full mode - detailed view for zoomed in ranges

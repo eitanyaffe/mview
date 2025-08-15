@@ -137,6 +137,13 @@ get_genes_f <- function(cxt) {
     # add mge color
     genes$mge_color <- get_mge_color(genes$prot_desc, mge_groups, mge_colors)
     
+    # build label text for tooltips (same logic as default in profile)
+    genes$label <- paste0(
+      "Gene: ", genes$gene, "\n",
+      if (!is.null(genes$prot_desc)) paste0("Description: ", genes$prot_desc, "\n") else "",
+      if (!is.null(genes$tax)) paste0("Taxonomy: ", genes$tax) else ""
+    )
+    
     genes
   })
 }

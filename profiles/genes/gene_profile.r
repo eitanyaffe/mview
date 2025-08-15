@@ -2,6 +2,7 @@ gene_profile <- function(id, name, height = 100,
                          gene_f = NULL,
                          color_field = "tax_color",
                          threshold = 200000,
+                         label_field = NULL,
                          params = list(),
                          auto_register = TRUE) {
   # Determine display mode based on view range
@@ -37,6 +38,7 @@ gene_profile <- function(id, name, height = 100,
     threshold = threshold,
     gene_f = gene_f,
     color_field = color_field,
+    label_field = label_field,
     auto_register = auto_register
   )
 }
