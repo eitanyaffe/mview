@@ -139,3 +139,8 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 **Views**: Create custom views by copying existing view files and modifying which profiles to display and their parameters. Each view defines a specific layout of gene tracks, read alignments and other profiles.
 
 **Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs.
+
+## Under development (v1.01)
+
+1. Read filtering is currently applied only to the full query mode. Future versions will extend read filtering to all query modes.
+2. Add density of segregating sites output to the bin query mode.  

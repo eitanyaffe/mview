@@ -29,9 +29,10 @@ get_alignment_colors <- function(alignments, reads, style) {
 align_query_full_mode <- function(aln, cxt, 
 height_style_str = "by_mutations", 
 max_reads = 1000,
-alignment_filter = "all") {
+alignment_filter = "all",
+min_mutations_density = 0.0) {
   # Query full alignment data
-  df <- aln_query_full(aln, cxt$intervals, height_style_str, max_reads, alignment_filter)
+  df <- aln_query_full(aln, cxt$intervals, height_style_str, max_reads, alignment_filter, min_mutations_density)
   cat(sprintf("done with aln_query_full\n"))
   
   # Process alignments
@@ -77,7 +78,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     cxt = cxt, 
     height_style = height_style, 
     max_reads = profile$max_reads, 
-    alignment_filter = profile$alignment_filter)
+    alignment_filter = profile$alignment_filter,
+    min_mutations_density = profile$full_min_mutations_density)
   
   # Plot reads first (under alignments)
   if (!is.null(df$reads) && nrow(df$reads) > 0) {
@@ -241,7 +243,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
           color = fill_color,
           text = hover_text
         ),
-        size = 0.5
+        size = profile$full_mutation_lwd
       ) +
         ggplot2::scale_color_identity()
     }

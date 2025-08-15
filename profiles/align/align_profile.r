@@ -121,6 +121,16 @@ default_alignment_params <- list(
     type = "select",
     choices = c("auto", "10", "100", "1000", "5000", "10000"),
     default = "auto"
+  ),
+  full_min_mutations_density = list(
+    group_id = "alignment",
+    type = "double",
+    default = 0
+  ),
+  full_mutation_lwd = list(
+    group_id = "alignment", 
+    type = "double",
+    default = 0.5
   )
 )
 
@@ -137,6 +147,8 @@ align_profile <- function(id, name, height = 400,
                           max_reads = 1000,
                           full_style = "by_mutations",
                           alignment_filter = "all",
+                          full_min_mutations_density = 0,
+                          full_mutation_lwd = 0.5,
                           params = default_alignment_params,
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -216,6 +228,8 @@ align_profile <- function(id, name, height = 400,
     max_mutations = max_mutations,
     max_reads = max_reads,
     full_style = full_style,
-    alignment_filter = alignment_filter
+    alignment_filter = alignment_filter,
+    full_min_mutations_density = full_min_mutations_density,
+    full_mutation_lwd = full_mutation_lwd
   )
 }
