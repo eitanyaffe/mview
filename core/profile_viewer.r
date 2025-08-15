@@ -87,11 +87,9 @@ plot_profiles <- function(cxt) {
         param_id <- names(profile$params)[i]
         group_id <- profile$params[[i]]$group
         if (is.null(group_id)) {
-          cat(sprintf("profile %s, param: %s, group_id is NULL\n", id, param_id))
-          continue
+          next
         }
         param_value <- get_param(group_id, param_id)()
-        cat(sprintf("profile %s, param: %s, value: %s\n", id, param_id, param_value))
         profile[[param_id]] <- param_value
       }
     }

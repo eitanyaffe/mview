@@ -90,6 +90,22 @@ default_alignment_params <- list(
     type = "integer",
     default = 250
   ),
+  bin_style = list(
+    group_id = "alignment",
+    type = "select",
+    choices = c("by_mut_density", "by_seg_density", "by_nonref_density", "by_genomic_distance"),
+    default = "by_mut_density"
+  ),
+  seg_threshold = list(
+    group_id = "alignment",
+    type = "double",
+    default = 0.2
+  ),
+  non_ref_threshold = list(
+    group_id = "alignment",
+    type = "double",
+    default = 0.9
+  ),
   full_threshold = list(
     group_id = "alignment",
     type = "integer",

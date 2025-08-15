@@ -135,12 +135,12 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     alignments$color <- get_alignment_colors(alignments, reads, profile$full_style)
 
     alignments$align_length <- alignments$end - alignments$start + 1
-    alignments$mut_density <- alignments$mutation_count / (alignments$align_length / 1000)
+    alignments$mut_density_pct <- (alignments$mutation_count / alignments$align_length) * 100
     alignments$hover_text <- paste0(
       "Read: ", alignments$read_id, "\n",
       alignments$start, "-", alignments$end, "\n",
       "Read coords: ", alignments$read_start, "-", alignments$read_end, " / ", alignments$read_length, "\n",
-      "Mutations: ", alignments$mutation_count, " (", sprintf("%.2f", alignments$mut_density), " muts/1kb)"
+      "Mutations: ", alignments$mutation_count, " (", sprintf("%.3f", alignments$mut_density_pct), "%)"
     )
 
     # draw alignment rectangles

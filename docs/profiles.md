@@ -55,6 +55,24 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
 #### Bin mode parameters
   - `bin_type`: `auto` or a fixed bin size (e.g., `1000`).
   - `target_bins`: target number of bins when `bin_type=auto`.
+  - `bin_style`: visualization mode for bins:
+    - `by_mut_density`: traditional mutation density (gray to red scale).
+    - `by_seg_density`: segregating sites density (blue scale).
+    - `by_nonref_density`: non-reference sites density (yellow to orange scale).
+    - `by_genomic_distance`: stacked mutation distance categories (red gradient, logarithmic scale).
+  - `seg_threshold`: threshold for segregating sites detection (default: 0.2).
+  - `non_ref_threshold`: threshold for non-reference sites detection (default: 0.9).
+
+#### Mutation distance categories (logarithmic scale)
+When using `bin_style=by_genomic_distance`, alignments are categorized by mutations per bp:
+  - `dist_none`: exactly 0 mutations
+  - `dist_5`: 1e-5 to 1e-4 per bp (10-100 mutations per 100kb)
+  - `dist_4`: 1e-4 to 1e-3 per bp (100-1,000 mutations per 100kb)
+  - `dist_3`: 1e-3 to 1e-2 per bp (1,000-10,000 mutations per 100kb)
+  - `dist_2`: 1e-2 to 1e-1 per bp (10,000-100,000 mutations per 100kb)
+  - `dist_1_plus`: >1e-1 per bp (>100,000 mutations per 100kb)
+
+Categories are stacked from highest distance (bottom) to lowest distance (top) in shades of red.
 
 #### Full mode parameters
   - `alignment_filter`:

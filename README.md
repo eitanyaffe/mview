@@ -4,7 +4,7 @@ A nimble metagenomic visualization tool for exploring genome assemblies.
 
 ## Description
 
-Mview provides a customizable R-based shiny application for visualizing genomic data. The tool is designed for researchers working with metagenomic assemblies.
+Mview provides a customizable R-based shiny application for visualizing genomic data. The tool is designed for researchers working with metagenomic assemblies and features advanced mutation analysis including segregating sites detection and genomic distance visualization.
 
 Mview is built around four key components that work together to create flexible genomic visualizations:
 
@@ -110,8 +110,22 @@ The collapsible right panel contains profile-specific settings that are applied 
 
 ### Profiles
 
-- **alignment**: Display read alignments.
+- **alignment**: Display read alignments with multiple visualization modes:
+  - **by_mut_density**: Traditional mutation density visualization (gray to red scale)
+  - **by_seg_density**: Segregating sites density visualization (blue scale) 
+  - **by_nonref_density**: Non-reference sites density visualization (yellow to orange scale)
+  - **by_genomic_distance**: Stacked mutation distance categories (red gradient, log scale)
 - **gene**: Display gene segments.
+
+#### Alignment Profile Parameters
+
+The alignment profile supports several key parameters accessible through the right panel:
+
+- **bin_style**: Choose visualization mode (`by_mut_density`, `by_seg_density`, `by_nonref_density`, `by_genomic_distance`)
+- **seg_threshold**: Threshold for segregating sites detection (default: 0.2)
+- **non_ref_threshold**: Threshold for non-reference sites detection (default: 0.9)
+- **plot_style**: Query mode selection (`auto_full`, `auto_pileup`, `bin`, `full`, `pileup`)
+- **binsize/target_bins**: Control bin resolution for bin mode
 
 Hover shows element information in all profiles. Profile parameters can be set in code or adjusted interactively in the right panel. See the detailed profile guide: [profiles](docs/profiles.md).
 
@@ -140,7 +154,10 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 **Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs.
 
-## Under development (v1.01)
+## Current development version (v1.01)
 
-1. Read filtering is currently applied only to the full query mode. Future versions will extend read filtering to all query modes.
-2. Add density of segregating sites output to the bin query mode.  
+- Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
+
+## Planned Features
+
+- Read filtering is currently applied only to the full query mode. Future versions will extend read filtering to all query modes.  
