@@ -18,24 +18,20 @@ Mview is built around four key components that work together to create flexible 
 
 Users visualize their data by creating configuration files that point to their tables while using existing profiles. The architecture supports the implementation of new profiles.
 
-## Prerequisites
+## Installation
 
-### Installation
+### Installation Overview
 
-Install required packages in R:
+mview is part of the makeshift toolkit for genomics analysis. The recommended setup organizes related tools in a shared directory structure:
 
-```r
-install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
+```
+makeshift/
+└── tools/
+    ├── mview/      # This visualization tool
+    └── alntools/   # Optional alignment processing (for read alignment profiles)
 ```
 
-### Dependencies for alntools integration
-
-For optimal performance with large alignment datasets, mview uses threaded bin queries from alntools. This requires:
-
-*   **Linux**: OpenMP library (usually included with gcc as `libgomp`)
-*   **macOS**: Install via Homebrew: `brew install libomp`
-
-Note: alntools should compile and work without OpenMP, but large alignment datasets will process sequentially rather than in parallel.
+This organization allows mview to seamlessly integrate with alntools for advanced alignment visualization features.
 
 ### Installing mview
 
@@ -48,7 +44,20 @@ cd /path/to/your/makeshift/tools
 git clone https://github.com/eitanyaffe/mview.git
 ```
 
+Install required packages in R:
+
+```r
+install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
+```
+
 ### Installing alntools (optional; needed for read alignment profiles)
+
+For optimal performance with large alignment datasets, mview uses threaded bin queries from alntools. This requires:
+
+*   **Linux**: OpenMP library (usually included with gcc as `libgomp`)
+*   **macOS**: Install via Homebrew: `brew install libomp`
+
+Note: alntools should compile and work without OpenMP, but large alignment datasets will process sequentially rather than in parallel.
 
 If you plan to visualize read alignments, install alntools:
 
