@@ -276,7 +276,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$sequenced_bp / df$length, 0)
-  df$mut_density <- ifelse(df$length > 0, df$mutation_count / df$length, 0)
+  df$mut_density <- ifelse(df$sequenced_bp > 0, df$mutation_count / df$sequenced_bp, 0)
 
   # choose and call appropriate visualization function
   if (bin_style == "by_mut_density") {
