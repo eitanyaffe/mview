@@ -3,6 +3,46 @@
 
 shifted_numbers <- c("!", "@", "#", "$", "%", "^", "&", "*", "(", ")")
 
+# helper function to zoom to 10^N basepairs around current center
+zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
+  # calculate target range (10^N basepairs)
+  target_range <- 10^n
+  half_range <- target_range / 2
+  
+  # determine current center
+  current_center <- if (!is.null(main_state_rv$zoom)) {
+    # if zoomed, use center of current zoom
+    (main_state_rv$zoom[1] + main_state_rv$zoom[2]) / 2
+  } else {
+    # if not zoomed, need to get center of all selected contigs
+    # this requires getting the contig data to find the center
+    NULL
+  }
+  
+  if (is.null(current_center)) {
+    # fallback: try to get center from contig data if available
+    if (length(main_state_rv$contigs) > 0) {
+      # attempt to get center from first contig - this is a fallback
+      cat(sprintf("command+%d: no current zoom, cannot determine center\n", n))
+      return()
+    } else {
+      cat(sprintf("command+%d: no contigs selected, cannot determine center\n", n))
+      return()
+    }
+  }
+  
+  # save current state before changing zoom
+  states_module_output$push_state()
+  
+  # set new zoom range centered on current center
+  new_start <- current_center - half_range
+  new_end <- current_center + half_range
+  main_state_rv$zoom <- c(new_start, new_end)
+  
+  cat(sprintf("zoomed to %s basepairs around center %.0f\n", 
+              format(target_range, big.mark = ","), current_center))
+}
+
 # Define keyboard shortcuts globally
 keyboard_shortcuts <- list(
   "Shift+backspace" = list(
@@ -82,6 +122,48 @@ keyboard_shortcuts <- list(
       states_module_output$push_state()
       main_state_rv$contigs <- character()
       cat("cleared selected contigs by Shift+C\n")
+    }
+  ),
+  "Command+2" = list(
+    description = "Zoom to 100 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(2, states_module_output, main_state_rv)
+    }
+  ),
+  "Command+3" = list(
+    description = "Zoom to 1,000 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(3, states_module_output, main_state_rv)
+    }
+  ),
+  "Command+4" = list(
+    description = "Zoom to 10,000 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(4, states_module_output, main_state_rv)
+    }
+  ),
+  "Command+5" = list(
+    description = "Zoom to 100,000 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(5, states_module_output, main_state_rv)
+    }
+  ),
+  "Command+6" = list(
+    description = "Zoom to 1,000,000 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(6, states_module_output, main_state_rv)
+    }
+  ),
+  "Command+7" = list(
+    description = "Zoom to 10,000,000 basepairs around current center",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      zoom_to_power_of_ten(7, states_module_output, main_state_rv)
     }
   )
 )
@@ -194,19 +276,31 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
 
 # Generate keyboard shortcuts documentation for help
 keyboard_summary <- function() {
+  # separate command+N zoom shortcuts for cleaner display
+  command_zoom_shortcuts <- grep("^Command\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
+  other_shortcuts <- setdiff(names(keyboard_shortcuts), command_zoom_shortcuts)
+  
   html_content <- "<h5>Actions</h5><ul>"
-  for (i in seq_along(keyboard_shortcuts)) {
-    shortcut <- names(keyboard_shortcuts)[i]
-    type <- keyboard_shortcuts[[i]]$type
+  
+  # add non-tab switch, non-command+N shortcuts first
+  for (shortcut_name in other_shortcuts) {
+    type <- keyboard_shortcuts[[shortcut_name]]$type
     if (type == "tab_switch") {
       next
     }
     html_content <- paste0(
       html_content,
-      "<li><strong>", shortcut, ":</strong> ",
-      keyboard_shortcuts[[shortcut]]$description, "</li>"
+      "<li><strong>", shortcut_name, ":</strong> ",
+      keyboard_shortcuts[[shortcut_name]]$description, "</li>"
     )
   }
+  
+  # add command+N shortcuts as a group
+  if (length(command_zoom_shortcuts) > 0) {
+    html_content <- paste0(html_content, 
+      "<li><strong>Command+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
+  }
+  
   html_content <- paste0(html_content, "</ul>")
 
   return(HTML(html_content))
