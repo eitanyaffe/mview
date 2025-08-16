@@ -29,7 +29,7 @@ get_current_bin_size <- function(xlim, bin_type, target_bins = 1024) {
   return(bin_size)
 }
 
-align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9) {
+align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0) {
   bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type, target_bins = target_bins)
 
   # Create cache key based on all relevant parameters
@@ -46,12 +46,13 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
                        xlim = cxt$mapper$xlim,
                        bin_size = bin_size,
                        seg_threshold = seg_threshold,
-                       non_ref_threshold = non_ref_threshold
+                       non_ref_threshold = non_ref_threshold,
+                       num_threads = num_threads
                      ), algo = "md5"))
 
   # Use cache for the bin query
   df <- cache(cache_key, {
-    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold)
+    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold, num_threads)
   })
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
@@ -278,8 +279,9 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   # Get threshold parameters from profile
   seg_threshold <- if (!is.null(profile$seg_threshold)) profile$seg_threshold else 0.2
   non_ref_threshold <- if (!is.null(profile$non_ref_threshold)) profile$non_ref_threshold else 0.9
+  num_threads <- if (!is.null(profile$num_threads)) profile$num_threads else 0
   
-  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold)
+  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads)
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }

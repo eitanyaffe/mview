@@ -168,6 +168,11 @@ default_alignment_params <- list(
     type = "double",
     default = 0.9
   ),
+  num_threads = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 0
+  ),
   normalize_distrib_bins = list(
     group_id = "align_bin",
     type = "boolean",
@@ -184,10 +189,9 @@ align_profile <- function(id, name, height = 400,
                           aln_f = NULL,
                           bin_type = "auto",
                           plot_style = "auto_full",
-
                           full_threshold = 50000,
                           pileup_threshold = 1000,
-                          target_bins = 250,
+                          target_bins = 100,
                           height_style = "by_mutations",
                           max_mutations = 1000,
                           max_reads = 1000,

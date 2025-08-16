@@ -28,14 +28,33 @@ Install required packages in R:
 install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
 ```
 
-### Installing alntools (required for the read alignment profile)
+### Dependencies for alntools integration
 
-Alntools is a C++ program that allows for efficient querying of alignments for real-time visualization in mview.
+For optimal performance with large alignment datasets, mview uses threaded bin queries from alntools. This requires:
 
-Install **alntools** from GitHub:
+*   **Linux**: OpenMP library (usually included with gcc as `libgomp`)
+*   **macOS**: Install via Homebrew: `brew install libomp`
+
+Note: alntools should compile and work without OpenMP, but large alignment datasets will process sequentially rather than in parallel.
+
+### Installing mview
+
+Clone mview from GitHub:
 
 ```bash
-# Clone and build from source
+# Create makeshift directory and clone mview
+mkdir -p /path/to/your/makeshift/tools
+cd /path/to/your/makeshift/tools
+git clone https://github.com/eitanyaffe/mview.git
+```
+
+### Installing alntools (optional; needed for read alignment profiles)
+
+If you plan to visualize read alignments, install alntools:
+
+```bash
+# Clone alntools into the same tools directory
+cd /path/to/your/makeshift/tools
 git clone https://github.com/eitanyaffe/alntools.git
 cd alntools
 make install
@@ -46,6 +65,14 @@ Add the local bin directory to your path if needed:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+**Set MAKESHIFT_ROOT environment variable** (only if using alntools): mview needs to locate the alntools C++ source files to compile the R adapter. Set this to your makeshift directory:
+
+```bash
+export MAKESHIFT_ROOT=/path/to/your/makeshift
+```
+
+Add this to your shell profile (`.bashrc`, `.zshrc`, etc.) to make it permanent.
+
 Install R package:
 ```r
 install.packages("Rcpp")
@@ -55,8 +82,15 @@ install.packages("Rcpp")
 
 ### 1. Start R and launch mview
 
+```bash
+# Navigate to the mview directory
+cd /path/to/your/makeshift/tools/mview
+# Start R
+R
+```
+
 ```r
-# Start R in the mview directory
+# Launch mview
 source("mview.r")
 ```
 
