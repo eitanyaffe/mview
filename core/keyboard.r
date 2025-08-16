@@ -23,10 +23,10 @@ zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
     # fallback: try to get center from contig data if available
     if (length(main_state_rv$contigs) > 0) {
       # attempt to get center from first contig - this is a fallback
-      cat(sprintf("command+%d: no current zoom, cannot determine center\n", n))
+      cat(sprintf("ctrl+%d: no current zoom, cannot determine center\n", n))
       return()
     } else {
-      cat(sprintf("command+%d: no contigs selected, cannot determine center\n", n))
+      cat(sprintf("ctrl+%d: no contigs selected, cannot determine center\n", n))
       return()
     }
   }
@@ -124,42 +124,42 @@ keyboard_shortcuts <- list(
       cat("cleared selected contigs by Shift+C\n")
     }
   ),
-  "Command+2" = list(
+  "Ctrl+2" = list(
     description = "Zoom to 100 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(2, states_module_output, main_state_rv)
     }
   ),
-  "Command+3" = list(
+  "Ctrl+3" = list(
     description = "Zoom to 1,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(3, states_module_output, main_state_rv)
     }
   ),
-  "Command+4" = list(
+  "Ctrl+4" = list(
     description = "Zoom to 10,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(4, states_module_output, main_state_rv)
     }
   ),
-  "Command+5" = list(
+  "Ctrl+5" = list(
     description = "Zoom to 100,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(5, states_module_output, main_state_rv)
     }
   ),
-  "Command+6" = list(
+  "Ctrl+6" = list(
     description = "Zoom to 1,000,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(6, states_module_output, main_state_rv)
     }
   ),
-  "Command+7" = list(
+  "Ctrl+7" = list(
     description = "Zoom to 10,000,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -276,13 +276,13 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
 
 # Generate keyboard shortcuts documentation for help
 keyboard_summary <- function() {
-  # separate command+N zoom shortcuts for cleaner display
-  command_zoom_shortcuts <- grep("^Command\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
-  other_shortcuts <- setdiff(names(keyboard_shortcuts), command_zoom_shortcuts)
+  # separate ctrl+N zoom shortcuts for cleaner display
+  ctrl_zoom_shortcuts <- grep("^Ctrl\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
+  other_shortcuts <- setdiff(names(keyboard_shortcuts), ctrl_zoom_shortcuts)
   
   html_content <- "<h5>Actions</h5><ul>"
   
-  # add non-tab switch, non-command+N shortcuts first
+  # add non-tab switch, non-ctrl+N shortcuts first
   for (shortcut_name in other_shortcuts) {
     type <- keyboard_shortcuts[[shortcut_name]]$type
     if (type == "tab_switch") {
@@ -295,10 +295,10 @@ keyboard_summary <- function() {
     )
   }
   
-  # add command+N shortcuts as a group
-  if (length(command_zoom_shortcuts) > 0) {
+  # add ctrl+N shortcuts as a group
+  if (length(ctrl_zoom_shortcuts) > 0) {
     html_content <- paste0(html_content, 
-      "<li><strong>Command+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
+      "<li><strong>Ctrl+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
   }
   
   html_content <- paste0(html_content, "</ul>")
