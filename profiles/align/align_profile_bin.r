@@ -63,7 +63,7 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
 }
 
 # Function to plot stacked mutation rates
-plot_stacked_mutation_rates <- function(gg, df) {
+plot_stacked_mutation_rates <- function(gg, df, normalize = FALSE) {
   if (nrow(df) == 0) return(gg)
   
   # use shared red color scale for discrete mutation categories
@@ -76,6 +76,26 @@ plot_stacked_mutation_rates <- function(gg, df) {
   # descriptions for hover text
   descriptions <- c(">10% per bp", "1% to 10% per bp", "0.1% to 1% per bp", 
                    "0.01% to 0.1% per bp", "0.001% to 0.01% per bp", "0 mutations")
+  
+  # normalize counts to percentages if requested
+  if (normalize) {
+    # calculate total counts for each bin
+    total_counts <- rep(0, nrow(df))
+    for (cat in categories) {
+      cat_counts <- df[[cat]]
+      if (!is.null(cat_counts)) {
+        cat_counts[is.na(cat_counts)] <- 0
+        total_counts <- total_counts + cat_counts
+      }
+    }
+    
+    # normalize each category to percentage of total
+    for (cat in categories) {
+      if (!is.null(df[[cat]])) {
+        df[[cat]] <- ifelse(total_counts > 0, (df[[cat]] / total_counts) * 100, 0)
+      }
+    }
+  }
   
   # initialize bottom y values for each bin (start at 0)
   bottom_y <- rep(0, nrow(df))
@@ -116,10 +136,17 @@ plot_stacked_mutation_rates <- function(gg, df) {
       )
       
       # create hover text
-      category_data$hover_text <- paste0(
-        category_data$count, " out of ", category_data$read_count, " reads\n",
-        "Category: ", category_data$description, "\n"
-      )
+      if (normalize) {
+        category_data$hover_text <- paste0(
+          sprintf("%.1f%%", category_data$count), " of reads\n",
+          "Category: ", category_data$description, "\n"
+        )
+      } else {
+        category_data$hover_text <- paste0(
+          category_data$count, " out of ", category_data$read_count, " reads\n",
+          "Category: ", category_data$description, "\n"
+        )
+      }
       
       stacked_data <- rbind(stacked_data, category_data)
     }
@@ -274,6 +301,9 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   # Get bin style from profile parameters
   bin_style <- if (!is.null(profile$bin_style)) profile$bin_style else "by_mut_density"
   
+  # Get normalization parameter
+  normalize_distrib_bins <- if (!is.null(profile$normalize_distrib_bins)) profile$normalize_distrib_bins else FALSE
+  
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$sequenced_bp / df$length, 0)
   df$mut_density <- ifelse(df$sequenced_bp > 0, df$mutation_count / df$sequenced_bp, 0)
@@ -286,7 +316,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   } else if (bin_style == "by_nonref_density") {
     gg <- plot_nonref_sites_bins(gg, df)
   } else if (bin_style == "by_genomic_distance") {
-    gg <- plot_stacked_mutation_rates(gg, df)
+    gg <- plot_stacked_mutation_rates(gg, df, normalize = normalize_distrib_bins)
   }
 
   gg <- gg + ggplot2::theme_minimal() +

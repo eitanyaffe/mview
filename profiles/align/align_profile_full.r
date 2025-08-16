@@ -31,8 +31,29 @@ height_style_str = "by_mutations",
 max_reads = 1000,
 alignment_filter = "all",
 min_mutations_density = 0.0) {
-  # Query full alignment data
-  df <- aln_query_full(aln, cxt$intervals, height_style_str, max_reads, alignment_filter, min_mutations_density)
+  
+  # Create cache key based on all relevant parameters
+  # Use address of external pointer as unique identifier for alignment
+  aln_id <- if (is(aln, "externalptr")) {
+    paste0("ptr_", format(aln))
+  } else {
+    digest::digest(aln, algo = "md5")
+  }
+  
+  cache_key <- paste0("full_query_",
+                     digest::digest(list(
+                       aln_id = aln_id,
+                       xlim = cxt$mapper$xlim,
+                       height_style_str = height_style_str,
+                       max_reads = max_reads,
+                       alignment_filter = alignment_filter,
+                       min_mutations_density = min_mutations_density
+                     ), algo = "md5"))
+
+  # Use cache for the full query
+  df <- cache(cache_key, {
+    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, alignment_filter, min_mutations_density)
+  })
   cat(sprintf("done with aln_query_full\n"))
   
   # Process alignments

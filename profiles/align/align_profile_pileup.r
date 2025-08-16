@@ -1,8 +1,25 @@
 # Pileup mode for alignment profile
 
-align_query_pileup_mode <- function(aln, cxt) {
-  # Query pileup data
-  df <- aln_query_pileup(aln, cxt$intervals, report_mode_str = "all")
+align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all") {
+  # Create cache key based on all relevant parameters
+  # Use address of external pointer as unique identifier for alignment
+  aln_id <- if (is(aln, "externalptr")) {
+    paste0("ptr_", format(aln))
+  } else {
+    digest::digest(aln, algo = "md5")
+  }
+  
+  cache_key <- paste0("pileup_query_",
+                     digest::digest(list(
+                       aln_id = aln_id,
+                       xlim = cxt$mapper$xlim,
+                       report_mode_str = report_mode_str
+                     ), algo = "md5"))
+
+  # Use cache for the pileup query
+  df <- cache(cache_key, {
+    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str)
+  })
 
   if (!is.null(df) && nrow(df) > 0) {
     # position from alntools is already 1-based, no need to add 1
@@ -14,7 +31,7 @@ align_query_pileup_mode <- function(aln, cxt) {
 }
 
 align_profile_pileup <- function(profile, cxt, aln, gg) {
-  df <- align_query_pileup_mode(aln, cxt)
+  df <- align_query_pileup_mode(aln, cxt, report_mode_str = "all")
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }

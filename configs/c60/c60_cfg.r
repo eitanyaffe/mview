@@ -60,7 +60,8 @@ view_register("early", view_file, timepoints = c("early"))
 view_register("pre", view_file, timepoints = c("pre"))
 view_register("post", view_file, timepoints = c("post"))
 view_register("late", view_file, timepoints = c("late"))
-view_register("pre vs. post", view_file, timepoints = c("pre", "post"))
+view_register("pre / post", view_file, timepoints = c("pre", "post"))
+view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"))
 view_register("all", view_file, timepoints = c("early", "pre", "post", "late"))
 
 ########################################################

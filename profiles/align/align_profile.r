@@ -168,6 +168,11 @@ default_alignment_params <- list(
     type = "double",
     default = 0.9
   ),
+  normalize_distrib_bins = list(
+    group_id = "align_bin",
+    type = "boolean",
+    default = FALSE
+  ),
   pileup_threshold = list(
     group_id = "align_pileup",
     type = "integer",
@@ -261,7 +266,6 @@ align_profile <- function(id, name, height = 400,
     aln_f = aln_f,
     bin_type = bin_type,
     plot_style = plot_style,
-
     full_threshold = full_threshold,
     pileup_threshold = pileup_threshold,
     target_bins = target_bins,
