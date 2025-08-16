@@ -44,14 +44,30 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
     return(gg)
   }
   
-  # get shared variant colors (consistent between full and pileup modes)
-  variant_colors <- get_variant_colors(aln, cxt)
-  
   # calculate cumulative heights using ave function
   df$y_bottom <- ave(df$count, df$coord, FUN = function(x) cumsum(c(0, x[-length(x)])))
   df$y_top <- df$y_bottom + df$count
   
-  # add color and position info  
+  # assign colors based on variant type
+  # use different colors for each variant to distinguish them in pileup view
+  unique_variants <- unique(df$variant)
+  n_variants <- length(unique_variants)
+  
+  if (n_variants <= 8) {
+    # use predefined distinct colors for small numbers of variants
+    distinct_colors <- c("#4e79a7", "#f28e2c", "#e15759", "#76b7b2", 
+                        "#59a14f", "#edc949", "#af7aa1", "#ff9d9a")
+    variant_colors <- setNames(distinct_colors[seq_len(n_variants)], unique_variants)
+  } else {
+    # use rainbow colors for larger numbers
+    variant_colors <- setNames(rainbow(n_variants), unique_variants)
+  }
+  
+  # special color for REF if present
+  if ("REF" %in% unique_variants) {
+    variant_colors["REF"] <- "#d3d3d3"
+  }
+  
   df$fill_color <- variant_colors[df$variant]
   # position rectangles centered on the coordinate, similar to mutation display in full mode
   df$x_left <- df$gcoord - 0.5

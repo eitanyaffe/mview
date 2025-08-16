@@ -74,6 +74,8 @@ axis_profile <- function(id = "simple_axis",
     zoom_xlim <- if (!is.null(cxt$mapper$xlim)) range(cxt$mapper$xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
     contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
 
+    if (nrow(contig_df) == 0) return(gg)
+
     if (nrow(contig_df) == 1) {
       name_data <- data.frame(x = (zoom_xlim[1] + zoom_xlim[2]) / 2, y = 0.45, label = contig_df$contig)
     } else {

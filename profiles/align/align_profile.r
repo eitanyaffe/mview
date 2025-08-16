@@ -35,57 +35,7 @@ get_mutation_colors <- function(mutations_per_bp) {
   return(colors)
 }
 
-# Get variant colors (shared between full and pileup modes)
-get_variant_colors <- function(aln, cxt) {
-  # query both full and pileup to get all possible variants
-  all_variants <- character(0)
-  
-  # get variants from pileup data
-  tryCatch({
-    pileup_df <- aln_query_pileup(aln, cxt$intervals, report_mode_str = "all")
-    if (!is.null(pileup_df) && nrow(pileup_df) > 0) {
-      all_variants <- c(all_variants, unique(pileup_df$variant))
-    }
-  }, error = function(e) {
-    # continue if pileup query fails
-  })
-  
-  # get variants from full data mutations (if any)
-  tryCatch({
-    full_df <- aln_query_full(aln, cxt$intervals, "by_mutations", 1000, "all")
-    if (!is.null(full_df$mutations) && nrow(full_df$mutations) > 0) {
-      all_variants <- c(all_variants, unique(full_df$mutations$desc))
-    }
-  }, error = function(e) {
-    # continue if full query fails
-  })
-  
-  # get unique sorted variants
-  unique_variants <- sort(unique(all_variants))
-  
-  if (length(unique_variants) == 0) {
-    return(list())
-  }
-  
-  # create color palette
-  if (length(unique_variants) <= 8) {
-    # use predefined soft colors for small numbers of variants
-    soft_colors <- c("#E8F4FD", "#FFE6E6", "#E6F7E6", "#FFF2E6", 
-                     "#F0E6FF", "#E6F7FF", "#FFE6F7", "#F7FFE6")
-    variant_colors <- soft_colors[seq_along(unique_variants)]
-  } else {
-    # use soft pastel colors for larger numbers
-    variant_colors <- rainbow(length(unique_variants), s = 0.3, v = 0.9)
-  }
-  names(variant_colors) <- unique_variants
-  
-  # standardized gray for REF
-  if ("REF" %in% unique_variants) {
-    variant_colors["REF"] <- "#D3D3D3"  # lighter than dark gray, darker than light gray
-  }
-  
-  return(variant_colors)
-}
+
 default_alignment_params <- list(
   # align_general - parameters used across multiple modes
   plot_style = list(
