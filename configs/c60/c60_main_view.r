@@ -38,7 +38,6 @@ make_align_profile <- function(timepoint) {
       tag <- get_map_tag(cxt$assembly, timepoint)
       get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
     },
-    height = 400,
     params = default_alignment_params
   )
 }
@@ -58,13 +57,18 @@ gene_params <- list(
     type = "select",
     choices = c("tax", "mge"),
     default = "tax"
+  ),
+  height = list(
+    group_id = "gene",
+    type = "integer",
+    default = 50
   )
 )
 
 gene_profile(
   id = "genes",
   name = "Genes",
-  height = 50,
+  height = gene_params$height$default,
   gene_f = get_genes_f,
   color_field = "tax",
   label_field = "label",

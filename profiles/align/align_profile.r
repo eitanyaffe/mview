@@ -35,6 +35,69 @@ get_mutation_colors <- function(mutations_per_bp) {
   return(colors)
 }
 
+# Get fixed colors for variant types (shared between full and pileup modes)
+get_variant_type_colors <- function(variants) {
+  # define gentle but visible colors for all 12 nucleotide substitutions
+  substitution_colors <- c(
+    "A:T" = "#e6d19a", "A:C" = "#b3e6f2", "A:G" = "#d9b3ff",
+    "T:A" = "#ffe0b3", "T:C" = "#b3e6d1", "T:G" = "#b3d9ff",
+    "C:A" = "#ffb3d9", "C:T" = "#d9ffb3", "C:G" = "#ffb3ff",
+    "G:A" = "#ffecb3", "G:T" = "#b3e0ff", "G:C" = "#ffccb3"
+  )
+  
+  # colors for gains (3 red shades, darker range, squeezed)
+  gain_light <- "#cc6666"   # darker light red for +1
+  gain_medium <- "#b30000"  # darker medium red for +2 to +3
+  gain_dark <- "#800000"    # darkest red for +4 or more
+  
+  # colors for losses (3 blue shades, darker range, squeezed)  
+  loss_light <- "#6666cc"   # darker light blue for -1
+  loss_medium <- "#0000b3"  # darker medium blue for -2 to -3
+  loss_dark <- "#000080"    # darkest blue for -4 or more
+  
+  # ref and unknown colors
+  ref_color <- "#e0dede"   # light gray
+  unknown_color <- "#000000" # black
+  
+  # assign colors based on variant pattern
+  colors <- character(length(variants))
+  
+  for (i in seq_along(variants)) {
+    variant <- variants[i]
+    
+    if (variant == "REF") {
+      colors[i] <- ref_color
+    } else if (variant %in% names(substitution_colors)) {
+      # direct substitution match
+      colors[i] <- substitution_colors[variant]
+    } else if (grepl("^\\+", variant)) {
+      # gain pattern: +XXX
+      gain_length <- nchar(gsub("^\\+", "", variant))
+      colors[i] <- if (gain_length == 1) {
+        gain_light
+      } else if (gain_length <= 3) {
+        gain_medium
+      } else {
+        gain_dark
+      }
+    } else if (grepl("^-", variant)) {
+      # loss pattern: -XXX
+      loss_length <- nchar(gsub("^-", "", variant))
+      colors[i] <- if (loss_length == 1) {
+        loss_light
+      } else if (loss_length <= 3) {
+        loss_medium
+      } else {
+        loss_dark
+      }
+    } else {
+      # unknown variant type
+      colors[i] <- unknown_color
+    }
+  }
+  
+  return(colors)
+}
 
 default_alignment_params <- list(
   # align_general - parameters used across multiple modes
@@ -55,6 +118,11 @@ default_alignment_params <- list(
     type = "select",
     choices = c("by_mutations", "by_coord_left", "by_coord_right"), 
     default = "by_mutations"
+  ),
+  height = list(
+    group_id = "align_general",
+    type = "integer",
+    default = 400
   ),
 
   # align_full - parameters specific to full profile mode
@@ -87,7 +155,7 @@ default_alignment_params <- list(
   full_mutation_lwd = list(
     group_id = "align_full", 
     type = "double",
-    default = 0.5
+    default = 1.5
   ),
 
   # align_bin / align_pileup - parameters for bin and pileup modes
@@ -135,7 +203,7 @@ default_alignment_params <- list(
   )
 )
 
-align_profile <- function(id, name, height = 400,
+align_profile <- function(id, name,
                           aln_f = NULL,
                           bin_type = "auto",
                           plot_style = "auto_full",
@@ -214,7 +282,7 @@ align_profile <- function(id, name, height = 400,
 
   # Create profile
   profile_create(
-    id = id, name = name, type = "align", height = height,
+    id = id, name = name, type = "align", height = params$height$default,
     params = params, plot_f = plot_f,
     auto_register = auto_register,
     aln_f = aln_f,

@@ -12,8 +12,20 @@ output$profilePlots <- renderUI({
     return(NULL)
   }
   
-  # Calculate total height from profile heights
-  total_height <- sum(sapply(profiles, function(p) p$height))
+  # Calculate total height from profile heights (including dynamic parameter values)
+  total_height <- sum(sapply(profiles, function(p) {
+    height <- p$height  # start with static height
+    
+    # update height from parameters if it exists
+    if ("height" %in% names(p$params)) {
+      height_param <- p$params[["height"]]
+      if (!is.null(height_param) && !is.null(height_param$group)) {
+        height <- get_param(height_param$group, "height")()
+      }
+    }
+    
+    return(height)
+  }))
   if (total_height <= 0) {
     total_height <- 200  # Default fallback
   }

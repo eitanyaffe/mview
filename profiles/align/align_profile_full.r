@@ -223,27 +223,8 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       cat(sprintf("sampled to %d mutations\n", profile$max_mutations))
     }
     
-    # assign colors based on variant type
-    # use different colors for each variant to distinguish them in full view
-    unique_variants <- unique(mutations$desc)
-    n_variants <- length(unique_variants)
-    
-    if (n_variants <= 8) {
-      # use predefined distinct colors for small numbers of variants
-      distinct_colors <- c("#8c564b", "#17becf", "#bcbd22", "#e377c2", 
-                          "#7f7f7f", "#2ca02c", "#d62728", "#ff7f0e")
-      variant_colors <- setNames(distinct_colors[seq_len(n_variants)], unique_variants)
-    } else {
-      # use rainbow colors for larger numbers
-      variant_colors <- setNames(rainbow(n_variants), unique_variants)
-    }
-    
-    # special color for REF if present
-    if ("REF" %in% unique_variants) {
-      variant_colors["REF"] <- "#d3d3d3"
-    }
-    
-    mutations$fill_color <- variant_colors[mutations$desc]
+    # use shared variant color function
+    mutations$fill_color <- get_variant_type_colors(mutations$desc)
 
     mutations$hover_text <- paste0(
       "Read: ", mutations$read_id, "\n",

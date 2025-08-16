@@ -93,6 +93,15 @@ plot_profiles <- function(cxt) {
         profile[[param_id]] <- param_value
       }
     }
+    
+    # update height from parameters if it exists
+    if ("height" %in% names(profile$params)) {
+      height_param <- profile$params[["height"]]
+      if (!is.null(height_param) && !is.null(height_param$group)) {
+        height_value <- get_param(height_param$group, "height")()
+        profile$height <- height_value
+      }
+    }
 
     # Create base ggplot
     gg <- pre_plot(cxt, profile)
