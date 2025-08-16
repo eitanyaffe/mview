@@ -16,8 +16,8 @@ get_alignment_colors <- function(alignments, reads, style) {
   } else if (style == "by_mutations") {
     # use shared mutation color function
     alignment_lengths <- alignments$end - alignments$start + 1
-    mutations_per_100bp <- (alignments$mutation_count / alignment_lengths) * 100
-    colors <- get_mutation_colors(mutations_per_100bp)
+    mutations_per_bp <- (alignments$mutation_count / alignment_lengths)
+    colors <- get_mutation_colors(mutations_per_bp)
     return(colors)
   } else if (style == "show_mutations") {
     return(rep("lightgray", nrow(alignments)))

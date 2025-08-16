@@ -53,7 +53,6 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
   df <- cache(cache_key, {
     aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold)
   })
-  
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
     df$end <- df$end
@@ -112,13 +111,14 @@ plot_stacked_mutation_rates <- function(gg, df) {
         end = df$end[has_count],
         length = df$length[has_count],
         read_count = df$read_count[has_count],
+        sequenced_bp = df$sequenced_bp[has_count],
         stringsAsFactors = FALSE
       )
       
       # create hover text
       category_data$hover_text <- paste0(
-        category_data$count, " out of ", category_data$read_count, "\n",
-        "Category: ", category_data$description
+        category_data$count, " out of ", category_data$read_count, " reads\n",
+        "Category: ", category_data$description, "\n"
       )
       
       stacked_data <- rbind(stacked_data, category_data)
@@ -148,8 +148,7 @@ plot_stacked_mutation_rates <- function(gg, df) {
 # Plot mutation density bins with red color scale
 plot_mutation_density_bins <- function(gg, df) {
   # mutation density visualization
-  mutations_per_100bp <- df$mut_density * 100
-  df$fill_color <- get_mutation_colors(mutations_per_100bp)
+  df$fill_color <- get_mutation_colors(df$mut_density)
   
   # hover text
   df$hover_text <- paste0(
@@ -276,7 +275,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   bin_style <- if (!is.null(profile$bin_style)) profile$bin_style else "by_mut_density"
   
   # Calculate metrics
-  df$cov <- ifelse(df$length > 0, df$read_count / df$length, 0)
+  df$cov <- ifelse(df$length > 0, df$sequenced_bp / df$length, 0)
   df$mut_density <- ifelse(df$length > 0, df$mutation_count / df$length, 0)
 
   # choose and call appropriate visualization function

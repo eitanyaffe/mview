@@ -20,10 +20,7 @@ get_shared_red_scale <- function(continuous = TRUE, num_colors = 6) {
 }
 
 # Get mutation density colors (shared between bin and full modes)
-get_mutation_colors <- function(mutations_per_100bp) {
-  # convert from mutations per 100bp to mutations per bp for threshold comparison
-  mutations_per_bp <- mutations_per_100bp / 100
-  
+get_mutation_colors <- function(mutations_per_bp) {
   # use shared red palette
   red_palette <- get_red_palette()
   
