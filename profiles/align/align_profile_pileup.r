@@ -56,8 +56,13 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
   df$y_bottom <- ave(df$count, df$coord, FUN = function(x) cumsum(c(0, x[-length(x)])))
   df$y_top <- df$y_bottom + df$count
   
-  # use shared variant color function
-  df$fill_color <- get_variant_type_colors(df$variant)
+  # choose color function based on mutation_color_mode
+  if (profile$mutation_color_mode == "type") {
+    df$fill_color <- get_mutation_type_colors(df$variant)
+  } else {
+    # detailed mode (default)
+    df$fill_color <- get_variant_type_colors(df$variant)
+  }
   # position rectangles centered on the coordinate, similar to mutation display in full mode
   df$x_left <- df$gcoord - 0.5
   df$x_right <- df$gcoord + 0.5

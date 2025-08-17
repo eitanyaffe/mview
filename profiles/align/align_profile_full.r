@@ -229,8 +229,13 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       cat(sprintf("sampled to %d mutations\n", profile$max_mutations))
     }
     
-    # use shared variant color function
-    mutations$fill_color <- get_variant_type_colors(mutations$desc)
+    # choose color function based on mutation_color_mode
+    if (profile$mutation_color_mode == "type") {
+      mutations$fill_color <- get_mutation_type_colors(mutations$desc)
+    } else {
+      # detailed mode (default)
+      mutations$fill_color <- get_variant_type_colors(mutations$desc)
+    }
 
     mutations$hover_text <- paste0(
       "Read: ", mutations$read_id, "\n",
