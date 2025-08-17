@@ -127,9 +127,9 @@ Application layout:
 
 1. **Select contigs**: Use State, Contigs or Genomes tab to select one or more contigs
 2. **Zoom**: Use mouse to select regions in the visualization
-3. **Lock zoom**: Press Shift+Z to set the selected region as zoom
-4. **Window size**: Press Ctrl+N (N=2-7) to zoom to 10^N basepairs around current center
-5. **Navigation**: Use Shift+Backspace for undo, press Help button for all shortcuts
+3. **Lock zoom**: Press Alt+Z to set the selected region as zoom
+4. **Window size**: Press Alt+N (N=2-7) to zoom to 10^N basepairs around current center
+5. **Navigation**: Use Alt+Backspace for undo, press Help button for all shortcuts
 
 #### Tables
 

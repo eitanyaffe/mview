@@ -23,10 +23,10 @@ zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
     # fallback: try to get center from contig data if available
     if (length(main_state_rv$contigs) > 0) {
       # attempt to get center from first contig - this is a fallback
-      cat(sprintf("ctrl+%d: no current zoom, cannot determine center\n", n))
+      cat(sprintf("alt+%d: no current zoom, cannot determine center\n", n))
       return()
     } else {
-      cat(sprintf("ctrl+%d: no contigs selected, cannot determine center\n", n))
+      cat(sprintf("alt+%d: no contigs selected, cannot determine center\n", n))
       return()
     }
   }
@@ -45,14 +45,14 @@ zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
 
 # Define keyboard shortcuts globally
 keyboard_shortcuts <- list(
-  "Shift+backspace" = list(
+  "Alt+backspace" = list(
     description = "Undo last action",
     type = "general", # Added type for dispatch
     action = function(states_module_output) {
       states_module_output$undo_state()
     }
   ),
-  "Shift+)" = list(
+  "Alt+0" = list(
     description = "Reset zoom to full range",
     type = "zoom", # Changed from general to zoom type for direct state access
     action = function(states_module_output, main_state_rv) {
@@ -60,7 +60,7 @@ keyboard_shortcuts <- list(
       main_state_rv$zoom <- NULL
     }
   ),
-  "Shift+Z" = list(
+  "Alt+Z" = list(
     description = "Update zoom from selected range",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -70,7 +70,7 @@ keyboard_shortcuts <- list(
       }
     }
   ),
-  "Shift+_" = list(
+  "Alt+_" = list(
     description = "Zoom out (double the view range)",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -84,7 +84,7 @@ keyboard_shortcuts <- list(
       }
     }
   ),
-  "Shift+>" = list(
+  "Alt+>" = list(
     description = "Move zoom area one window to the right",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -98,7 +98,7 @@ keyboard_shortcuts <- list(
       }
     }
   ),
-  "Shift+<" = list(
+  "Alt+<" = list(
     description = "Move zoom area one window to the left",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -109,57 +109,57 @@ keyboard_shortcuts <- list(
           main_state_rv$zoom[1] - zoom_range,
           main_state_rv$zoom[2] - zoom_range
         )
-        cat("moved zoom area left by Shift+<\n")
+        cat("moved zoom area left by Alt+<\n")
       } else {
-        cat("Shift+<: zoom is null, cannot move zoom area\n")
+        cat("Alt+<: zoom is null, cannot move zoom area\n")
       }
     }
   ),
-  "Shift+C" = list(
+  "Alt+C" = list(
     description = "Clear selected contigs",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       states_module_output$push_state()
       main_state_rv$contigs <- character()
-      cat("cleared selected contigs by Shift+C\n")
+      cat("cleared selected contigs by Alt+C\n")
     }
   ),
-  "Ctrl+2" = list(
+  "Alt+2" = list(
     description = "Zoom to 100 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(2, states_module_output, main_state_rv)
     }
   ),
-  "Ctrl+3" = list(
+  "Alt+3" = list(
     description = "Zoom to 1,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(3, states_module_output, main_state_rv)
     }
   ),
-  "Ctrl+4" = list(
+  "Alt+4" = list(
     description = "Zoom to 10,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(4, states_module_output, main_state_rv)
     }
   ),
-  "Ctrl+5" = list(
+  "Alt+5" = list(
     description = "Zoom to 100,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(5, states_module_output, main_state_rv)
     }
   ),
-  "Ctrl+6" = list(
+  "Alt+6" = list(
     description = "Zoom to 1,000,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
       zoom_to_power_of_ten(6, states_module_output, main_state_rv)
     }
   ),
-  "Ctrl+7" = list(
+  "Alt+7" = list(
     description = "Zoom to 10,000,000 basepairs around current center",
     type = "zoom",
     action = function(states_module_output, main_state_rv) {
@@ -177,7 +177,7 @@ create_and_add_tab_shortcuts <- function() {
   )
 
   for (i in seq_along(tabs)) {
-    shortcut_key <- paste0("Shift+", shifted_numbers[i])
+    shortcut_key <- paste0("Alt+", shifted_numbers[i])
     tab <- tabs[i]
 
     keyboard_shortcuts[[shortcut_key]] <<- list(
@@ -200,14 +200,37 @@ create_and_add_tab_shortcuts()
 keyboard_initialize <- function() {
   keyboard_js <- HTML("
     document.addEventListener('keydown', function(e) {
+      // prevent default behavior for Alt key combinations first
+      if (e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
       let keyCombo = [];
       if (e.metaKey) keyCombo.push('Command');
       if (e.ctrlKey) keyCombo.push('Ctrl');
       if (e.altKey) keyCombo.push('Alt');
       if (e.shiftKey) keyCombo.push('Shift');
 
-      let key = e.key;
-      if (key === 'Meta') return; // skip raw 'Meta' keypress
+      // use e.code for more reliable key detection
+      let key = e.code;
+      
+      // convert common codes to readable format
+      if (key.startsWith('Key')) {
+        key = key.replace('Key', '');
+      } else if (key.startsWith('Digit')) {
+        key = key.replace('Digit', '');
+      } else if (key === 'Backspace') {
+        key = 'backspace';
+      } else if (key === 'Comma') {
+        key = '<';
+      } else if (key === 'Period') {
+        key = '>';
+      } else if (key === 'Minus') {
+        key = '_';
+      }
+      
+      if (key === 'Meta' || key === 'Alt' || key === 'Control' || key === 'Shift') return;
       keyCombo.push(key);
 
       Shiny.setInputValue('key_pressed', keyCombo.join('+'), {priority: 'event'});
@@ -276,13 +299,13 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
 
 # Generate keyboard shortcuts documentation for help
 keyboard_summary <- function() {
-  # separate ctrl+N zoom shortcuts for cleaner display
-  ctrl_zoom_shortcuts <- grep("^Ctrl\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
-  other_shortcuts <- setdiff(names(keyboard_shortcuts), ctrl_zoom_shortcuts)
+  # separate alt+N zoom shortcuts for cleaner display
+  alt_zoom_shortcuts <- grep("^Alt\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
+  other_shortcuts <- setdiff(names(keyboard_shortcuts), alt_zoom_shortcuts)
   
   html_content <- "<h5>Actions</h5><ul>"
   
-  # add non-tab switch, non-ctrl+N shortcuts first
+  # add non-tab switch, non-alt+N shortcuts first
   for (shortcut_name in other_shortcuts) {
     type <- keyboard_shortcuts[[shortcut_name]]$type
     if (type == "tab_switch") {
@@ -295,10 +318,10 @@ keyboard_summary <- function() {
     )
   }
   
-  # add ctrl+N shortcuts as a group
-  if (length(ctrl_zoom_shortcuts) > 0) {
+  # add alt+N shortcuts as a group
+  if (length(alt_zoom_shortcuts) > 0) {
     html_content <- paste0(html_content, 
-      "<li><strong>Ctrl+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
+      "<li><strong>Alt+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
   }
   
   html_content <- paste0(html_content, "</ul>")
