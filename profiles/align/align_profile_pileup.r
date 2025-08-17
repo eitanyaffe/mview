@@ -1,6 +1,6 @@
 # Pileup mode for alignment profile
 
-align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all") {
+align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0) {
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
   aln_id <- if (is(aln, "externalptr")) {
@@ -13,12 +13,16 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all") {
                      digest::digest(list(
                        aln_id = aln_id,
                        xlim = cxt$mapper$xlim,
-                       report_mode_str = report_mode_str
+                       report_mode_str = report_mode_str,
+                       clip_mode = clip_mode,
+                       clip_margin = clip_margin,
+                       min_mutations_percent = min_mutations_percent,
+                       max_mutations_percent = max_mutations_percent
                      ), algo = "md5"))
 
   # Use cache for the pileup query
   df <- cache(cache_key, {
-    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str)
+    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent))
   })
 
   if (!is.null(df) && nrow(df) > 0) {
@@ -31,7 +35,11 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all") {
 }
 
 align_profile_pileup <- function(profile, cxt, aln, gg) {
-  df <- align_query_pileup_mode(aln, cxt, report_mode_str = "all")
+  df <- align_query_pileup_mode(aln, cxt, report_mode_str = "all", 
+                                clip_mode = profile$clip_mode, 
+                                clip_margin = profile$clip_margin, 
+                                min_mutations_percent = as.numeric(profile$min_mutations_percent),
+                                max_mutations_percent = as.numeric(profile$max_mutations_percent))
   if (is.null(df) || nrow(df) == 0) {
     return(gg)
   }

@@ -171,6 +171,12 @@ The alignment profile supports several key parameters accessible through the rig
 - **plot_style**: Query mode selection (`auto_full`, `auto_pileup`, `bin`, `full`, `pileup`)
 - **binsize/target_bins**: Control bin resolution for bin mode
 
+**Alignment Filtering**:
+- **clip_mode**: Control which alignments to include based on clipping (`all`, `complete`, `allow_one_side_clip`, `only_one_side_clipped`, `only_two_side_clipped`)
+- **clip_margin**: Margin of error when checking read boundaries (default: 10)
+- **min_mutations_percent**: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%
+- **max_mutations_percent**: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%
+
 Hover shows element information in all profiles. Profile parameters can be set in code or adjusted interactively in the right panel. See the detailed profile guide: [profiles](docs/profiles.md).
 
 ### Saving and loading states
@@ -201,7 +207,4 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 ## Current development version (v1.01)
 
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
-
-## Planned Features
-
-- Read filtering is currently applied only to the full query mode. Future versions will extend read filtering to all query modes.  
+- Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.

@@ -74,12 +74,18 @@ When using `bin_style=by_genomic_distance`, alignments are categorized by mutati
 
 Categories are stacked from highest distance (bottom) to lowest distance (top) in shades of red.
 
+#### Alignment filtering parameters
+  - `clip_mode`: Controls which alignments are included based on clipping:
+    - `all`: Allow all alignments regardless of clipping (default).
+    - `complete`: Alignment must cover the entire read from start to end.
+    - `allow_one_side_clip`: Allow alignments clipped on one side (start at read start OR end at read end).
+    - `only_one_side_clipped`: Only include alignments clipped on exactly one side.
+    - `only_two_side_clipped`: Only include alignments clipped on both sides.
+  - `clip_margin`: Margin of error in bases when checking read start/end positions (default 10).
+  - `min_mutations_percent`: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%. Filters out alignments with mutation rate below this threshold.
+  - `max_mutations_percent`: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%. Special case: 0% = only alignments with zero mutations. Otherwise filters out alignments with mutation rate above this threshold.
+
 #### Full mode parameters
-  - `alignment_filter`:
-    - `all`: no filtering.
-    - `single`: include only reads with exactly one alignment in the queried intervals.
-    - `single_complete`: like `single`, and the single alignment must span the entire read (no clipping).
-    - `only_multiple`: include only reads with two or more alignments in the queried intervals.
   - `full_style`:
     - `none`: alignments gray; no mutation overlay.
     - `by_mutations`: color alignments by mutation density.

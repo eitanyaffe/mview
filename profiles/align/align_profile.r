@@ -107,11 +107,28 @@ default_alignment_params <- list(
     choices = c("auto_full", "auto_pileup", "bin", "full", "pileup"),
     default = "auto_full"
   ),
-  alignment_filter = list(
-    group_id = "align_general",
+  clip_mode = list(
+    group_id = "align_filter",
     type = "select",
-    choices = c("all", "single", "single_complete", "only_multiple"),
+    choices = c("all", "complete", "allow_one_side_clip", "only_one_side_clipped", "only_two_side_clipped"),
     default = "all"
+  ),
+  clip_margin = list(
+    group_id = "align_filter",
+    type = "integer",
+    default = 10
+  ),
+  min_mutations_percent = list(
+    group_id = "align_filter",
+    type = "select",
+    choices = c("0%" = 0.0, "0.01%" = 0.01, "0.1%" = 0.1, "1%" = 1.0, "10%" = 10.0),
+    default = 0.0
+  ),
+  max_mutations_percent = list(
+    group_id = "align_filter",
+    type = "select",
+    choices = c("0%" = 0.0, "0.01%" = 0.01, "0.1%" = 0.1, "1%" = 1.0, "10%" = 10.0),
+    default = 10.0
   ),
   height_style = list(
     group_id = "align_general",
@@ -147,11 +164,7 @@ default_alignment_params <- list(
     type = "integer",
     default = 1000
   ),
-  full_min_mutations_density = list(
-    group_id = "align_full",
-    type = "double",
-    default = 0
-  ),
+
   full_mutation_lwd = list(
     group_id = "align_full", 
     type = "double",
@@ -214,8 +227,10 @@ align_profile <- function(id, name,
                           max_mutations = 1000,
                           max_reads = 1000,
                           full_style = "by_mutations",
-                          alignment_filter = "all",
-                          full_min_mutations_density = 0,
+                          clip_mode = "all",
+                          clip_margin = 10,
+                          min_mutations_percent = 0.0,
+                          max_mutations_percent = 10.0,
                           full_mutation_lwd = 0.5,
                           params = default_alignment_params,
                           auto_register = TRUE) {
@@ -295,8 +310,10 @@ align_profile <- function(id, name,
     max_mutations = max_mutations,
     max_reads = max_reads,
     full_style = full_style,
-    alignment_filter = alignment_filter,
-    full_min_mutations_density = full_min_mutations_density,
+    clip_mode = clip_mode,
+    clip_margin = clip_margin,
+    min_mutations_percent = min_mutations_percent,
+    max_mutations_percent = max_mutations_percent,
     full_mutation_lwd = full_mutation_lwd
   )
 }
