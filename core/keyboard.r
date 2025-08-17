@@ -284,6 +284,41 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
     ))
   })
 
+  # About button shows version and license info
+  observeEvent(input$aboutBtn, {
+    # gather system statistics
+    num_assemblies <- length(get_assemblies())
+    num_views <- length(get_view_ids())
+    num_profiles <- length(profiles_get_all())
+    num_tabs <- length(get_registered_tabs())
+    
+    # build statistics text
+    stats_text <- paste(
+      sprintf("<p><strong>Registered objects:</strong></p>"),
+      sprintf("<ul>"),
+      sprintf("<li>Assemblies: %d</li>", num_assemblies),
+      sprintf("<li>Views: %d</li>", num_views),
+      sprintf("<li>Profiles: %d</li>", num_profiles),
+      sprintf("<li>Dynamic tabs: %d</li>", num_tabs),
+      sprintf("</ul>"),
+      sep = ""
+    )
+    
+    showModal(modalDialog(
+      title = "About mview",
+      HTML(paste(
+        "<p><strong>mview v1.01</strong></p>",
+        "<p>Developed by Eitan Yaffe</p>",
+        "<p>August 2025</p>",
+        "<p>This software is provided under an open source license.</p>",
+        "<hr>",
+        stats_text,
+        sep = ""
+      )),
+      easyClose = TRUE
+    ))
+  })
+
   # Output for the last key pressed
   output$last_key_output <- renderText({
     paste(input$key_pressed, " ")

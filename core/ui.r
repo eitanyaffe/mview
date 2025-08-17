@@ -168,7 +168,8 @@ ui <- fluidPage(
       verbatimTextOutput("basic_info"),
       h5("Last Key Press"),
       verbatimTextOutput("last_key_output"),
-      actionButton("helpBtn", "Help")
+      actionButton("helpBtn", "Help"),
+      actionButton("aboutBtn", "About")
     ),
     column(
       width = 10,
