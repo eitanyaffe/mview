@@ -50,24 +50,25 @@ Install required packages in R:
 install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
 ```
 
-### Installing alntools (optional; needed for read alignment profiles)
+### Installing alntools (optional)
 
-For optimal performance with large alignment datasets, mview uses threaded bin queries from alntools. This requires:
+Install alntools if you wish to visualize read alignments. For optimal performance with large alignment datasets, mview uses threads and GPUs. 
+
+#### Threads
 
 *   **Linux**: OpenMP library (usually included with gcc as `libgomp`)
 *   **macOS**: Install via Homebrew: `brew install libomp`
+*   **Note**: alntools should compile without OpenMP
 
-#### GPU Acceleration (Apple Silicon)
+#### GPU Acceleration
 
-On macOS with Apple Silicon, mview supports GPU acceleration for significant performance improvements with large alignment datasets:
+On macOS with Apple Silicon, alntools uses GPUs to significantly boost performance.
 
-*   **Automatic detection**: GPU acceleration is automatically enabled when Metal is available (run `system_profiler SPDisplaysDataType`)
+*   **Automatic detection**: GPU acceleration is automatically enabled when Metal is available (run `system_profiler SPDisplaysDataType` to determine if you have GPUs)
 *   **Performance**: 1000x faster bin queries for datasets with >10K alignments
 *   **Fallback**: Automatically falls back to CPU if GPU not available
 
-Note: alntools should compile and work without OpenMP, but large alignment datasets will process sequentially rather than in parallel.
-
-If you plan to visualize read alignments, install alntools:
+#### Install alntools
 
 ```bash
 # Clone alntools into the same tools directory
@@ -94,6 +95,8 @@ Install R package:
 ```r
 install.packages("Rcpp")
 ```
+
+**Note**: The alntools adapter for mview is compiled during the first run of mview.
 
 ## Quick Start
 
@@ -217,3 +220,4 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
 - Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.
+- GPU support added (Apple Silicon only) for bin queries in the alignment profile.
