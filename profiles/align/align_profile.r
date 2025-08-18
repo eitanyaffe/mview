@@ -254,6 +254,11 @@ default_alignment_params <- list(
     group_id = "align_pileup",
     type = "integer",
     default = 1000
+  ),
+  use_gpu = list(
+    group_id = "align_general",
+    type = "boolean",
+    default = TRUE
   )
 )
 
@@ -274,6 +279,7 @@ align_profile <- function(id, name,
                           min_mutations_percent = 0.0,
                           max_mutations_percent = 10.0,
                           full_mutation_lwd = 0.5,
+                          use_gpu = TRUE,
                           params = default_alignment_params,
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -357,6 +363,7 @@ align_profile <- function(id, name,
     clip_margin = clip_margin,
     min_mutations_percent = min_mutations_percent,
     max_mutations_percent = max_mutations_percent,
-    full_mutation_lwd = full_mutation_lwd
+    full_mutation_lwd = full_mutation_lwd,
+    use_gpu = use_gpu
   )
 }

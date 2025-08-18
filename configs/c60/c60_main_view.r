@@ -1,21 +1,8 @@
-########################################################
-# Align code
-########################################################
+# Load shared alignment API
+source("profiles/align/align_profile_api.r")
 
-library(Rcpp)
-
-alntools_dir <- paste0(Sys.getenv("MAKESHIFT_ROOT"), "/tools/alntools/cpp")
-cdir <- ".Rcpp_dir"
-rebuild <- F
-
-# Configure OpenMP for threading support in bin queries
-if (Sys.info()["sysname"] == "Darwin" && file.exists("/opt/homebrew/opt/libomp/include/omp.h")) {
-  # macOS with Homebrew libomp - enables parallel processing of large alignment datasets
-  Sys.setenv(PKG_CPPFLAGS = "-I/opt/homebrew/opt/libomp/include -Xpreprocessor -fopenmp")
-  Sys.setenv(PKG_LIBS = "-L/opt/homebrew/opt/libomp/lib -lomp")
-}
-
-sourceCpp(paste0(alntools_dir, "/aln_R.cpp"), verbose = T, cacheDir = cdir, rebuild = rebuild)
+# Initialize alntools with GPU support
+init_alntools(enable_gpu = TRUE, verbose = FALSE)
 
 ########################################################
 # Alignment profiles
