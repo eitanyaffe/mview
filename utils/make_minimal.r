@@ -55,6 +55,43 @@ for (assembly in original_assemblies) {
   contig_data_filtered <- contig_data_filtered[order(contig_data_filtered$length), ]  # shortest first
   selected_contigs <- head(contig_data_filtered, 10)
   
+  # extract fasta sequences for selected contigs
+  # get fasta file path (not content) by using a custom read function that returns the path
+  contig_fasta_path <- get_data("ASSEMBLY_CONTIG_FILE", tag = assembly, read_f = function(path) path)
+  if (is.null(contig_fasta_path) || !file.exists(contig_fasta_path)) {
+    stop(sprintf("fasta file not found for assembly %s", assembly))
+  }
+  
+  if (!requireNamespace("seqinr", quietly = TRUE)) {
+    stop("seqinr package required for fasta processing. install with: install.packages('seqinr')")
+  }
+  
+  # read original fasta
+  original_sequences <- seqinr::read.fasta(file = contig_fasta_path, seqtype = "DNA", as.string = TRUE)
+  
+  # extract sequences for selected contigs
+  selected_contigs_list <- selected_contigs$contig
+  extracted_sequences <- list()
+  for (contig in selected_contigs_list) {
+    # find matching sequence
+    seq_found <- FALSE
+    for (seq_name in names(original_sequences)) {
+      if (seq_name == contig || grepl(paste0("^", contig, "($|\\s)"), seq_name)) {
+        extracted_sequences[[contig]] <- original_sequences[[seq_name]]
+        seq_found <- TRUE
+        break
+      }
+    }
+    if (!seq_found) {
+      stop(sprintf("sequence not found for contig %s", contig))
+    }
+  }
+  
+  # write extracted fasta
+  output_fasta <- paste0("examples/tables/contig_fasta_", assembly, ".fasta")
+  seqinr::write.fasta(extracted_sequences, names(extracted_sequences), output_fasta)
+  cat(sprintf("  wrote %d sequences to %s\n", length(extracted_sequences), output_fasta))
+  
   # keep only minimal, lowercase columns
   selected_contigs <- selected_contigs[, intersect(names(selected_contigs), c("contig", "length", "circular", "coverage"))]
   names(selected_contigs) <- tolower(names(selected_contigs))
@@ -211,6 +248,13 @@ get_aln_f <- function(assembly = NULL) {
   read_cached(paste0("aln_", assembly), path, read_f = aln_load)
 }
 
+get_fasta_f <- function(assembly = NULL) {
+  if (is.null(assembly)) return(NULL)
+  path <- file.path(tables_dir, paste0("contig_fasta_", assembly, ".fasta"))
+  if (!file.exists(path)) return(NULL)
+  return(path)
+}
+
 # helper function to generate taxonomy colors
 get_tax_color <- function(tax_values) {
   unique_tax <- sort(unique(tax_values[!is.na(tax_values) & tax_values != ""]))
@@ -296,6 +340,7 @@ set_assemblies(aids)
 register_contigs_f(get_contigs_f)
 register_genomes_f(get_genomes_f)
 register_contig_map_f(get_contig_map_f)
+register_fasta_f(get_fasta_f)
 
 ########################################################
 # register views

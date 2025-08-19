@@ -7,7 +7,7 @@ get_intervals <- function(mapper, zoom) {
   }
   start_rr <- mapper$g2l(cdf$start + 1)
   end_rr <- mapper$g2l(cdf$end)
-  rr <- data.frame(contig = cdf$contig, start = start_rr$coord, end = end_rr$coord)
+  rr <- data.frame(contig = cdf$contig, start = start_rr$coord + 1, end = end_rr$coord)
 }
 
 build_context <- function(state_contigs, contig_table, zoom, assembly) {

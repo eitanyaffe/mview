@@ -29,7 +29,7 @@ register_contigs_f(function(assembly = NULL) {
   if (is.null(df)) {
     return(NULL)
   }
-  data.frame(contig = df$contig, length = df$length, circular = df$circular)
+  data.frame(contig = df$contig, length = df$length, coverage = df$coverage, circular = df$circular)
 })
 
 # Register genomes function
@@ -49,6 +49,17 @@ register_contig_map_f(function(assembly = NULL) {
     return(NULL)
   }
   data.frame(contig = df$contig, gid = df$contig)
+})
+
+# Register fasta function
+register_fasta_f(function(assembly = NULL) {
+  get_data("ASSEMBLY_CONTIG_FILE", tag = assembly, read_f = function(path) {
+    # check if seqinr is available
+    if (!requireNamespace("seqinr", quietly = TRUE)) {
+      stop("seqinr package not available, install with: install.packages('seqinr')")
+    }
+    seqinr::read.fasta(file = path, seqtype = "DNA", as.string = TRUE)
+  })
 })
 
 ########################################################

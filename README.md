@@ -47,7 +47,7 @@ git clone https://github.com/eitanyaffe/mview.git
 Install required packages in R:
 
 ```r
-install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui"))
+install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui", "seqinr"))
 ```
 
 ### Installing alntools (optional)
@@ -221,3 +221,4 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
 - Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.
 - GPU support added (Apple Silicon only) for bin queries in the alignment profile.
+- Added nucleotide sequence display for axis profiles.

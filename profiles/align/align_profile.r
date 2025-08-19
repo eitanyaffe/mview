@@ -188,7 +188,7 @@ default_alignment_params <- list(
     group_id = "align_full",
     type = "select",
     choices = c("none", "by_mutations", "by_strand", "show_mutations"), 
-    default = "by_mutations"
+    default = "show_mutations"
   ),
   full_threshold = list(
     group_id = "align_full",

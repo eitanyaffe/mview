@@ -87,13 +87,14 @@ output$basic_info <- renderText({
     c(zoom_text, sprintf("Window: %s", window_size_text))
   }
 
-  mouse_info <- get_mouse_info(state)
+  # hover coord functionality disabled - coordinates are a bit off and need debugging
+  # mouse_info <- get_mouse_info(state)
   
-  # combine all text with newlines, excluding NULL mouse_info
+  # combine all text with newlines
   info_parts <- c(assembly_text, zoom_info)
-  if (!is.null(mouse_info)) {
-    info_parts <- c(info_parts, mouse_info)
-  }
+  # if (!is.null(mouse_info)) {
+  #   info_parts <- c(info_parts, mouse_info)
+  # }
   paste(info_parts, collapse = "\n")
 })
 

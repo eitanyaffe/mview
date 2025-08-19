@@ -84,6 +84,21 @@ keyboard_shortcuts <- list(
       }
     }
   ),
+  "Alt+=" = list(
+    description = "Zoom in (halve the view range)",
+    type = "zoom",
+    action = function(states_module_output, main_state_rv) {
+      if (!is.null(main_state_rv$zoom)) {
+        states_module_output$push_state()
+        zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        # halve the range while keeping the same center
+        main_state_rv$zoom <- c(
+          main_state_rv$zoom[1] + zoom_range * 0.25,
+          main_state_rv$zoom[2] - zoom_range * 0.25
+        )
+      }
+    }
+  ),
   "Alt+>" = list(
     description = "Move zoom area one window to the right",
     type = "zoom",
@@ -228,6 +243,8 @@ keyboard_initialize <- function() {
         key = '>';
       } else if (key === 'Minus') {
         key = '_';
+      } else if (key === 'Equal') {
+        key = '=';
       }
       
       if (key === 'Meta' || key === 'Alt' || key === 'Control' || key === 'Shift') return;

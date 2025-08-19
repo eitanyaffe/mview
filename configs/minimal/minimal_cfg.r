@@ -56,6 +56,21 @@ get_aln_f <- function(assembly = NULL) {
   read_cached(paste0("aln_", assembly), path, read_f = aln_load)
 }
 
+get_fasta_f <- function(assembly = NULL) {
+  if (is.null(assembly)) return(NULL)
+  path <- file.path(tables_dir, paste0("contig_fasta_", assembly, ".fasta"))
+  if (!file.exists(path)) return(NULL)
+  
+  # check if seqinr is available
+  if (!requireNamespace("seqinr", quietly = TRUE)) {
+    stop("seqinr package not available, install with: install.packages('seqinr')")
+  }
+  
+  read_cached(paste0("fasta_", assembly), path, read_f = function(file_path) {
+    seqinr::read.fasta(file = file_path, seqtype = "DNA", as.string = TRUE)
+  })
+}
+
 # helper function to generate taxonomy colors
 get_tax_color <- function(tax_values) {
   unique_tax <- sort(unique(tax_values[!is.na(tax_values) & tax_values != ""]))
@@ -141,6 +156,7 @@ set_assemblies(aids)
 register_contigs_f(get_contigs_f)
 register_genomes_f(get_genomes_f)
 register_contig_map_f(get_contig_map_f)
+register_fasta_f(get_fasta_f)
 
 ########################################################
 # register views

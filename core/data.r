@@ -6,6 +6,7 @@
 .data_env$register_contigs_f <- NULL
 .data_env$register_genomes_f <- NULL
 .data_env$register_contig_map_f <- NULL
+.data_env$register_fasta_f <- NULL
 .data_env$assemblies <- NULL
 
 # Set lookup tables from files
@@ -104,6 +105,11 @@ register_contig_map_f <- function(f) {
   .data_env$register_contig_map_f <- f
 }
 
+register_fasta_f <- function(f) {
+  cat(sprintf("registering fasta function\n"))
+  .data_env$register_fasta_f <- f
+}
+
 # Get contigs using the registered function
 get_contigs <- function(assembly = NULL) {
   if (is.null(.data_env$register_contigs_f)) {
@@ -147,4 +153,15 @@ set_assemblies <- function(assemblies) {
 
 get_assemblies <- function() {
   .data_env$assemblies
+}
+
+# get fasta using the registered function
+get_fasta <- function(assembly = NULL) {
+  if (is.null(.data_env$register_fasta_f)) {
+    stop("fasta function not registered, call register_fasta_f first")
+  }
+  key <- sprintf("global.fasta.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_fasta_f(assembly)
+  })
 }

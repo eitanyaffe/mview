@@ -1,3 +1,23 @@
+  
+     # default parameters
+   default_axis_params <- list(
+     show_nt = list(
+       group_id = "axis",
+       type = "boolean",
+       default = TRUE
+     ),
+     nt_threshold = list(
+       group_id = "axis",
+       type = "integer",
+       default = 200
+     ),
+     scale_factor = list(
+       group_id = "axis",
+       type = "double",
+       default = 2
+     )
+   )
+  
 #' Create a simple axis profile
 #' @param id Unique profile id
 #' @param name Display name
@@ -7,8 +27,48 @@
 axis_profile <- function(id = "simple_axis",
                          name = "simple axis",
                          height = 100,
+                         params = default_axis_params,
                          auto_register = TRUE) {
+
   data_f <- function(cxt) NULL
+
+  # helper function to extract sequence for a contig and range from cached fasta data
+  get_sequence <- function(assembly, contig, start_pos, end_pos) {
+    tryCatch({
+      # get cached fasta sequences
+      sequences <- get_fasta(assembly)
+      
+      if (is.null(sequences)) {
+        return(NULL)
+      }
+      
+      # find the target contig
+      contig_seq <- NULL
+      for (seq_name in names(sequences)) {
+        if (seq_name == contig || grepl(paste0("^", contig, "($|\\s)"), seq_name)) {
+          contig_seq <- sequences[[seq_name]]
+          break
+        }
+      }
+      
+      if (is.null(contig_seq)) {
+        return(NULL)
+      }
+      
+      # get the full sequence string
+      full_sequence <- as.character(contig_seq)
+      
+      # extract the requested range (1-based coordinates)
+      if (start_pos < 1) start_pos <- 1
+      if (end_pos > nchar(full_sequence)) end_pos <- nchar(full_sequence)
+      if (start_pos > end_pos) return(NULL)
+      
+      substr(full_sequence, start_pos, end_pos)
+    }, error = function(e) {
+      cat(sprintf("error reading sequence: %s\n", e$message))
+      NULL
+    })
+  }
 
   # compute coordinate annotations for the current view
   get_annotations_f <- function(profile, cxt) {
@@ -75,6 +135,10 @@ axis_profile <- function(id = "simple_axis",
     contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
 
     if (nrow(contig_df) == 0) return(gg)
+    
+    # get threshold parameter
+    nt_threshold <- get_param("axis", "nt_threshold")()
+    window_size <- zoom_xlim[2] - zoom_xlim[1] + 1
 
     if (nrow(contig_df) == 1) {
       name_data <- data.frame(x = (zoom_xlim[1] + zoom_xlim[2]) / 2, y = 0.45, label = contig_df$contig)
@@ -95,8 +159,8 @@ axis_profile <- function(id = "simple_axis",
       contig_end <- contig_df$end[1]
 
       # compute tick marks in contig-local coordinates
-      local_visible_start <- max(0, zoom_xlim[1] - contig_start)
-      local_visible_end <- min(contig_end - contig_start, zoom_xlim[2] - contig_start)
+      local_visible_start <- floor(max(0, zoom_xlim[1] - contig_start))
+      local_visible_end <- ceiling(min(contig_end - contig_start, zoom_xlim[2] - contig_start))
       local_visible_range <- local_visible_end - local_visible_start
       if (local_visible_range > 0) {
         target_ticks <- 10
@@ -120,6 +184,47 @@ axis_profile <- function(id = "simple_axis",
           tick_data <- data.frame(x = global_ticks, y = 0.8, xend = global_ticks, yend = 0.8 - tick_height)
           gg <- gg + ggplot2::geom_segment(data = tick_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), color = "black", size = 0.3)
         }
+        
+        # show nucleotides if enabled and window is small enough
+        show_nt <- get_param("axis", "show_nt")()
+        if (show_nt && window_size <= nt_threshold) {
+          contig <- contig_df$contig[1]
+          assembly <- cxt$assembly
+          cat("axis_profile: showing nucleotides for contig ", contig, " in assembly ", assembly, "\n")
+          sequence <- get_sequence(assembly, contig, 
+                                 local_visible_start, local_visible_end)
+          
+          if (!is.null(sequence) && nchar(sequence) > 0) {
+            # create nucleotide positions and labels
+            nt_positions <- seq(local_visible_start + 1, local_visible_end)
+            nt_chars <- strsplit(sequence, "")[[1]]
+            
+            # limit to visible range
+            visible_indices <- nt_positions >= (zoom_xlim[1] - contig_start + 1) & 
+                             nt_positions <= (zoom_xlim[2] - contig_start + 1)
+            nt_positions <- nt_positions[visible_indices]
+            nt_chars <- nt_chars[visible_indices]
+            
+            if (length(nt_positions) > 0) {
+              global_nt_positions <- contig_start + nt_positions - 1
+              
+              # calculate font size based on zoom level to avoid collisions
+              scale_factor <- get_param("axis", "scale_factor")()
+              size_factor <- max(0.1, min(2.0, 100.0 / window_size))
+              font_size <- scale_factor * size_factor
+              
+              # debug output
+              cat(sprintf("axis nucleotides: window_size=%.1f, nt_threshold=%d, scale_factor=%.2f, size_factor=%.2f, font_size=%.2f\n", 
+                         window_size, nt_threshold, scale_factor, size_factor, font_size))
+              
+              nt_data <- data.frame(x = global_nt_positions, y = 0.85, label = toupper(nt_chars))
+              gg <- gg + ggplot2::geom_text(data = nt_data, 
+                                          ggplot2::aes(x = x, y = y, label = label), 
+                                          color = "darkblue", size = font_size, 
+                                          family = "mono", vjust = 0.5)
+            }
+          }
+        }
       }
     }
 
@@ -132,6 +237,7 @@ axis_profile <- function(id = "simple_axis",
     type = "axis",
     height = height,
     attr = list(hide_y_label = TRUE, hide_y_ticks = TRUE),
+    params = params,
     data_f = data_f,
     plot_f = plot_f,
     get_annotations = get_annotations_f,

@@ -97,3 +97,10 @@ Categories are stacked from highest distance (bottom) to lowest distance (top) i
     - `by_mutations`: order by mutation density while preventing overlaps.
   - `max_reads`: cap alignments fetched per interval in full mode.
   - `max_mutations`: cap mutations drawn when `full_style=show_mutations`.
+
+#### Mutation Identifiers
+
+Mutation identifiers follow standard notation:
+- **X:Y** - substitution where base X is substituted by base Y
+- **+XYZ** - insertion where sequence XYZ was added
+- **-XYZ** - deletion where sequence XYZ was removed
