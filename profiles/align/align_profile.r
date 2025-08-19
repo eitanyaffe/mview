@@ -203,7 +203,7 @@ default_alignment_params <- list(
   max_mutations = list(
     group_id = "align_full",
     type = "integer",
-    default = 1000
+    default = 10000
   ),
 
   full_mutation_lwd = list(
