@@ -16,9 +16,9 @@ observeEvent(input$addContigsBtn, {
     new_contigs <- contigs_data$contig[rows]
     new_contigs <- new_contigs[!new_contigs %in% state$contigs]
     if (length(new_contigs) > 0) {
-      states_module_output$push_state()
+      # push current region to undo before changing
+      regions_module_output$push_undo_state()
       state$contigs <- c(state$contigs, new_contigs)
-  
     }
   }
 })
@@ -29,9 +29,9 @@ observeEvent(input$setContigsBtn, {
     contigs_data <- get_contigs(state$assembly)
     selected_contigs <- contigs_data$contig[rows]
     if (!identical(selected_contigs, state$contigs)) {
-      states_module_output$push_state()
+      # push current region to undo before changing
+      regions_module_output$push_undo_state()
       state$contigs <- selected_contigs
-  
     }
   }
 })
@@ -45,9 +45,9 @@ observeEvent(input$addGenomesBtn, {
     new_contigs <- contig_map_data$contig[contig_map_data$gid %in% selected_gids]
     new_contigs <- new_contigs[!new_contigs %in% state$contigs]
     if (length(new_contigs) > 0) {
-      states_module_output$push_state()
+      # push current region to undo before changing
+      regions_module_output$push_undo_state()
       state$contigs <- c(state$contigs, new_contigs)
-  
     }
   }
 })
@@ -57,8 +57,8 @@ observeEvent(input$removeContigsBtn, {
   contigs_data <- get_contigs(state$assembly)
   removed_contigs <- selected_contigs_from_table(state$contigs, contigs_data, rows)
   if (length(removed_contigs) > 0) {
-    states_module_output$push_state()
+    # push current state to undo before changing
+    regions_module_output$push_undo_state()
     state$contigs <- setdiff(state$contigs, removed_contigs)
-
   }
 })

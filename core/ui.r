@@ -67,6 +67,16 @@ ui <- fluidPage(
           }
         });
       });
+      
+      // handle focus input message from regions module
+      Shiny.addCustomMessageHandler('focusInput', function(inputId) {
+        document.getElementById(inputId).focus();
+      });
+      
+      // handle updating readonly inputs
+      Shiny.addCustomMessageHandler('updateReadonlyInput', function(data) {
+        document.getElementById(data.id).value = data.value;
+      });
     "))
   ),
   tags$style(HTML("
@@ -157,7 +167,7 @@ ui <- fluidPage(
     column(
       width = 2,
       uiOutput("state_info"),
-      shiny::selectInput("states_module-assembly_select", "Assembly:",
+      shiny::selectInput("regions_module-assembly_select", "Assembly:",
         choices = get_assemblies(),
         selected = get_assemblies()[1],
         multiple = FALSE,

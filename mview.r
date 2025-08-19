@@ -11,8 +11,8 @@ get_server <- function() {
         load_tabs()
         source("core/server_tabs.r", local = TRUE)
 
-        states_module_output <- states_server(
-            id = "states_module",
+        regions_module_output <- regions_server(
+            id = "regions_module",
             main_state_rv = state,
             session = session
         )
@@ -22,7 +22,7 @@ get_server <- function() {
             output = output,
             session = session,
             main_state_rv = state,
-            states_module_output = states_module_output
+            regions_module_output = regions_module_output
         )
     }
 }
@@ -52,8 +52,8 @@ rl_core <- function(project_id) {
     # tabs system
     source("core/tabs.r", local = FALSE)
 
-    # state table
-    source("core/states.R", local = FALSE)
+    # regions table
+    source("core/regions.r", local = FALSE)
 
     # keyboard
     source("core/keyboard.r", local = FALSE)

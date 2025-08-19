@@ -89,7 +89,8 @@ observeEvent(input$goto_alignment_location_trigger, {
     "contig_end" %in% colnames(selected_alignment)
   )
 
-  states_module_output$push_state()
+  # push current region to undo before changing
+  regions_module_output$push_undo_state()
 
   state$contigs <- selected_alignment$contig_id
   gstart <- selected_alignment$contig_start

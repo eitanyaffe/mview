@@ -43,7 +43,7 @@ state <- reactiveValues(
   mouse_coords = NULL
 )
 
-# Basic info output with same font as top state display
+# Basic info output with same font as top region display
 output$basic_info <- renderText({
   assembly_text <- if (is.null(state$assembly) || state$assembly == "") {
     "Assembly: none selected"
@@ -120,11 +120,11 @@ output$contig_count <- renderUI({
   )
 })
 
-# Add a new output renderer for the current state display box
-output$current_state_display <- renderText({
+# Add a new output renderer for the current region display box
+output$current_region_display <- renderText({
   # Capture output from print_state in a string
   output_text <- capture.output({
-    print_state(state, show_title = FALSE)
+  print_region(state, show_title = FALSE)
   })
 
   # Return the captured output as a single string

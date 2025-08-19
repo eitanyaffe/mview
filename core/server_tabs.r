@@ -6,8 +6,8 @@ output$mainTabsPanel <- renderUI({
   # fixed tabs that are always present
   fixed_tabs <- list(
     tabPanel(
-      "States",
-      states_ui("states_module")
+      "Regions",
+      regions_ui("regions_module")
     ),
     tabPanel(
       "Contigs",

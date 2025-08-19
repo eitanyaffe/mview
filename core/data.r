@@ -8,6 +8,7 @@
 .data_env$register_contig_map_f <- NULL
 .data_env$register_fasta_f <- NULL
 .data_env$assemblies <- NULL
+.data_env$regions_dir <- NULL
 
 # Set lookup tables from files
 set_lookup <- function(lookup_files) {
@@ -153,6 +154,18 @@ set_assemblies <- function(assemblies) {
 
 get_assemblies <- function() {
   .data_env$assemblies
+}
+
+# Set and get regions directory
+set_regions_dir <- function(regions_dir) {
+  .data_env$regions_dir <- regions_dir
+}
+
+get_regions_dir <- function() {
+  if (is.null(.data_env$regions_dir)) {
+    stop("regions directory not set, call set_regions_dir first")
+  }
+  .data_env$regions_dir
 }
 
 # get fasta using the registered function

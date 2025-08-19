@@ -202,8 +202,8 @@ observeEvent(input$zoomToGeneBtn, {
     if (!is.null(genes_df) && nrow(genes_df) > 0) {
       selected_gene <- genes_df[selected_row, ]
 
-      # Save current state before changing zoom
-      states_module_output$push_state()
+      # push current region to undo before changing
+      regions_module_output$push_undo_state()
 
       # Set zoom to the gene with some padding
       padding <- max(500, (selected_gene$gend - selected_gene$gstart) * 0.2)

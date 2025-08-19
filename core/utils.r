@@ -37,7 +37,7 @@ format_bp <- function(bp, digits = 1) {
   return(result)
 }
 
-print_state <- function(state, title = "State", show_title = TRUE) {
+print_region <- function(state, title = "Region", show_title = TRUE) {
   # Format contig display based on count
   contig_display <- if (length(state$contigs) == 0) {
     "None"

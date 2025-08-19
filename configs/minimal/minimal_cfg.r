@@ -2,6 +2,9 @@
 # Minimal test configuration file
 ########################################################
 
+# Set regions directory
+set_regions_dir("configs/minimal/regions")
+
 # example data directories
 example_dir <- "examples"
 tables_dir <- file.path(example_dir, "tables")

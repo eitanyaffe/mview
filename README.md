@@ -132,11 +132,11 @@ Application layout:
 - **Central region**: Plot region with genomic profiles (also called tracks).
 - **Left panel**: Information about the display window and cursor location.
 - **Right panel**: Window where user-defined profiles parameters can be customized.
-- **Bottom tabs**: Tables (states, contigs, genomes, genes, alignments).
+- **Bottom tabs**: Tables (regions, contigs, genomes, genes, alignments).
 
 #### Selecting the viewing region
 
-1. **Select contigs**: Use State, Contigs or Genomes tab to select one or more contigs
+1. **Select contigs**: Use Regions, Contigs or Genomes tab to select one or more contigs
 2. **Zoom**: Use mouse to select regions in the visualization
 3. **Lock zoom**: Press Alt+Z to set the selected region as zoom
 4. **Window size**: Press Alt+N (N=2-7) to zoom to 10^N basepairs around current center
@@ -145,7 +145,7 @@ Application layout:
 #### Tables
 
 The bottom panel contains these tabs:
-- **States**: Manage saved visualization states 
+- **Regions**: Manage saved visualization regions 
 - **Contigs**: Table for selecting individual contigs
 - **Genomes**: Table for selecting reconstructed genomes
 - **Contig Map**: Mapping between contigs and genomes
@@ -191,20 +191,34 @@ The alignment profile supports several key parameters accessible through the rig
 
 Hover shows element information in all profiles. Profile parameters can be set in code or adjusted interactively in the right panel. See the detailed profile guide: [profiles](docs/profiles.md).
 
-### Saving and loading states
+### Managing regions
 
-**Initialize state table**: Create a new table ("New Table").
+The Regions tab provides comprehensive management of saved visualization states, including assembly, contig selection, and zoom level. Region tables are stored as tab-delimited files with automatic versioning.
 
-**To save current state**:
-1. Navigate to States tab
-2. Enter description in text field  
-3. Click "Add Current State"
-4. Click "Save Table" to save the state table
+#### Creating and opening region tables
 
-**To restore a state**:
-1. Load an existing state table by clicking "Load Table"
-2. Select state from table
-3. Click "Go to Selected State"
+- **New Table**: Create a new region table with a custom name
+- **Open Table**: Select from existing region tables in the regions directory  
+- **Delete Table**: Remove an entire region table (with confirmation)
+
+#### Working with regions
+
+**To save current region**:
+1. Navigate to Regions tab
+2. Click "Add" button or press Alt+S
+3. Enter description in the dialog
+4. Region is automatically saved
+
+**To restore a region**:
+1. Select region from the table
+2. Click "Goto" button in the Actions column
+3. Use Alt+Backspace to undo navigation
+
+**To manage regions**:
+- **Edit**: Modify region descriptions
+- **Delete**: Remove individual regions
+
+Region files are saved as `[name].txt` with automatic backup versions stored in `versions/[name]_v1.txt`, `v2.txt`, etc.
 
 ## Working with your data
 

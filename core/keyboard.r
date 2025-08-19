@@ -4,7 +4,7 @@
 shifted_numbers <- c("!", "@", "#", "$", "%", "^", "&", "*", "(", ")")
 
 # helper function to zoom to 10^N basepairs around current center
-zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
+zoom_to_power_of_ten <- function(n, regions_module_output, main_state_rv) {
   # calculate target range (10^N basepairs)
   target_range <- 10^n
   half_range <- target_range / 2
@@ -31,8 +31,8 @@ zoom_to_power_of_ten <- function(n, states_module_output, main_state_rv) {
     }
   }
   
-  # save current state before changing zoom
-  states_module_output$push_state()
+  # save current region before changing zoom
+  regions_module_output$push_undo_state()
   
   # set new zoom range centered on current center
   new_start <- current_center - half_range
@@ -48,24 +48,24 @@ keyboard_shortcuts <- list(
   "Alt+backspace" = list(
     description = "Undo last action",
     type = "general", # Added type for dispatch
-    action = function(states_module_output) {
-      states_module_output$undo_state()
+    action = function(regions_module_output) {
+      regions_module_output$undo_last_action()
     }
   ),
   "Alt+0" = list(
     description = "Reset zoom to full range",
-    type = "zoom", # Changed from general to zoom type for direct state access
-    action = function(states_module_output, main_state_rv) {
-      states_module_output$push_state()
+    type = "zoom", # Changed from general to zoom type for direct region access
+    action = function(regions_module_output, main_state_rv) {
+      regions_module_output$push_undo_state()
       main_state_rv$zoom <- NULL
     }
   ),
   "Alt+Z" = list(
     description = "Update zoom from selected range",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$current_xlim)) {
-        states_module_output$push_state()
+        regions_module_output$push_undo_state()
         main_state_rv$zoom <- main_state_rv$current_xlim
       }
     }
@@ -73,9 +73,9 @@ keyboard_shortcuts <- list(
   "Alt+_" = list(
     description = "Zoom out (double the view range)",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
-        states_module_output$push_state()
+        regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
         main_state_rv$zoom <- c(
           main_state_rv$zoom[1] - zoom_range * 0.5,
@@ -87,9 +87,9 @@ keyboard_shortcuts <- list(
   "Alt+=" = list(
     description = "Zoom in (halve the view range)",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
-        states_module_output$push_state()
+        regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
         # halve the range while keeping the same center
         main_state_rv$zoom <- c(
@@ -102,9 +102,9 @@ keyboard_shortcuts <- list(
   "Alt+>" = list(
     description = "Move zoom area one window to the right",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
-        states_module_output$push_state()
+        regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
         main_state_rv$zoom <- c(
           main_state_rv$zoom[1] + zoom_range,
@@ -116,9 +116,9 @@ keyboard_shortcuts <- list(
   "Alt+<" = list(
     description = "Move zoom area one window to the left",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
-        states_module_output$push_state()
+        regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
         main_state_rv$zoom <- c(
           main_state_rv$zoom[1] - zoom_range,
@@ -133,8 +133,8 @@ keyboard_shortcuts <- list(
   "Alt+C" = list(
     description = "Clear selected contigs",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      states_module_output$push_state()
+action = function(regions_module_output, main_state_rv) {
+      regions_module_output$push_undo_state()
       main_state_rv$contigs <- character()
       cat("cleared selected contigs by Alt+C\n")
     }
@@ -142,43 +142,51 @@ keyboard_shortcuts <- list(
   "Alt+2" = list(
     description = "Zoom to 100 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(2, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(2, regions_module_output, main_state_rv)
     }
   ),
   "Alt+3" = list(
     description = "Zoom to 1,000 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(3, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(3, regions_module_output, main_state_rv)
     }
   ),
   "Alt+4" = list(
     description = "Zoom to 10,000 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(4, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(4, regions_module_output, main_state_rv)
     }
   ),
   "Alt+5" = list(
     description = "Zoom to 100,000 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(5, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(5, regions_module_output, main_state_rv)
     }
   ),
   "Alt+6" = list(
     description = "Zoom to 1,000,000 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(6, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(6, regions_module_output, main_state_rv)
     }
   ),
   "Alt+7" = list(
     description = "Zoom to 10,000,000 basepairs around current center",
     type = "zoom",
-    action = function(states_module_output, main_state_rv) {
-      zoom_to_power_of_ten(7, states_module_output, main_state_rv)
+    action = function(regions_module_output, main_state_rv) {
+      zoom_to_power_of_ten(7, regions_module_output, main_state_rv)
+    }
+  ),
+  "Alt+S" = list(
+    description = "Add current region",
+    type = "region",
+    action = function(regions_module_output) {
+      # trigger the add region input focus
+      regions_module_output$focus_add_input()
     }
   )
 )
@@ -187,7 +195,7 @@ keyboard_shortcuts <- list(
 create_and_add_tab_shortcuts <- function() {
   # Fixed vector of tab titles as they appear in the UI
   tabs <- c(
-    "States", "Contigs", "Genomes", "Contig Map", "Selected Contigs",
+    "Regions", "Contigs", "Genomes", "Contig Map", "Selected Contigs",
     "Options", "Parameters"
   )
 
@@ -258,7 +266,7 @@ keyboard_initialize <- function() {
 }
 
 # Server-side handler for keyboard shortcuts
-keyboard_server <- function(input, output, session, main_state_rv, states_module_output) {
+keyboard_server <- function(input, output, session, main_state_rv, regions_module_output) {
   # Create a reactive value to track keyboard events
   keyboard_events <- reactiveVal(0)
 
@@ -278,11 +286,13 @@ keyboard_server <- function(input, output, session, main_state_rv, states_module
             shortcut_details$action(session) # Pass session for tab switching
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "general") {
             # Default for "general" type or if type is not specified
-            shortcut_details$action(states_module_output)
+            shortcut_details$action(regions_module_output)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "zoom") {
-            shortcut_details$action(states_module_output, main_state_rv)
+            shortcut_details$action(regions_module_output, main_state_rv)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region") {
+            shortcut_details$action(regions_module_output)
           } else {
-            cat("Unknown shortcut type:", shortcut_details$type, "\n")
+            cat("unknown shortcut type:", shortcut_details$type, "\n")
           }
 
           keyboard_events(keyboard_events() + 1)
