@@ -67,13 +67,17 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
   df$x_left <- df$gcoord - 0.5
   df$x_right <- df$gcoord + 0.5
   
-  # create hover text
-  df$hover_text <- paste0(
-    "Position: ", df$coord, "\n",
-    "Variant: ", df$variant, "\n",
-    "Count: ", df$count, " / ", df$coverage, "\n",
-    "Fraction: ", sprintf("%.3f", df$count / df$coverage)
-  )
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    df$hover_text <- paste0(
+      "Position: ", df$coord, "\n",
+      "Variant: ", df$variant, "\n",
+      "Count: ", df$count, " / ", df$coverage, "\n",
+      "Fraction: ", sprintf("%.3f", df$count / df$coverage)
+    )
+  } else {
+    df$hover_text <- ""
+  }
   
   # plot rectangles
   gg <- gg + ggplot2::geom_rect(

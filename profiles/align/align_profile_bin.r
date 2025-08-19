@@ -69,7 +69,7 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
 }
 
 # Function to plot stacked mutation rates
-plot_stacked_mutation_rates <- function(gg, df, normalize = FALSE) {
+plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
   if (nrow(df) == 0) return(gg)
   
   # use shared red color scale for discrete mutation categories
@@ -141,17 +141,21 @@ plot_stacked_mutation_rates <- function(gg, df, normalize = FALSE) {
         stringsAsFactors = FALSE
       )
       
-      # create hover text
-      if (normalize) {
-        category_data$hover_text <- paste0(
-          sprintf("%.1f%%", category_data$count), " of reads\n",
-          "Category: ", category_data$description, "\n"
-        )
+      # create hover text only if enabled
+      if (profile$show_hover) {
+        if (normalize) {
+          category_data$hover_text <- paste0(
+            sprintf("%.1f%%", category_data$count), " of reads\n",
+            "Category: ", category_data$description, "\n"
+          )
+        } else {
+          category_data$hover_text <- paste0(
+            category_data$count, " out of ", category_data$read_count, " reads\n",
+            "Category: ", category_data$description, "\n"
+          )
+        }
       } else {
-        category_data$hover_text <- paste0(
-          category_data$count, " out of ", category_data$read_count, " reads\n",
-          "Category: ", category_data$description, "\n"
-        )
+        category_data$hover_text <- ""
       }
       
       stacked_data <- rbind(stacked_data, category_data)
@@ -168,8 +172,10 @@ plot_stacked_mutation_rates <- function(gg, df, normalize = FALSE) {
       ggplot2::aes(
         xmin = gstart, xmax = gend,
         ymin = ymin, ymax = ymax,
-        fill = fill_color, color = fill_color, text = hover_text
-      ), size = 0.1
+        fill = fill_color, color = fill_color,
+        text = hover_text
+      ),
+      size = 0.1
     ) +
       ggplot2::scale_fill_identity() +
       ggplot2::scale_color_identity()
@@ -179,15 +185,19 @@ plot_stacked_mutation_rates <- function(gg, df, normalize = FALSE) {
 }
 
 # Plot mutation density bins with red color scale
-plot_mutation_density_bins <- function(gg, df) {
+plot_mutation_density_bins <- function(gg, df, profile) {
   # mutation density visualization
   df$fill_color <- get_mutation_colors(df$mut_density)
   
-  # hover text
-  df$hover_text <- paste0(
-    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
-    "Mutation density: ", sprintf("%.3f%%", df$mut_density * 100)
-  )
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Mutation density: ", sprintf("%.3f%%", df$mut_density * 100)
+    )
+  } else {
+    df$hover_text <- ""
+  }
   
   # plot bins
   gg <- gg + ggplot2::geom_rect(
@@ -195,8 +205,10 @@ plot_mutation_density_bins <- function(gg, df) {
     ggplot2::aes(
       xmin = gstart, xmax = gend,
       ymin = 0, ymax = cov,
-      fill = fill_color, color = fill_color, text = hover_text
-    ), size = 0.1
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
   ) +
     ggplot2::scale_fill_identity() +
     ggplot2::scale_color_identity()
@@ -205,7 +217,7 @@ plot_mutation_density_bins <- function(gg, df) {
 }
 
 # Plot segregating sites bins with blue color scale
-plot_segregating_sites_bins <- function(gg, df) {
+plot_segregating_sites_bins <- function(gg, df, profile) {
   # segregating sites density visualization
   seg_density_per_100bp <- df$seg_sites_density
   max_seg_density <- max(seg_density_per_100bp, na.rm = TRUE)
@@ -220,12 +232,16 @@ plot_segregating_sites_bins <- function(gg, df) {
     num_steps = 20
   )
   
-  # hover text
-  seg_sites_count <- round(df$seg_sites_density * df$length)
-  df$hover_text <- paste0(
-    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
-    "Segregating sites: ", seg_sites_count
-  )
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    seg_sites_count <- round(df$seg_sites_density * df$length)
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Segregating sites: ", seg_sites_count
+    )
+  } else {
+    df$hover_text <- ""
+  }
   
   # plot bins
   gg <- gg + ggplot2::geom_rect(
@@ -233,8 +249,10 @@ plot_segregating_sites_bins <- function(gg, df) {
     ggplot2::aes(
       xmin = gstart, xmax = gend,
       ymin = 0, ymax = cov,
-      fill = fill_color, color = fill_color, text = hover_text
-    ), size = 0.1
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
   ) +
     ggplot2::scale_fill_identity() +
     ggplot2::scale_color_identity()
@@ -243,7 +261,7 @@ plot_segregating_sites_bins <- function(gg, df) {
 }
 
 # Plot non-reference sites bins with orange color scale
-plot_nonref_sites_bins <- function(gg, df) {
+plot_nonref_sites_bins <- function(gg, df, profile) {
   # non-reference sites density visualization
   nonref_density_per_100bp <- df$non_ref_sites_density
   max_nonref_density <- max(nonref_density_per_100bp, na.rm = TRUE)
@@ -258,12 +276,16 @@ plot_nonref_sites_bins <- function(gg, df) {
     num_steps = 20
   )
   
-  # hover text
-  nonref_sites_count <- round(df$non_ref_sites_density * df$length)
-  df$hover_text <- paste0(
-    "Coverage: ", sprintf("%.2f", df$cov), "x\n",
-    "Non-ref sites: ", nonref_sites_count
-  )
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    nonref_sites_count <- round(df$non_ref_sites_density * df$length)
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Non-ref sites: ", nonref_sites_count
+    )
+  } else {
+    df$hover_text <- ""
+  }
   
   # plot bins
   gg <- gg + ggplot2::geom_rect(
@@ -271,8 +293,10 @@ plot_nonref_sites_bins <- function(gg, df) {
     ggplot2::aes(
       xmin = gstart, xmax = gend,
       ymin = 0, ymax = cov,
-      fill = fill_color, color = fill_color, text = hover_text
-    ), size = 0.1
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
   ) +
     ggplot2::scale_fill_identity() +
     ggplot2::scale_color_identity()
@@ -318,13 +342,13 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
 
   # choose and call appropriate visualization function
   if (bin_style == "by_mut_density") {
-    gg <- plot_mutation_density_bins(gg, df)
+    gg <- plot_mutation_density_bins(gg, df, profile)
   } else if (bin_style == "by_seg_density") {
-    gg <- plot_segregating_sites_bins(gg, df)
+    gg <- plot_segregating_sites_bins(gg, df, profile)
   } else if (bin_style == "by_nonref_density") {
-    gg <- plot_nonref_sites_bins(gg, df)
+    gg <- plot_nonref_sites_bins(gg, df, profile)
   } else if (bin_style == "by_genomic_distance") {
-    gg <- plot_stacked_mutation_rates(gg, df, normalize = normalize_distrib_bins)
+    gg <- plot_stacked_mutation_rates(gg, df, profile, normalize = normalize_distrib_bins)
   }
 
   gg <- gg + ggplot2::theme_minimal() +

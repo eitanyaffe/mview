@@ -117,10 +117,15 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     reads$gstart <- pmax(reads$gstart, cxt$mapper$xlim[1])
     reads$gend <- pmin(reads$gend, cxt$mapper$xlim[2])
 
-    reads$hover_text <- paste0(
-      "Read: ", reads$read_id, "\n",
-      reads$start, "-", reads$end
-    )
+    # create hover text only if enabled
+    if (profile$show_hover) {
+      reads$hover_text <- paste0(
+        "Read: ", reads$read_id, "\n",
+        reads$start, "-", reads$end
+      )
+    } else {
+      reads$hover_text <- ""
+    }
 
     # draw read lines at middle height
     gg <- gg + ggplot2::geom_segment(
@@ -163,12 +168,18 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
     alignments$align_length <- alignments$end - alignments$start + 1
     alignments$mut_density_pct <- (alignments$mutation_count / alignments$align_length) * 100
-    alignments$hover_text <- paste0(
-      "Read: ", alignments$read_id, "\n",
-      alignments$start, "-", alignments$end, "\n",
-      "Read coords: ", alignments$read_start, "-", alignments$read_end, " / ", alignments$read_length, "\n",
-      "Mutations: ", alignments$mutation_count, " (", sprintf("%.3f", alignments$mut_density_pct), "%)"
-    )
+    
+    # create hover text only if enabled
+    if (profile$show_hover) {
+      alignments$hover_text <- paste0(
+        "Read: ", alignments$read_id, "\n",
+        alignments$start, "-", alignments$end, "\n",
+        "Read coords: ", alignments$read_start, "-", alignments$read_end, " / ", alignments$read_length, "\n",
+        "Mutations: ", alignments$mutation_count, " (", sprintf("%.3f", alignments$mut_density_pct), "%)"
+      )
+    } else {
+      alignments$hover_text <- ""
+    }
 
     # draw alignment rectangles
     gg <- gg + ggplot2::geom_rect(
@@ -200,7 +211,6 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     # draw right clipping indicators
     if (any(alignments$clipped_right)) {
       right_clipped <- alignments[alignments$clipped_right, ]
-      
       gg <- gg + ggplot2::geom_segment(
         data = right_clipped,
         ggplot2::aes(
@@ -237,11 +247,16 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       mutations$fill_color <- get_variant_type_colors(mutations$desc)
     }
 
-    mutations$hover_text <- paste0(
-      "Read: ", mutations$read_id, "\n",
-      "Position: ", mutations$coord, "\n",
-      "Type: ", mutations$desc
-    )
+    # create hover text only if enabled
+    if (profile$show_hover) {
+      mutations$hover_text <- paste0(
+        "Read: ", mutations$read_id, "\n",
+        "Position: ", mutations$coord, "\n",
+        "Type: ", mutations$desc
+      )
+    } else {
+      mutations$hover_text <- ""
+    }
 
     # show rectangles when zoomed in under 100bp, otherwise segments
     xlim_range <- cxt$mapper$xlim[2] - cxt$mapper$xlim[1]

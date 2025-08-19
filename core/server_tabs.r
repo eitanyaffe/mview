@@ -48,7 +48,24 @@ output$mainTabsPanel <- renderUI({
         max = 3000,
         step = 100
       ),
-      p("These settings control the minimum and maximum allowed height for the combined profile plots.")
+      p("These settings control the minimum and maximum allowed height for the combined profile plots."),
+      br(),
+      h4("Contig Length Filtering"),
+      numericInput(
+        inputId = "min_contig_length",
+        label = "Minimum contig length (kb)",
+        value = 0,
+        min = 0,
+        step = 1
+      ),
+      numericInput(
+        inputId = "max_contig_length",
+        label = "Maximum contig length (kb)",
+        value = 100000,
+        min = 0,
+        step = 1000
+      ),
+      p("Filter contigs displayed in the contig table by length. Adjust values to focus on contigs within specific size ranges.")
     )
   )
   

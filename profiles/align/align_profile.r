@@ -221,8 +221,8 @@ default_alignment_params <- list(
   bin_style = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("by_mut_density", "by_genomic_distance", "by_seg_density", "by_nonref_density"),
-    default = "by_mut_density"
+    choices = c("by_seg_density", "by_mut_density", "by_genomic_distance", "by_nonref_density"),
+    default = "by_seg_density"
   ),
   bin_type = list(
     group_id = "align_bin",
@@ -259,6 +259,11 @@ default_alignment_params <- list(
     group_id = "align_general",
     type = "boolean",
     default = TRUE
+  ),
+  show_hover = list(
+    group_id = "align_general",
+    type = "boolean",
+    default = TRUE
   )
 )
 
@@ -280,6 +285,7 @@ align_profile <- function(id, name,
                           max_mutations_percent = 10.0,
                           full_mutation_lwd = 0.5,
                           use_gpu = TRUE,
+                          show_hover = TRUE,
                           params = default_alignment_params,
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -364,6 +370,7 @@ align_profile <- function(id, name,
     min_mutations_percent = min_mutations_percent,
     max_mutations_percent = max_mutations_percent,
     full_mutation_lwd = full_mutation_lwd,
-    use_gpu = use_gpu
+    use_gpu = use_gpu,
+    show_hover = show_hover
   )
 }

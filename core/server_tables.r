@@ -17,6 +17,25 @@ get.highlight.options <- function(contigs, index) {
 
 output$contigTable <- renderDT({
     dat <- get_contigs(state$assembly)
+    
+    # apply length filtering based on options (convert kb to bp)
+    if (!is.null(dat) && "length" %in% names(dat)) {
+        min_length_kb <- if (is.null(input$min_contig_length)) 0 else input$min_contig_length
+        max_length_kb <- input$max_contig_length
+        
+        # convert kb to bp for comparison with contig lengths
+        min_length_bp <- min_length_kb * 1000
+        max_length_bp <- if (!is.null(max_length_kb) && !is.na(max_length_kb)) max_length_kb * 1000 else NULL
+        
+        # filter by minimum length
+        dat <- dat[dat$length >= min_length_bp, ]
+        
+        # filter by maximum length if specified
+        if (!is.null(max_length_bp)) {
+            dat <- dat[dat$length <= max_length_bp, ]
+        }
+    }
+    
     index <- which(names(dat) == "contig")
     datatable(
         dat,

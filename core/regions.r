@@ -21,6 +21,7 @@ regions_ui <- function(id = "regions_module") {
         shiny::actionButton(ns("open_region_table"), "Open Table"),
         shiny::actionButton(ns("delete_region_table"), "Delete Table"),
         shiny::hr(),
+        shiny::actionButton(ns("goto_region_btn"), "Goto"),
         shiny::actionButton(ns("add_region"), "Add"),
         shiny::actionButton(ns("edit_region"), "Edit"),
         shiny::actionButton(ns("delete_region"), "Delete")
@@ -544,7 +545,19 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         )
       })
 
-      # handle goto button clicks
+      # goto region button (standalone button)
+      observeEvent(input$goto_region_btn, {
+        selected_rows <- input$region_table_display_rows_selected
+        if (length(selected_rows) == 0) {
+          shiny::showNotification("please select a region to go to", type = "warning")
+          return()
+        }
+        
+        region_row <- region_table()[selected_rows[1], ]
+        goto_region(region_row)
+      })
+
+      # handle goto button clicks (table buttons)
       observeEvent(input$goto_region, {
         region_id <- input$goto_region
         region_row <- region_table()[region_table()$id == region_id, ]
