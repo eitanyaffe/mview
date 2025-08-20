@@ -171,12 +171,6 @@ default_alignment_params <- list(
     choices = c("0%" = 0.0, "0.01%" = 0.01, "0.1%" = 0.1, "1%" = 1.0, "10%" = 10.0),
     default = 10.0
   ),
-  height_style = list(
-    group_id = "align_general",
-    type = "select",
-    choices = c("by_mutations", "by_coord_left", "by_coord_right"), 
-    default = "by_mutations"
-  ),
   height = list(
     group_id = "align_general",
     type = "integer",
@@ -189,6 +183,12 @@ default_alignment_params <- list(
   ),
 
   # align_full - parameters specific to full profile mode
+  height_style = list(
+    group_id = "align_full",
+    type = "select",
+    choices = c("by_mutations", "by_coord_left", "by_coord_right"), 
+    default = "by_mutations"
+  ),  
   full_style = list(
     group_id = "align_full",
     type = "select",

@@ -112,11 +112,12 @@ plot_profiles <- function(cxt) {
     # Add overlays
     gg_final <- post_plot(cxt, pf_result, profile)
 
-    # Convert to plotly, using 'text' aesthetic when provided
-    p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
-    # disable hover if requested by the profile plot
-    if (isTRUE(attr(gg_final, "disable_hover"))) {
-      p_ly <- plotly::style(p_ly, hoverinfo = "skip")
+    # Convert to plotly, using 'text' aesthetic when hover is enabled
+    if (isFALSE(profile$show_hover)) {
+      p_ly <- plotly::ggplotly(gg_final, tooltip = NULL) %>%
+         plotly::style(hoverinfo = "none")
+    } else {
+      p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
     }
 
     # Store in list

@@ -1,9 +1,30 @@
+# default parameters for gene profile
+default_gene_params <- list(
+  color_field = list(
+    group_id = "gene",
+    type = "select",
+    choices = c("tax", "mge"),
+    default = "tax"
+  ),
+  height = list(
+    group_id = "gene",
+    type = "integer",
+    default = 50
+  ),
+  show_hover = list(
+    group_id = "gene",
+    type = "boolean",
+    default = TRUE
+  )
+)
+
 gene_profile <- function(id, name, height = 100,
                          gene_f = NULL,
                          color_field = "tax_color",
                          threshold = 200000,
                          label_field = NULL,
-                         params = list(),
+                         show_hover = TRUE,
+                         params = default_gene_params,
                          auto_register = TRUE) {
   # Determine display mode based on view range
   get_display_mode <- function(xlim, threshold) {
@@ -39,6 +60,7 @@ gene_profile <- function(id, name, height = 100,
     gene_f = gene_f,
     color_field = color_field,
     label_field = label_field,
+    show_hover = show_hover,
     auto_register = auto_register
   )
 }
