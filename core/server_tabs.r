@@ -54,14 +54,14 @@ output$mainTabsPanel <- renderUI({
       numericInput(
         inputId = "min_contig_length",
         label = "Minimum contig length (kb)",
-        value = 0,
+        value = cache_get_if_exists("input_min_contig_length", 0),
         min = 0,
         step = 1
       ),
       numericInput(
         inputId = "max_contig_length",
         label = "Maximum contig length (kb)",
-        value = 100000,
+        value = cache_get_if_exists("input_max_contig_length", 100000),
         min = 0,
         step = 1000
       ),
@@ -77,4 +77,13 @@ output$mainTabsPanel <- renderUI({
   
   # create the tabsetPanel with all tabs
   do.call(tabsetPanel, c(list(id = "mainTabs"), all_tabs))
+})
+
+# observers to cache contig length filter values
+observeEvent(input$min_contig_length, {
+  cache_set("input_min_contig_length", input$min_contig_length)
+})
+
+observeEvent(input$max_contig_length, {
+  cache_set("input_max_contig_length", input$max_contig_length)
 })

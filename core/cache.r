@@ -40,6 +40,15 @@ cache_get <- function(key) {
   g.cache[[make_full_key(key)]]
 }
 
+# Get a value from the cache if it exists, otherwise return default
+cache_get_if_exists <- function(key, default) {
+  if (cache_exists(key)) {
+    cache_get(key)
+  } else {
+    default
+  }
+}
+
 # Set a value in the cache
 cache_set <- function(key, value) {
   g.cache[[make_full_key(key)]] <<- value
