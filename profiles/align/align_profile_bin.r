@@ -354,5 +354,10 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   gg <- gg + ggplot2::theme_minimal() +
     ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
 
+  # apply force_max_y if set
+  if (!is.null(profile$force_max_y) && profile$force_max_y > 0) {
+    gg <- gg + ggplot2::coord_cartesian(ylim = c(NA, profile$force_max_y))
+  }
+
   return(gg)
 }

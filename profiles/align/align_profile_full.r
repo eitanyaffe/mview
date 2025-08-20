@@ -288,6 +288,12 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         ggplot2::scale_color_identity()
     }
   }
+  
+  # apply force_max_y if set
+  if (!is.null(profile$force_max_y) && profile$force_max_y > 0) {
+    gg <- gg + ggplot2::coord_cartesian(ylim = c(NA, profile$force_max_y))
+  }
+  
   # !!!
   # cache_set("alns", df$reads)
   return(gg)

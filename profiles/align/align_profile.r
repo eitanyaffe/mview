@@ -37,21 +37,21 @@ get_mutation_colors <- function(mutations_per_bp) {
 
 # Get fixed colors for variant types (shared between full and pileup modes)
 get_variant_type_colors <- function(variants) {
-  # define gentle but visible colors for all 12 nucleotide substitutions
+  # define vibrant and lively colors for all 12 nucleotide substitutions
   substitution_colors <- c(
-    "A:T" = "#e6d19a", "A:C" = "#b3e6f2", "A:G" = "#d9b3ff",
-    "T:A" = "#ffe0b3", "T:C" = "#b3e6d1", "T:G" = "#b3d9ff",
-    "C:A" = "#ffb3d9", "C:T" = "#d9ffb3", "C:G" = "#ffb3ff",
-    "G:A" = "#ffecb3", "G:T" = "#b3e0ff", "G:C" = "#ffccb3"
+    "A:T" = "#ffcc00", "A:C" = "#00ccff", "A:G" = "#cc00ff",
+    "T:A" = "#ff6600", "T:C" = "#00ff66", "T:G" = "#6600ff",
+    "C:A" = "#ff0066", "C:T" = "#66ff00", "C:G" = "#ff3399",
+    "G:A" = "#ff9900", "G:T" = "#0099ff", "G:C" = "#9900ff"
   )
   
   # colors for gains (3 red shades, darker range, squeezed)
-  gain_light <- "#cc6666"   # darker light red for +1
+  gain_light <- "#c0c0c0"   # gray color slightly darker than ref for +1
   gain_medium <- "#b30000"  # darker medium red for +2 to +3
   gain_dark <- "#800000"    # darkest red for +4 or more
   
   # colors for losses (3 blue shades, darker range, squeezed)  
-  loss_light <- "#6666cc"   # darker light blue for -1
+  loss_light <- "#c0c0c0"   # gray color slightly darker than ref for -1
   loss_medium <- "#0000b3"  # darker medium blue for -2 to -3
   loss_dark <- "#000080"    # darkest blue for -4 or more
   
@@ -182,6 +182,11 @@ default_alignment_params <- list(
     type = "integer",
     default = 400
   ),
+  force_max_y = list(
+    group_id = "align_general",
+    type = "integer",
+    default = 0
+  ),
 
   # align_full - parameters specific to full profile mode
   full_style = list(
@@ -209,7 +214,7 @@ default_alignment_params <- list(
   full_mutation_lwd = list(
     group_id = "align_full", 
     type = "double",
-    default = 1.5
+    default = 1
   ),
 
   # align_bin / align_pileup - parameters for bin and pileup modes
@@ -284,6 +289,7 @@ align_profile <- function(id, name,
                           min_mutations_percent = 0.0,
                           max_mutations_percent = 10.0,
                           full_mutation_lwd = 0.5,
+                          force_max_y = 0,
                           use_gpu = TRUE,
                           show_hover = TRUE,
                           params = default_alignment_params,
@@ -370,6 +376,7 @@ align_profile <- function(id, name,
     min_mutations_percent = min_mutations_percent,
     max_mutations_percent = max_mutations_percent,
     full_mutation_lwd = full_mutation_lwd,
+    force_max_y = force_max_y,
     use_gpu = use_gpu,
     show_hover = show_hover
   )
