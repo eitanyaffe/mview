@@ -230,9 +230,15 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 **Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs.
 
-## Current development version (v1.01)
+## Developement log
+
+### Version v1.01
 
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
 - Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.
 - GPU support added (Apple Silicon only) for bin queries in the alignment profile.
 - Added nucleotide sequence display for axis profiles.
+
+### Under development (v1.02)
+
+- Legends tab added
