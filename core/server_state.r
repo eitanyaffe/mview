@@ -43,6 +43,11 @@ state <- reactiveValues(
   mouse_coords = NULL
 )
 
+# Project info output
+output$project_info <- renderText({
+  sprintf("Project: %s", get_project_id())
+})
+
 # Basic info output with same font as top region display
 output$basic_info <- renderText({
   assembly_text <- if (is.null(state$assembly) || state$assembly == "") {

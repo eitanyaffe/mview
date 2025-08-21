@@ -167,6 +167,7 @@ ui <- fluidPage(
     column(
       width = 2,
       uiOutput("state_info"),
+      verbatimTextOutput("project_info"),
       shiny::selectInput("regions_module-assembly_select", "Assembly:",
         choices = get_assemblies(),
         selected = get_assemblies()[1],

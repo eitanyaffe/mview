@@ -19,6 +19,8 @@ observeEvent(input$addContigsBtn, {
       # push current region to undo before changing
       regions_module_output$push_undo_state()
       state$contigs <- c(state$contigs, new_contigs)
+      # reset zoom to see full range of all contigs
+      state$zoom <- NULL
     }
   }
 })
@@ -32,6 +34,8 @@ observeEvent(input$setContigsBtn, {
       # push current region to undo before changing
       regions_module_output$push_undo_state()
       state$contigs <- selected_contigs
+      # reset zoom to see full range of new contigs
+      state$zoom <- NULL
     }
   }
 })
@@ -48,6 +52,8 @@ observeEvent(input$addGenomesBtn, {
       # push current region to undo before changing
       regions_module_output$push_undo_state()
       state$contigs <- c(state$contigs, new_contigs)
+      # reset zoom to see full range of all contigs
+      state$zoom <- NULL
     }
   }
 })
