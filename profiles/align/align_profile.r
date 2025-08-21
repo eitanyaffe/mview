@@ -99,6 +99,8 @@ get_variant_type_colors <- function(variants) {
   return(colors)
 }
 
+ 
+
 # get simplified colors for variant types (type mode: sub=orange, deletion=blue, addition=red)
 get_mutation_type_colors <- function(variants) {
   # define simplified color scheme
@@ -232,7 +234,7 @@ default_alignment_params <- list(
   bin_type = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("auto", "10", "100", "1000", "5000", "10000"),
+    choices = c("auto", "10", "100", "1000", "10000"),
     default = "auto"
   ),
   seg_threshold = list(
@@ -269,6 +271,12 @@ default_alignment_params <- list(
     group_id = "align_general",
     type = "boolean",
     default = TRUE
+  ),
+  max_col_dist_percent = list(
+    group_id = "align_general",
+    type = "select",
+    choices = c("auto", "0.1", "1", "10"),
+    default = "auto"
   )
 )
 
@@ -323,7 +331,7 @@ align_profile <- function(id, name,
     # Check that intervals dataframe has at least one row
     if (is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
       warning("intervals dataframe is empty")
-      return(gg)
+      return(list(plot = gg, legends = list()))
     }
 
     aln <- if (is.function(aln_f)) aln_f(cxt) else aln_f
@@ -333,13 +341,13 @@ align_profile <- function(id, name,
     
   if (any(!is.element(cxt$contigs, aln_get_contigs(aln)$contig_id))) {
     warning("contigs not found in alignment")
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
 
 
     if (is.null(aln) || !inherits(aln, "externalptr")) {
       warning(sprintf("align_profile '%s': Invalid AlignmentStore pointer.", name))
-      return(gg)
+      return(list(plot = gg, legends = list()))
     }
 
     mode <- get_display_mode(cxt$mapper$xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style)

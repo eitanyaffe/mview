@@ -17,6 +17,18 @@ get_map_tag <- function(assembly, timepoint) {
   paste0(assembly, "_", lib.table$LIB_ID[ix])
 }
 
+# self-align profile (assembly only, no timepoint)
+if (get_current_view_parameter("show_self_align")) {
+  align_profile(
+    id = "align_self",
+    name = "Self Align",
+    aln_f = function(cxt) {
+    get_data("MINIMAP_SELF_ALN", tag = cxt$assembly, read_f = aln_load)
+    },
+    params = default_alignment_params
+  )
+}
+
 make_align_profile <- function(timepoint) {
   align_profile(
     id = paste0("align_", timepoint),

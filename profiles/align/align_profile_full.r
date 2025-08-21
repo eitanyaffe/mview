@@ -190,7 +190,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         text = hover_text,
         key = read_id
       ),
-      fill = alignments$color, color = NA
+      fill = alignments$color, color = "gray50", size = 0.2
     )
 
     # draw left clipping indicators
@@ -296,5 +296,20 @@ align_profile_full <- function(profile, cxt, aln, gg) {
   
   # !!!
   # cache_set("alns", df$reads)
-  return(gg)
+  # build legends based on mutation_color_mode
+  legends <- list()
+  mutation_color_mode <- if (!is.null(profile$mutation_color_mode)) profile$mutation_color_mode else "detailed"
+  if (mutation_color_mode == "detailed") {
+    legend_gg <- create_detailed_variant_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 420, width = 350)))
+    }
+  } else if (mutation_color_mode == "type") {
+    legend_gg <- create_simplified_variant_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 140, width = 300)))
+    }
+  }
+  
+  return(list(plot = gg, legends = legends))
 }

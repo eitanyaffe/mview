@@ -15,6 +15,11 @@ default_gene_params <- list(
     group_id = "gene",
     type = "boolean",
     default = TRUE
+  ),
+  max_items_in_legend = list(
+    group_id = "gene",
+    type = "integer",
+    default = 10
   )
 )
 
@@ -44,11 +49,11 @@ gene_profile <- function(id, name, height = 100,
   plot_f <- function(profile, cxt, gg) {
     genes <- gene_f(cxt)
     if (is.null(genes)) {
-      return(NULL)
+      return(list(plot = gg, legends = list()))
     }
     mode <- get_display_mode(cxt$mapper$xlim, profile$threshold)
     cat(sprintf("mode: %s\n", mode))
-    plot_gene_profile(profile, cxt, genes, gg, mode)
+    return(plot_gene_profile(profile, cxt, genes, gg, mode))
   }
 
   # Create profile

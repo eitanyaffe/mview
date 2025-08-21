@@ -130,3 +130,19 @@ output$current_region_display <- renderText({
   # Return the captured output as a single string
   paste(output_text, collapse = "\n")
 })
+
+# update assembly from dropdown
+observeEvent(input$`regions_module-assembly_select`, {
+  if (!identical(state$assembly, input$`regions_module-assembly_select`)) {
+    state$assembly <- input$`regions_module-assembly_select`
+  }
+})
+
+# sync dropdown when assembly changes
+observe({
+  current_input <- input$`regions_module-assembly_select`
+  selected <- state$assembly
+  if (!is.null(selected) && !identical(current_input, selected)) {
+    updateSelectInput(session, "regions_module-assembly_select", selected = selected)
+  }
+})

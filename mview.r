@@ -10,6 +10,7 @@ get_server <- function() {
         # load tabs
         load_tabs()
         source("core/server_tabs.r", local = TRUE)
+        source("core/server_legend.r", local = TRUE)
 
         regions_module_output <- regions_server(
             id = "regions_module",

@@ -153,11 +153,11 @@ ui <- fluidPage(
     #parameter-panel-column.collapsed {
       width: 50px !important;
       max-width: 50px;
-      flex: 0 0 50px;
+      flex: 0 0 50px !important;
     }
     #profile-plots-column.expanded {
       width: calc(100% - 60px) !important;
-      flex: 1 1 auto;
+      flex: 1 1 auto !important;
     }
     .expanded #profilePlots {
       width: 100% !important;
@@ -185,15 +185,16 @@ ui <- fluidPage(
       width = 10,
 
       # Profile plots area with collapsible parameter panel
-      fluidRow(
-        column(
-          width = 10,
+      div(
+        style = "display: flex; width: 100%;",
+        div(
           id = "profile-plots-column",
+          style = "flex: 1 1 auto; width: 79.17%;",
           uiOutput("profilePlots")
         ),
-        column(
-          width = 2,
+        div(
           id = "parameter-panel-column",
+          style = "flex: 0 0 20.83%; width: 20.83%;",
           div(
             id = "parameter-panel",
             class = "parameter-panel",

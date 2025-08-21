@@ -196,7 +196,7 @@ create_and_add_tab_shortcuts <- function() {
   # Fixed vector of tab titles as they appear in the UI
   tabs <- c(
     "Regions", "Contigs", "Genomes", "Contig Map", "Selected Contigs",
-    "Options", "Parameters"
+    "Legends", "Options", "Parameters"
   )
 
   for (i in seq_along(tabs)) {

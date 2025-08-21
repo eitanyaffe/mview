@@ -46,7 +46,7 @@ assign_gene_colors <- function(df, profile) {
 
 plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   if (is.null(genes) || nrow(genes) == 0) {
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
 
   # Process genes for plotting
@@ -58,7 +58,7 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   # Filter to visible range
   df <- filter_segments(df, cxt, cxt$mapper$xlim)
   if (is.null(df) || nrow(df) == 0) {
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
 
   # clip so that genes are not plotted outside of the visible range
@@ -149,5 +149,12 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     )
   }
 
-  return(gg)
+  # build gene legend based on color field and prevalence
+  legends <- list()
+  legend_info <- create_gene_legend_from_data(df, profile)
+  if (!is.null(legend_info)) {
+    legends <- c(legends, list(legend_info))
+  }
+
+  return(list(plot = gg, legends = legends))
 }

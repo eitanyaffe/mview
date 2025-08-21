@@ -57,6 +57,9 @@ observe({
   # Get combined plotly object and height info
   plot_result <- plot_profiles(cxt)
   combined_plotly_obj <- if (!is.null(plot_result)) plot_result$plot else NULL
+  
+  # Store legends in state for the legend tab
+  state$current_legends <- if (!is.null(plot_result)) plot_result$legends else list()
 
   # Register the relayout event for the plot so zoom events can be captured with the correct source ID
   if (!is.null(combined_plotly_obj)) {

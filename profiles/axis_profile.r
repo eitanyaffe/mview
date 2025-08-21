@@ -128,13 +128,13 @@ axis_profile <- function(id = "simple_axis",
   }
 
   plot_f <- function(profile, cxt, gg) {
-    if (is.null(cxt$mapper) || is.null(cxt$mapper$cdf) || nrow(cxt$mapper$cdf) == 0) return(gg)
+    if (is.null(cxt$mapper) || is.null(cxt$mapper$cdf) || nrow(cxt$mapper$cdf) == 0) return(list(plot = gg, legends = list()))
 
     contig_df_all <- cxt$mapper$cdf
     zoom_xlim <- if (!is.null(cxt$mapper$xlim)) range(cxt$mapper$xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
     contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
 
-    if (nrow(contig_df) == 0) return(gg)
+    if (nrow(contig_df) == 0) return(list(plot = gg, legends = list()))
     
     # get threshold parameter
     nt_threshold <- get_param("axis", "nt_threshold")()
@@ -228,7 +228,7 @@ axis_profile <- function(id = "simple_axis",
       }
     }
 
-    gg + ggplot2::coord_cartesian(ylim = c(0.35, 0.9), clip = "off")
+    return(list(plot = gg + ggplot2::coord_cartesian(ylim = c(0.35, 0.9), clip = "off"), legends = list()))
   }
 
   profile_create(

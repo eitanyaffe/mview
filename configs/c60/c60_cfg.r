@@ -73,13 +73,16 @@ register_fasta_f(function(assembly = NULL) {
 ########################################################
 
 view_file <- "configs/c60/c60_main_view.r"
-view_register("early", view_file, timepoints = c("early"))
-view_register("pre", view_file, timepoints = c("pre"))
-view_register("post", view_file, timepoints = c("post"))
-view_register("late", view_file, timepoints = c("late"))
-view_register("pre / post", view_file, timepoints = c("pre", "post"))
-view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"))
-view_register("all", view_file, timepoints = c("early", "pre", "post", "late"))
+
+view_register("early", view_file, timepoints = c("early"), show_self_align = FALSE)
+view_register("pre", view_file, timepoints = c("pre"), show_self_align = FALSE)
+view_register("post", view_file, timepoints = c("post"), show_self_align = FALSE)
+view_register("late", view_file, timepoints = c("late"), show_self_align = FALSE)
+view_register("pre / post", view_file, timepoints = c("pre", "post"), show_self_align = FALSE)
+view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"), show_self_align = FALSE)
+view_register("all", view_file, timepoints = c("early", "pre", "post", "late"), show_self_align = FALSE)
+
+view_register("self-align", view_file, timepoints = NULL, show_self_align = TRUE)
 
 ########################################################
 # genes

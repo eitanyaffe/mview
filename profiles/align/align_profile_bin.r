@@ -218,26 +218,32 @@ plot_mutation_density_bins <- function(gg, df, profile) {
 
 # Plot segregating sites bins with blue color scale
 plot_segregating_sites_bins <- function(gg, df, profile) {
-  # segregating sites density visualization
+  # segregating sites density visualization using fixed/auto scale
   seg_density_per_100bp <- df$seg_sites_density
-  max_seg_density <- max(seg_density_per_100bp, na.rm = TRUE)
-  if (is.na(max_seg_density) || max_seg_density == 0) {
-    max_seg_density <- 1  # set a default if no segregating sites found
+  max_density_scale <- profile$max_col_dist_percent
+  if (is.null(max_density_scale) || identical(max_density_scale, "auto")) {
+    max_density_scale <- max(seg_density_per_100bp, na.rm = TRUE)
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  } else {
+    max_density_scale <- as.numeric(max_density_scale) / 100
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
   }
   df$fill_color <- get_color_scale(
     values = seg_density_per_100bp,
     colors = c("#c6dbef", "#08306b"),
     min_val = 0,
-    max_val = max_seg_density,
+    max_val = max_density_scale,
     num_steps = 20
   )
   
   # create hover text only if enabled
   if (profile$show_hover) {
     seg_sites_count <- round(df$seg_sites_density * df$length)
+    seg_pct <- df$seg_sites_density * 100
     df$hover_text <- paste0(
       "Coverage: ", sprintf("%.2f", df$cov), "x\n",
-      "Segregating sites: ", seg_sites_count
+      "Segregating sites: ", seg_sites_count, " out of ", df$length, " bp\n",
+      "Percent: ", sprintf("%.3f%%", seg_pct)
     )
   } else {
     df$hover_text <- ""
@@ -262,26 +268,32 @@ plot_segregating_sites_bins <- function(gg, df, profile) {
 
 # Plot non-reference sites bins with orange color scale
 plot_nonref_sites_bins <- function(gg, df, profile) {
-  # non-reference sites density visualization
+  # non-reference sites density visualization using fixed/auto scale
   nonref_density_per_100bp <- df$non_ref_sites_density
-  max_nonref_density <- max(nonref_density_per_100bp, na.rm = TRUE)
-  if (is.na(max_nonref_density) || max_nonref_density == 0) {
-    max_nonref_density <- 1  # set a default if no non-ref sites found
+  max_density_scale <- profile$max_col_dist_percent
+  if (is.null(max_density_scale) || identical(max_density_scale, "auto")) {
+    max_density_scale <- max(nonref_density_per_100bp, na.rm = TRUE)
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  } else {
+    max_density_scale <- as.numeric(max_density_scale) / 100
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
   }
   df$fill_color <- get_color_scale(
     values = nonref_density_per_100bp,
     colors = c("#fff7bc", "#d94701"),
     min_val = 0,
-    max_val = max_nonref_density,
+    max_val = max_density_scale,
     num_steps = 20
   )
   
   # create hover text only if enabled
   if (profile$show_hover) {
     nonref_sites_count <- round(df$non_ref_sites_density * df$length)
+    nonref_pct <- df$non_ref_sites_density * 100
     df$hover_text <- paste0(
       "Coverage: ", sprintf("%.2f", df$cov), "x\n",
-      "Non-ref sites: ", nonref_sites_count
+      "Non-ref sites: ", nonref_sites_count, " out of ", df$length, " bp\n",
+      "Percent: ", sprintf("%.3f%%", nonref_pct)
     )
   } else {
     df$hover_text <- ""
@@ -304,6 +316,53 @@ plot_nonref_sites_bins <- function(gg, df, profile) {
   return(gg)
 }
 
+# create legends for bin profile based on bin style
+create_bin_profile_legends <- function(bin_style, profile, df) {
+  legends <- list()
+  
+  if (bin_style == "by_mut_density") {
+    legend_gg <- create_mutation_density_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "mutations per bp")))
+    }
+  } else if (bin_style == "by_seg_density") {
+    max_density <- profile$max_col_dist_percent
+    if (is.null(max_density) || identical(max_density, "auto")) {
+      max_density <- max(df$seg_sites_density, na.rm = TRUE)
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    } else {
+      max_density <- as.numeric(max_density) / 100
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    }
+    color_defs <- get_alignment_color_definitions()
+    legend_gg <- create_gradient_legend("segregating sites (per 100 bp)", colors = color_defs$seg_gradient, max_val = max_density, n_steps = 10, as_percent = TRUE)
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "segregating sites density")))
+    }
+  } else if (bin_style == "by_nonref_density") {
+    max_density <- profile$max_col_dist_percent
+    if (is.null(max_density) || identical(max_density, "auto")) {
+      max_density <- max(df$non_ref_sites_density, na.rm = TRUE)
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    } else {
+      max_density <- as.numeric(max_density) / 100
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    }
+    color_defs <- get_alignment_color_definitions()
+    legend_gg <- create_gradient_legend("non-ref sites (per 100 bp)", colors = color_defs$nonref_gradient, max_val = max_density, n_steps = 10, as_percent = TRUE)
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "non-ref sites density")))
+    }
+  } else if (bin_style == "by_genomic_distance") {
+    legend_gg <- create_stacked_mutation_rates_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 210, width = 320, title = "mutation rate bins")))
+    }
+  }
+  
+  return(legends)
+}
+
 align_profile_bin <- function(profile, cxt, aln, gg) {
   # Get threshold parameters from profile
   seg_threshold <- if (!is.null(profile$seg_threshold)) profile$seg_threshold else 0.2
@@ -313,7 +372,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   
   df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), use_gpu = use_gpu)
   if (is.null(df) || nrow(df) == 0) {
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
   
   # eliminate gaps between bins by adjusting boundaries
@@ -359,5 +418,8 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
     gg <- gg + ggplot2::coord_cartesian(ylim = c(NA, profile$force_max_y))
   }
 
-  return(gg)
+  # create legends for legend tab
+  legends <- create_bin_profile_legends(bin_style, profile, df)
+  
+  return(list(plot = gg, legends = legends))
 }

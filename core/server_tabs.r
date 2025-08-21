@@ -30,6 +30,10 @@ output$mainTabsPanel <- renderUI({
       DTOutput("selectedTable")
     ),
     tabPanel(
+      "Legends",
+      uiOutput("legendsContent")
+    ),
+    tabPanel(
       "Options",
       h4("Plot Height Settings"),
       numericInput(
@@ -49,6 +53,17 @@ output$mainTabsPanel <- renderUI({
         step = 100
       ),
       p("These settings control the minimum and maximum allowed height for the combined profile plots."),
+      br(),
+      h4("Legend Settings"),
+      numericInput(
+        inputId = "legend_scale",
+        label = "Legend scale factor",
+        value = 1.0,
+        min = 0.5,
+        max = 3.0,
+        step = 0.1
+      ),
+      p("Scale factor for all legend sizes. Use values < 1 to make legends smaller, > 1 to make them larger."),
       br(),
       h4("Contig Length Filtering"),
       numericInput(
@@ -87,3 +102,5 @@ observeEvent(input$min_contig_length, {
 observeEvent(input$max_contig_length, {
   cache_set("input_max_contig_length", input$max_contig_length)
 })
+
+

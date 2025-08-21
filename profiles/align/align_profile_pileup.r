@@ -41,7 +41,7 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
                                 min_mutations_percent = as.numeric(profile$min_mutations_percent),
                                 max_mutations_percent = as.numeric(profile$max_mutations_percent))
   if (is.null(df) || nrow(df) == 0) {
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
   
   cat(sprintf("plotting pileup with %d variant records\n", nrow(df)))
@@ -49,7 +49,7 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
   # ensure gcoord exists (should be added by filter_coords in align_query_pileup_mode)
   if (!"gcoord" %in% colnames(df)) {
     warning("gcoord column missing from pileup data")
-    return(gg)
+    return(list(plot = gg, legends = list()))
   }
   
   # calculate cumulative heights using ave function
@@ -98,5 +98,20 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
     gg <- gg + ggplot2::coord_cartesian(ylim = c(NA, profile$force_max_y))
   }
   
-  return(gg)
+  # build legends based on mutation_color_mode
+  legends <- list()
+  mutation_color_mode <- if (!is.null(profile$mutation_color_mode)) profile$mutation_color_mode else "detailed"
+  if (mutation_color_mode == "detailed") {
+    legend_gg <- create_detailed_variant_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 420, width = 350)))
+    }
+  } else if (mutation_color_mode == "type") {
+    legend_gg <- create_simplified_variant_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 140, width = 300)))
+    }
+  }
+  
+  return(list(plot = gg, legends = legends))
 }

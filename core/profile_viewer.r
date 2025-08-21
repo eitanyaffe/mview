@@ -77,6 +77,7 @@ plot_profiles <- function(cxt) {
 
   plotly_list <- list()
   heights <- numeric()
+  legends <- list()
 
   for (id in names(profiles)) {
     cat(sprintf("plotting profile: %s\n", id))
@@ -109,8 +110,25 @@ plot_profiles <- function(cxt) {
     # Get the profile's plot result
     pf_result <- profile$plot_f(profile, cxt, gg)
 
+    # profiles must return list(plot = gg, legends = list_of_legends)
+    if (is.list(pf_result)) {
+      gg_plot <- pf_result$plot
+      profile_legends <- pf_result$legends
+      if (!is.null(profile_legends) && length(profile_legends) > 0) {
+        legends[[id]] <- profile_legends
+      }
+    } else {
+      gg_plot <- pf_result
+    }
+
+    # validate that we have a plot object (not NULL)
+    if (is.null(gg_plot)) {
+      warning(sprintf("Profile '%s' returned NULL plot object, skipping", id))
+      next
+    }
+
     # Add overlays
-    gg_final <- post_plot(cxt, pf_result, profile)
+    gg_final <- post_plot(cxt, gg_plot, profile)
 
     # Convert to plotly, using 'text' aesthetic when hover is enabled
     if (isFALSE(profile$show_hover)) {
@@ -226,5 +244,5 @@ plot_profiles <- function(cxt) {
   
   combined_plot <- do.call(plotly::layout, c(list(combined_plot), layout_args))
   cat(sprintf("plotting done, total height: %dpx\n", total_height))
-  return(list(plot = combined_plot, total_height = total_height))
+  return(list(plot = combined_plot, total_height = total_height, legends = legends))
 }
