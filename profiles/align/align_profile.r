@@ -228,7 +228,7 @@ default_alignment_params <- list(
   bin_style = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("by_seg_density", "by_mut_density", "by_genomic_distance", "by_nonref_density"),
+    choices = c("by_seg_density", "by_mut_density", "by_genomic_distance", "by_nonref_density", "by_seg_clip_density", "by_non_ref_clip_density"),
     default = "by_seg_density"
   ),
   bin_type = list(

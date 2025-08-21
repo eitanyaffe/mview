@@ -169,6 +169,8 @@ The collapsible right panel contains profile-specific settings that are applied 
   - **by_mut_density**: Traditional mutation density visualization (gray to red scale)
   - **by_seg_density**: Segregating sites density visualization (blue scale) 
   - **by_nonref_density**: Non-reference sites density visualization (yellow to orange scale)
+  - **by_seg_clip_density**: Segregating clip sites density visualization (purple scale)
+  - **by_non_ref_clip_density**: Non-reference clip sites density visualization (green scale)
   - **by_genomic_distance**: Stacked mutation distance categories (red gradient, log scale)
 - **gene**: Display gene segments.
 
@@ -176,7 +178,7 @@ The collapsible right panel contains profile-specific settings that are applied 
 
 The alignment profile supports several key parameters accessible through the right panel:
 
-- **bin_style**: Choose visualization mode (`by_mut_density`, `by_seg_density`, `by_nonref_density`, `by_genomic_distance`)
+- **bin_style**: Choose visualization mode (`by_mut_density`, `by_seg_density`, `by_nonref_density`, `by_seg_clip_density`, `by_non_ref_clip_density`, `by_genomic_distance`)
 - **seg_threshold**: Threshold for segregating sites detection (default: 0.2)
 - **non_ref_threshold**: Threshold for non-reference sites detection (default: 0.9)
 - **plot_style**: Query mode selection (`auto_full`, `auto_pileup`, `bin`, `full`, `pileup`)

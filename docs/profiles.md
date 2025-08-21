@@ -59,6 +59,8 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
     - `by_mut_density`: traditional mutation density (gray to red scale).
     - `by_seg_density`: segregating sites density (blue scale).
     - `by_nonref_density`: non-reference sites density (yellow to orange scale).
+    - `by_seg_clip_density`: segregating clip sites density (purple scale).
+    - `by_non_ref_clip_density`: non-reference clip sites density (green scale).
     - `by_genomic_distance`: stacked mutation distance categories (red gradient, logarithmic scale).
   - `seg_threshold`: threshold for segregating sites detection (default: 0.2).
   - `non_ref_threshold`: threshold for non-reference sites detection (default: 0.9).

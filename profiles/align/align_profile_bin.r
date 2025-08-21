@@ -316,6 +316,106 @@ plot_nonref_sites_bins <- function(gg, df, profile) {
   return(gg)
 }
 
+# Plot segregating clip sites bins with purple color scale
+plot_seg_clip_sites_bins <- function(gg, df, profile) {
+  # segregating clip sites density visualization using fixed/auto scale
+  seg_clip_density_per_100bp <- df$seg_clip_density
+  max_density_scale <- profile$max_col_dist_percent
+  if (is.null(max_density_scale) || identical(max_density_scale, "auto")) {
+    max_density_scale <- max(seg_clip_density_per_100bp, na.rm = TRUE)
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  } else {
+    max_density_scale <- as.numeric(max_density_scale) / 100
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  }
+  df$fill_color <- get_color_scale(
+    values = seg_clip_density_per_100bp,
+    colors = c("#f1eef6", "#6a51a3"),
+    min_val = 0,
+    max_val = max_density_scale,
+    num_steps = 20
+  )
+  
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    seg_clip_sites_count <- round(df$seg_clip_density * df$length)
+    seg_clip_pct <- df$seg_clip_density * 100
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Seg clip sites: ", seg_clip_sites_count, " out of ", df$length, " bp\n",
+      "Percent: ", sprintf("%.3f%%", seg_clip_pct)
+    )
+  } else {
+    df$hover_text <- ""
+  }
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
+  
+  return(gg)
+}
+
+# Plot non-reference clip sites bins with green color scale
+plot_nonref_clip_sites_bins <- function(gg, df, profile) {
+  # non-reference clip sites density visualization using fixed/auto scale
+  nonref_clip_density_per_100bp <- df$non_ref_clip_density
+  max_density_scale <- profile$max_col_dist_percent
+  if (is.null(max_density_scale) || identical(max_density_scale, "auto")) {
+    max_density_scale <- max(nonref_clip_density_per_100bp, na.rm = TRUE)
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  } else {
+    max_density_scale <- as.numeric(max_density_scale) / 100
+    if (!is.finite(max_density_scale) || max_density_scale <= 0) max_density_scale <- 1.0
+  }
+  df$fill_color <- get_color_scale(
+    values = nonref_clip_density_per_100bp,
+    colors = c("#edf8e9", "#238b45"),
+    min_val = 0,
+    max_val = max_density_scale,
+    num_steps = 20
+  )
+  
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    nonref_clip_sites_count <- round(df$non_ref_clip_density * df$length)
+    nonref_clip_pct <- df$non_ref_clip_density * 100
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Non-ref clip sites: ", nonref_clip_sites_count, " out of ", df$length, " bp\n",
+      "Percent: ", sprintf("%.3f%%", nonref_clip_pct)
+    )
+  } else {
+    df$hover_text <- ""
+  }
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
+  
+  return(gg)
+}
+
 # create legends for bin profile based on bin style
 create_bin_profile_legends <- function(bin_style, profile, df) {
   legends <- list()
@@ -352,6 +452,32 @@ create_bin_profile_legends <- function(bin_style, profile, df) {
     legend_gg <- create_gradient_legend("non-ref sites (per 100 bp)", colors = color_defs$nonref_gradient, max_val = max_density, n_steps = 10, as_percent = TRUE)
     if (!is.null(legend_gg)) {
       legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "non-ref sites density")))
+    }
+  } else if (bin_style == "by_seg_clip_density") {
+    max_density <- profile$max_col_dist_percent
+    if (is.null(max_density) || identical(max_density, "auto")) {
+      max_density <- max(df$seg_clip_density, na.rm = TRUE)
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    } else {
+      max_density <- as.numeric(max_density) / 100
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    }
+    legend_gg <- create_gradient_legend("segregating clip sites (per 100 bp)", colors = c("#f1eef6", "#6a51a3"), max_val = max_density, n_steps = 10, as_percent = TRUE)
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "segregating clip sites density")))
+    }
+  } else if (bin_style == "by_non_ref_clip_density") {
+    max_density <- profile$max_col_dist_percent
+    if (is.null(max_density) || identical(max_density, "auto")) {
+      max_density <- max(df$non_ref_clip_density, na.rm = TRUE)
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    } else {
+      max_density <- as.numeric(max_density) / 100
+      if (!is.finite(max_density) || max_density <= 0) max_density <- 1.0
+    }
+    legend_gg <- create_gradient_legend("non-ref clip sites (per 100 bp)", colors = c("#edf8e9", "#238b45"), max_val = max_density, n_steps = 10, as_percent = TRUE)
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "non-ref clip sites density")))
     }
   } else if (bin_style == "by_genomic_distance") {
     legend_gg <- create_stacked_mutation_rates_legend()
@@ -406,6 +532,10 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
     gg <- plot_segregating_sites_bins(gg, df, profile)
   } else if (bin_style == "by_nonref_density") {
     gg <- plot_nonref_sites_bins(gg, df, profile)
+  } else if (bin_style == "by_seg_clip_density") {
+    gg <- plot_seg_clip_sites_bins(gg, df, profile)
+  } else if (bin_style == "by_non_ref_clip_density") {
+    gg <- plot_nonref_clip_sites_bins(gg, df, profile)
   } else if (bin_style == "by_genomic_distance") {
     gg <- plot_stacked_mutation_rates(gg, df, profile, normalize = normalize_distrib_bins)
   }
