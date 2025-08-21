@@ -58,6 +58,23 @@ observeEvent(input$addGenomesBtn, {
   }
 })
 
+observeEvent(input$setGenomesBtn, {
+  rows <- input$genomeTable_rows_selected
+  if (length(rows) > 0) {
+    genomes_data <- get_genomes(state$assembly)
+    contig_map_data <- get_contig_map(state$assembly)
+    selected_gids <- genomes_data$gid[rows]
+    selected_contigs <- contig_map_data$contig[contig_map_data$gid %in% selected_gids]
+    if (!identical(selected_contigs, state$contigs)) {
+      # push current region to undo before changing
+      regions_module_output$push_undo_state()
+      state$contigs <- selected_contigs
+      # reset zoom to see full range of new contigs
+      state$zoom <- NULL
+    }
+  }
+})
+
 observeEvent(input$removeContigsBtn, {
   rows <- input$selectedTable_rows_selected
   contigs_data <- get_contigs(state$assembly)
@@ -67,4 +84,18 @@ observeEvent(input$removeContigsBtn, {
     regions_module_output$push_undo_state()
     state$contigs <- setdiff(state$contigs, removed_contigs)
   }
+})
+
+# create proxies for tables to manipulate selections
+contigTableProxy <- DT::dataTableProxy("contigTable")
+genomeTableProxy <- DT::dataTableProxy("genomeTable")
+
+observeEvent(input$clearContigSelectionBtn, {
+  # clear the selected rows in the contig table
+  DT::selectRows(contigTableProxy, NULL)
+})
+
+observeEvent(input$clearGenomeSelectionBtn, {
+  # clear the selected rows in the genome table
+  DT::selectRows(genomeTableProxy, NULL)
 })

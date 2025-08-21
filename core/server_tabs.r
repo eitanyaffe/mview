@@ -13,11 +13,14 @@ output$mainTabsPanel <- renderUI({
       "Contigs",
       actionButton("addContigsBtn", "Add selected contigs"),
       actionButton("setContigsBtn", "Set selected contigs"),
+      actionButton("clearContigSelectionBtn", "Clear selection"),
       DTOutput("contigTable")
     ),
     tabPanel(
       "Genomes",
       actionButton("addGenomesBtn", "Add contigs of selected genomes"),
+      actionButton("setGenomesBtn", "Set selected genomes"),
+      actionButton("clearGenomeSelectionBtn", "Clear selection"),
       DTOutput("genomeTable")
     ),
     tabPanel(
@@ -80,7 +83,15 @@ output$mainTabsPanel <- renderUI({
         min = 0,
         step = 1000
       ),
-      p("Filter contigs displayed in the contig table by length. Adjust values to focus on contigs within specific size ranges.")
+      p("Filter contigs displayed in the contig table by length. Adjust values to focus on contigs within specific size ranges."),
+      br(),
+      h4("Table Display Settings"),
+      checkboxInput(
+        inputId = "enable_contig_highlighting",
+        label = "Enable contig table highlighting for selected contigs",
+        value = FALSE
+      ),
+      p("When enabled, selected contigs are highlighted with a green background in the contig and contig map tables.")
     )
   )
   

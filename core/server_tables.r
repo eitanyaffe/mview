@@ -1,6 +1,11 @@
 # ---- DataTable Renderers ----
 
-get.highlight.options <- function(contigs, index) {
+get.highlight.options <- function(contigs, index, enable_highlighting = TRUE) {
+    if (!enable_highlighting) {
+        # return empty options when highlighting is disabled
+        return(list())
+    }
+    
     str <- sprintf(
         "function(row, data) {
        const selected = %s;
@@ -37,11 +42,13 @@ output$contigTable <- renderDT({
     }
     
     index <- which(names(dat) == "contig")
+    # check if highlighting is enabled in options
+    enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
     datatable(
         dat,
         rownames = FALSE,
         selection = list(mode = "multiple", target = "row"),
-        options = get.highlight.options(state$contigs, index)
+        options = get.highlight.options(state$contigs, index, enable_highlighting)
     )
 })
 
@@ -52,11 +59,13 @@ output$genomeTable <- renderDT({
 output$mapTable <- renderDT({
     dat <- get_contig_map(state$assembly)
     index <- which(names(dat) == "contig")
+    # check if highlighting is enabled in options
+    enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
     datatable(
         dat,
         rownames = FALSE,
         selection = list(mode = "multiple", target = "row"),
-        options = get.highlight.options(state$contigs, index)
+        options = get.highlight.options(state$contigs, index, enable_highlighting)
     )
 })
 
