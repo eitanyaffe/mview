@@ -11,16 +11,18 @@ output$mainTabsPanel <- renderUI({
     ),
     tabPanel(
       "Contigs",
-      actionButton("addContigsBtn", "Add selected contigs"),
-      actionButton("setContigsBtn", "Set selected contigs"),
-      actionButton("clearContigSelectionBtn", "Clear selection"),
+      actionButton("addContigsBtn", "add selected"),
+      actionButton("setContigsBtn", "only selected"),
+      actionButton("removeContigsFromListBtn", "remove selected"),
+      actionButton("clearContigSelectionBtn", "clear selected"),
       DTOutput("contigTable")
     ),
     tabPanel(
       "Genomes",
-      actionButton("addGenomesBtn", "Add contigs of selected genomes"),
-      actionButton("setGenomesBtn", "Set selected genomes"),
-      actionButton("clearGenomeSelectionBtn", "Clear selection"),
+      actionButton("addGenomesBtn", "add selected"),
+      actionButton("setGenomesBtn", "only selected"),
+      actionButton("removeGenomesFromListBtn", "remove selected"),
+      actionButton("clearGenomeSelectionBtn", "clear selected"),
       DTOutput("genomeTable")
     ),
     tabPanel(
