@@ -29,7 +29,7 @@ get_current_bin_size <- function(xlim, bin_type, target_bins = 1024) {
   return(bin_size)
 }
 
-align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, use_gpu = FALSE) {
+align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, use_gpu = FALSE) {
   bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type, target_bins = target_bins)
 
   # Create cache key based on all relevant parameters
@@ -52,12 +52,14 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
                        clip_margin = clip_margin,
                        min_mutations_percent = min_mutations_percent,
                        max_mutations_percent = max_mutations_percent,
+                       min_alignment_length = min_alignment_length,
+                       max_alignment_length = max_alignment_length,
                        use_gpu = use_gpu
                      ), algo = "md5"))
 
   # Use cache for the bin query
   df <- cache(cache_key, {
-    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold, num_threads, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), use_gpu = use_gpu)
+    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold, num_threads, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length), use_gpu = use_gpu)
   })
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
@@ -496,7 +498,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   num_threads <- if (!is.null(profile$num_threads)) profile$num_threads else 0
   use_gpu <- if (!is.null(profile$use_gpu)) profile$use_gpu else FALSE
   
-  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), use_gpu = use_gpu)
+  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), use_gpu = use_gpu)
   if (is.null(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }

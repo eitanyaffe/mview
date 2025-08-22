@@ -173,6 +173,16 @@ default_alignment_params <- list(
     choices = c("0%" = 0.0, "0.01%" = 0.01, "0.1%" = 0.1, "1%" = 1.0, "10%" = 10.0),
     default = 10.0
   ),
+  min_alignment_length = list(
+    group_id = "align_filter",
+    type = "integer",
+    default = 0
+  ),
+  max_alignment_length = list(
+    group_id = "align_filter",
+    type = "integer",
+    default = 0
+  ),
   height = list(
     group_id = "align_general",
     type = "integer",
@@ -296,6 +306,8 @@ align_profile <- function(id, name,
                           clip_margin = 10,
                           min_mutations_percent = 0.0,
                           max_mutations_percent = 10.0,
+                          min_alignment_length = 0,
+                          max_alignment_length = 0,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           use_gpu = TRUE,
@@ -383,6 +395,8 @@ align_profile <- function(id, name,
     clip_margin = clip_margin,
     min_mutations_percent = min_mutations_percent,
     max_mutations_percent = max_mutations_percent,
+    min_alignment_length = min_alignment_length,
+    max_alignment_length = max_alignment_length,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
     use_gpu = use_gpu,

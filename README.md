@@ -168,7 +168,7 @@ The collapsible right panel contains profile-specific settings that are applied 
 
 mview includes several built-in profiles for genomic visualization:
 
-- **alignment**: Display read alignments with advanced mutation analysis and multiple visualization modes
+- **alignment**: Display read alignments with advanced mutation analysis, multiple visualization modes, and comprehensive filtering options including alignment length, mutation rates, and clipping patterns
 - **gene**: Display gene segments with strand orientation and customizable coloring
 - **segments**: Display genomic segments as colored rectangles (used for regions, annotations)
 - **axis**: Show contig coordinates with tick marks for orientation
@@ -224,6 +224,7 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
 - Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.
+- Alignment length filtering: Added minimum and maximum alignment length filters based on read coordinates for precise control over which alignments to include in visualization.
 - GPU support added (Apple Silicon only) for bin queries in the alignment profile.
 - Added nucleotide sequence display for axis profiles.
 

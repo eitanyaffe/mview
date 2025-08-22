@@ -32,7 +32,9 @@ max_reads = 1000,
 clip_mode = "all",
 clip_margin = 10,
 min_mutations_percent = 0.0,
-max_mutations_percent = 10.0) {
+max_mutations_percent = 10.0,
+min_alignment_length = 0,
+max_alignment_length = 0) {
   
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
@@ -51,12 +53,14 @@ max_mutations_percent = 10.0) {
                        clip_mode = clip_mode,
                        clip_margin = clip_margin,
                        min_mutations_percent = min_mutations_percent,
-                       max_mutations_percent = max_mutations_percent
+                       max_mutations_percent = max_mutations_percent,
+                       min_alignment_length = min_alignment_length,
+                       max_alignment_length = max_alignment_length
                      ), algo = "md5"))
 
   # Use cache for the full query
   df <- cache(cache_key, {
-    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent))
+    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length))
   })
   cat(sprintf("done with aln_query_full\n"))
   
@@ -106,7 +110,9 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     clip_mode = profile$clip_mode,
     clip_margin = profile$clip_margin,
     min_mutations_percent = as.numeric(profile$min_mutations_percent),
-    max_mutations_percent = as.numeric(profile$max_mutations_percent))
+    max_mutations_percent = as.numeric(profile$max_mutations_percent),
+    min_alignment_length = as.integer(profile$min_alignment_length),
+    max_alignment_length = as.integer(profile$max_alignment_length))
   
   # Plot reads first (under alignments)
   if (!is.null(df$reads) && nrow(df$reads) > 0) {
