@@ -222,6 +222,10 @@ The Regions tab provides comprehensive management of saved visualization states,
 
 Region files are saved as `[name].txt` with automatic backup versions stored in `versions/[name]_v1.txt`, `v2.txt`, etc.
 
+#### Regions profile visualization
+
+Saved regions are automatically displayed in the segments profile, which shows each single-contig region as a colored rectangle with its ID label. This provides immediate visual feedback when navigating between regions and helps identify overlapping or adjacent saved areas. The regions profile appears between the gene and axis profiles in both the c60 and minimal configurations.
+
 ## Working with your data
 
 See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing data files and configuration.

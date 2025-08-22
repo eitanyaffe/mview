@@ -48,14 +48,106 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       # --- Helper Functions ---
       create_empty_region_table <- function() {
         data.frame(
-          id = integer(),
+          id = character(),
           description = character(),
           assembly = character(),
           contigs = character(),
           zoom_start = numeric(),
           zoom_end = numeric(),
+          segment_contig = character(),
+          segment_start = integer(),
+          segment_end = integer(),
+          single_contig = logical(),
           stringsAsFactors = FALSE
         )
+      }
+      
+      # migrate region table to add segment columns if missing
+      migrate_region_table <- function(rt) {
+        required_new_cols <- c("segment_contig", "segment_start", "segment_end", "single_contig")
+        missing_cols <- setdiff(required_new_cols, colnames(rt))
+        
+        if (length(missing_cols) == 0) {
+          return(rt)
+        }
+        
+        cat("migrating regions table: adding segment columns\n")
+        
+        # add missing columns with default values
+        for (col in missing_cols) {
+          if (col == "segment_contig") {
+            rt[[col]] <- character(nrow(rt))
+          } else if (col %in% c("segment_start", "segment_end")) {
+            rt[[col]] <- integer(nrow(rt))
+          } else if (col == "single_contig") {
+            rt[[col]] <- logical(nrow(rt))
+          }
+        }
+        
+        # compute segment information for each row
+        for (i in seq_len(nrow(rt))) {
+          segment_info <- compute_segment_info(rt[i, ])
+          rt$segment_contig[i] <- segment_info$contig
+          rt$segment_start[i] <- segment_info$start
+          rt$segment_end[i] <- segment_info$end
+          rt$single_contig[i] <- segment_info$single_contig
+        }
+        
+        return(rt)
+      }
+      
+      # compute segment information for a single region row
+      compute_segment_info <- function(region_row) {
+        # parse contigs
+        contigs_list <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
+          character(0)
+        } else {
+          trimws(strsplit(region_row$contigs, ",")[[1]])
+        }
+        
+        # default values for multi-contig or invalid regions
+        default_result <- list(
+          contig = NA_character_,
+          start = 0L,
+          end = 0L,
+          single_contig = FALSE
+        )
+        
+        if (length(contigs_list) == 0 || 
+            is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
+          return(default_result)
+        }
+        
+        # try to build context
+        cxt <- tryCatch({
+          build_context(contigs_list, get_contigs(region_row$assembly), 
+                       c(region_row$zoom_start, region_row$zoom_end), region_row$assembly)
+        }, error = function(e) NULL)
+        
+        if (is.null(cxt) || is.null(cxt$mapper)) {
+          return(default_result)
+        }
+        
+        # check which contigs the region spans
+        cdf <- cxt$mapper$cdf
+        zoom_contigs <- cdf[cdf$start < region_row$zoom_end & cdf$end > region_row$zoom_start, ]
+        
+        if (nrow(zoom_contigs) != 1) {
+          # spans multiple contigs or no contigs
+          return(default_result)
+        }
+        
+        # single contig case - compute local coordinates
+        contig_name <- zoom_contigs$contig[1]
+        local_start <- round(region_row$zoom_start - zoom_contigs$start[1]) + 1
+        local_end <- round(region_row$zoom_end - zoom_contigs$start[1])
+        
+        return(list(
+          contig = contig_name,
+          start = as.integer(local_start),
+          end = as.integer(local_end),
+          single_contig = TRUE
+        ))
       }
 
       format_contigs_for_display <- function(contigs_vector) {
@@ -100,6 +192,53 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           }
         }
       })
+      
+      # update cache when regions table changes
+      shiny::observe({
+        rt <- region_table()
+        segments_data <- convert_regions_to_segments(rt)
+        cache_set("segments.current_regions", segments_data)
+      })
+      
+      # convert regions table to segments format
+      convert_regions_to_segments <- function(rt) {
+        if (is.null(rt) || nrow(rt) == 0) {
+          return(data.frame(
+            assembly = character(),
+            contig = character(),
+            start = integer(),
+            end = integer(),
+            desc = character(),
+            id = character(),
+            stringsAsFactors = FALSE
+          ))
+        }
+        
+        # filter for single-contig segments only
+        single_contig_rows <- rt[rt$single_contig %in% TRUE & !is.na(rt$segment_contig), ]
+        
+        if (nrow(single_contig_rows) == 0) {
+          return(data.frame(
+            assembly = character(),
+            contig = character(),
+            start = integer(),
+            end = integer(),
+            desc = character(),
+            id = character(),
+            stringsAsFactors = FALSE
+          ))
+        }
+        
+        data.frame(
+          assembly = single_contig_rows$assembly,
+          contig = single_contig_rows$segment_contig,
+          start = single_contig_rows$segment_start,
+          end = single_contig_rows$segment_end,
+          desc = single_contig_rows$description,
+          id = single_contig_rows$id,
+          stringsAsFactors = FALSE
+        )
+      }
 
       # ensure regions directory exists
       ensure_regions_dir <- function() {
@@ -150,6 +289,9 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         if (!all(required_cols %in% colnames(df))) {
           stop(paste("region file missing required columns:", paste(setdiff(required_cols, colnames(df)), collapse = ", ")))
         }
+        
+        # migrate table to add segment columns if needed
+        df <- migrate_region_table(df)
         
         region_table(df)
         set_current_regions_file(filename)
@@ -277,8 +419,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
+        # suggest next ID
+        next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
+        
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
+          shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
@@ -290,10 +436,23 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       observeEvent(input$confirm_add_region, {
         req(input$add_region_description)
+        req(input$add_region_id)
         description <- trimws(input$add_region_description)
+        custom_id <- trimws(input$add_region_id)
         
         if (description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
+          return()
+        }
+        
+        if (custom_id == "") {
+          shiny::showNotification("ID cannot be empty", type = "error")
+          return()
+        }
+        
+        # check for duplicate ID
+        if (custom_id %in% region_table()$id) {
+          shiny::showNotification(paste("ID", custom_id, "already exists"), type = "error")
           return()
         }
         
@@ -311,14 +470,25 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         zoom_end <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[2]
         
         new_row <- data.frame(
-          id = if (nrow(region_table()) == 0) 1 else max(region_table()$id, 0) + 1,
+          id = custom_id,
           description = description,
           assembly = current_app_state$assembly %||% "",
           contigs = contigs_str,
           zoom_start = zoom_start,
           zoom_end = zoom_end,
+          segment_contig = NA_character_,
+          segment_start = 0L,
+          segment_end = 0L,
+          single_contig = FALSE,
           stringsAsFactors = FALSE
         )
+        
+        # compute segment information
+        segment_info <- compute_segment_info(new_row)
+        new_row$segment_contig <- segment_info$contig
+        new_row$segment_start <- segment_info$start
+        new_row$segment_end <- segment_info$end
+        new_row$single_contig <- segment_info$single_contig
         
         region_table(rbind(region_table(), new_row))
         save_region_table(current_regions_file())
@@ -339,6 +509,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         shiny::showModal(shiny::modalDialog(
           title = "Edit Region",
+          shiny::textInput(ns("edit_id_input"), "Region ID:", value = row_data$id, placeholder = "Enter region ID"),
           shiny::textInput(ns("edit_description_input"), "Description:", value = row_data$description),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
@@ -350,22 +521,39 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       observeEvent(input$confirm_edit_region, {
         req(input$edit_description_input)
+        req(input$edit_id_input)
         selected_rows <- input$region_table_display_rows_selected
         if (length(selected_rows) == 0) return()
         
         new_description <- trimws(input$edit_description_input)
+        new_id <- trimws(input$edit_id_input)
+        
         if (new_description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
           return()
         }
         
+        if (new_id == "") {
+          shiny::showNotification("ID cannot be empty", type = "error")
+          return()
+        }
+        
         current_table <- region_table()
+        old_id <- current_table[selected_rows[1], "id"]
+        
+        # check for duplicate ID (but allow keeping the same ID)
+        if (new_id != old_id && new_id %in% current_table$id) {
+          shiny::showNotification(paste("ID", new_id, "already exists"), type = "error")
+          return()
+        }
+        
+        current_table[selected_rows[1], "id"] <- new_id
         current_table[selected_rows[1], "description"] <- new_description
         region_table(current_table)
         save_region_table(current_regions_file())
         
         shiny::removeModal()
-        shiny::showNotification("region description updated", type = "message")
+        shiny::showNotification("region updated", type = "message")
       })
 
       # delete region
@@ -573,8 +761,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
+        # suggest next ID
+        next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
+        
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
+          shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),

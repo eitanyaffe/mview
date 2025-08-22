@@ -9,6 +9,9 @@
 # Load shared alignment API
 source("profiles/align/align_profile_api.r")
 
+# Load segments profile
+source("profiles/segments_profile.r")
+
 # Initialize alntools with GPU support if available
 init_alntools(enable_gpu = TRUE, verbose = FALSE)
 
@@ -39,6 +42,16 @@ gene_profile(
   color_field = "tax",
   label_field = "label",
   params = default_gene_params
+)
+
+########################################################
+# regions segments profile
+########################################################
+
+segments_profile(
+  id = "regions",
+  name = "Regions",
+  segments_data = "segments.current_regions"
 )
 
 ########################################################
