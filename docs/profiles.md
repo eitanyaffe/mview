@@ -83,6 +83,7 @@ Categories are stacked from highest distance (bottom) to lowest distance (top) i
     - `allow_one_side_clip`: Allow alignments clipped on one side (start at read start OR end at read end).
     - `only_one_side_clipped`: Only include alignments clipped on exactly one side.
     - `only_two_side_clipped`: Only include alignments clipped on both sides.
+    - `only_clipped`: Only include alignments clipped on one or both sides.
   - `clip_margin`: Margin of error in bases when checking read start/end positions (default 10).
   - `min_mutations_percent`: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%. Filters out alignments with mutation rate below this threshold.
   - `max_mutations_percent`: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%. Special case: 0% = only alignments with zero mutations. Otherwise filters out alignments with mutation rate above this threshold.

@@ -58,7 +58,7 @@ output$parameter_tabs_ui <- renderUI({
           label = param$id,
           value = current_val
         ),
-        "select" = radioButtons(
+        "select" = selectInput(
           inputId = input_id,
           label = param$id,
           choices = param$choices,

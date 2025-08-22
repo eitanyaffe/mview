@@ -186,7 +186,7 @@ The alignment profile supports several key parameters accessible through the rig
 - **use_gpu**: Enable GPU acceleration for bin queries (Apple Silicon only, default: true)
 
 **Alignment Filtering**:
-- **clip_mode**: Control which alignments to include based on clipping (`all`, `complete`, `allow_one_side_clip`, `only_one_side_clipped`, `only_two_side_clipped`)
+- **clip_mode**: Control which alignments to include based on clipping (`all`, `complete`, `allow_one_side_clip`, `only_one_side_clipped`, `only_two_side_clipped`, `only_clipped`)
 - **clip_margin**: Margin of error when checking read boundaries (default: 10)
 - **min_mutations_percent**: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%
 - **max_mutations_percent**: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%
