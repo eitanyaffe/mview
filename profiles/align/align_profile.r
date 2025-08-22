@@ -262,6 +262,12 @@ default_alignment_params <- list(
     type = "integer",
     default = 1000
   ),
+  max_col_dist_percent = list(
+    group_id = "align_general",
+    type = "select",
+    choices = c("auto", "0.1", "1", "10"),
+    default = "auto"
+  ),  
   use_gpu = list(
     group_id = "align_general",
     type = "boolean",
@@ -271,12 +277,6 @@ default_alignment_params <- list(
     group_id = "align_general",
     type = "boolean",
     default = TRUE
-  ),
-  max_col_dist_percent = list(
-    group_id = "align_general",
-    type = "select",
-    choices = c("auto", "0.1", "1", "10"),
-    default = "auto"
   )
 )
 
