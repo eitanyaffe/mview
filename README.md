@@ -161,37 +161,19 @@ The Alignments tab shows all alignment of a selected read. A read can be selecte
 The Genes tab details all genes in view. Click on any gene in the table to select it for navigation. The "Navigate to Gene" button zooms the visualization to the selected gene's location with appropriate padding, making it easy to examine genes of interest in their genomic context.
 
 #### Profile parameters
+
 The collapsible right panel contains profile-specific settings that are applied in real-time to customize visualization appearance and behavior. The specific parameters shown here can be controlled through the configuration file.
 
 ### Profiles
 
-- **alignment**: Display read alignments with multiple visualization modes:
-  - **by_mut_density**: Traditional mutation density visualization (gray to red scale)
-  - **by_seg_density**: Segregating sites density visualization (blue scale) 
-  - **by_nonref_density**: Non-reference sites density visualization (yellow to orange scale)
-  - **by_seg_clip_density**: Segregating clip sites density visualization (purple scale)
-  - **by_non_ref_clip_density**: Non-reference clip sites density visualization (green scale)
-  - **by_genomic_distance**: Stacked mutation distance categories (red gradient, log scale)
-- **gene**: Display gene segments.
+mview includes several built-in profiles for genomic visualization:
 
-#### Alignment Profile Parameters
+- **alignment**: Display read alignments with advanced mutation analysis and multiple visualization modes
+- **gene**: Display gene segments with strand orientation and customizable coloring
+- **segments**: Display genomic segments as colored rectangles (used for regions, annotations)
+- **axis**: Show contig coordinates with tick marks for orientation
 
-The alignment profile supports several key parameters accessible through the right panel:
-
-- **bin_style**: Choose visualization mode (`by_mut_density`, `by_seg_density`, `by_nonref_density`, `by_seg_clip_density`, `by_non_ref_clip_density`, `by_genomic_distance`)
-- **seg_threshold**: Threshold for segregating sites detection (default: 0.2)
-- **non_ref_threshold**: Threshold for non-reference sites detection (default: 0.9)
-- **plot_style**: Query mode selection (`auto_full`, `auto_pileup`, `bin`, `full`, `pileup`)
-- **binsize/target_bins**: Control bin resolution for bin mode
-- **use_gpu**: Enable GPU acceleration for bin queries (Apple Silicon only, default: true)
-
-**Alignment Filtering**:
-- **clip_mode**: Control which alignments to include based on clipping (`all`, `complete`, `allow_one_side_clip`, `only_one_side_clipped`, `only_two_side_clipped`, `only_clipped`)
-- **clip_margin**: Margin of error when checking read boundaries (default: 10)
-- **min_mutations_percent**: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%
-- **max_mutations_percent**: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%
-
-Hover shows element information in all profiles. Profile parameters can be set in code or adjusted interactively in the right panel. See the detailed profile guide: [profiles](docs/profiles.md).
+Profiles support interactive parameter adjustment through the right panel and hover information for all elements. For detailed information about profile parameters and usage, see the comprehensive guide: [profiles](docs/profiles.md).
 
 ### Managing regions
 
@@ -234,7 +216,7 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 **Views**: Create custom views by copying existing view files and modifying which profiles to display and their parameters. Each view defines a specific layout of gene tracks, read alignments and other profiles.
 
-**Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs.
+**Profiles**: Building custom profiles is straightforward - use existing profile code from the `profiles/` directory as a template and modify the plotting functions to handle your specific data types and visualization needs. The segments profile has minimal code and can be used as a starting point, see [profiles](docs/profiles.md).
 
 ## Developement log
 

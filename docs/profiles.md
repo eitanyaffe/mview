@@ -13,6 +13,58 @@ Hover is available in all profiles to reveal information about the plotted eleme
 
 ---
 
+### segments profile
+
+Display genomic segments as colored rectangles with customizable data sources. Designed for visualizing regions, annotations, or any segmented genomic features.
+
+#### Main parameters
+- **segments_data**: data source, can be:
+  - Cache key (string): references cached segment data (e.g., `"segments.current_regions"`)
+  - Data frame: direct segment data with required columns (`assembly`, `contig`, `start`, `end`, `desc`, `id`)
+- **color**: fill color for segment rectangles (default: `"#2E86AB"`)
+- **height**: vertical size of the profile in pixels (default: 40)
+
+#### Data format
+Segment data requires these columns:
+- **assembly**: assembly identifier (e.g., "EBC", "BAA")  
+- **contig**: contig name within the assembly
+- **start**: start coordinate within contig (local coordinates)
+- **end**: end coordinate within contig (local coordinates)
+- **desc**: description text for hover display
+- **id**: unique identifier displayed as label
+
+#### Display behavior
+- **Assembly filtering**: only shows segments matching current assembly context
+- **Context filtering**: automatically filters segments to current view and contigs
+- **Rectangle display**: segments shown as filled rectangles with black borders
+- **ID labels**: segment IDs displayed to the right of each rectangle in black text
+- **Hover information**: shows contig coordinates and description when hovering over ID labels
+
+#### Usage examples
+```r
+# Basic segments profile with cache data
+segments_profile(
+  id = "regions",
+  name = "Regions", 
+  segments_data = "segments.current_regions"
+)
+
+# Custom segments with direct data and styling
+segments_profile(
+  id = "annotations",
+  name = "Annotations",
+  segments_data = my_segments_df,
+  color = "#FF6B6B",
+  height = 30
+)
+```
+
+**Notes**:
+- Supports string-based IDs for flexible labeling (e.g., "A1", "control", "REG_001")
+- Automatically filters to show only segments relevant to the current assembly and view
+
+---
+
 ### axis profile
 
 Shows the contig name, axis line, and tick marks for orientation.
@@ -64,6 +116,7 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
     - `by_genomic_distance`: stacked mutation distance categories (red gradient, logarithmic scale).
   - `seg_threshold`: threshold for segregating sites detection (default: 0.2).
   - `non_ref_threshold`: threshold for non-reference sites detection (default: 0.9).
+  - `use_gpu`: Enable GPU acceleration for bin queries (Apple Silicon only, default: true)
 
 #### Mutation distance categories (logarithmic scale)
 When using `bin_style=by_genomic_distance`, alignments are categorized by mutations per bp:
@@ -107,55 +160,3 @@ Mutation identifiers follow standard notation:
 - **X:Y** - substitution where base X is substituted by base Y
 - **+XYZ** - insertion where sequence XYZ was added
 - **-XYZ** - deletion where sequence XYZ was removed
-
----
-
-### segments profile
-
-Display genomic segments as colored rectangles with customizable data sources. Designed for visualizing regions, annotations, or any segmented genomic features.
-
-#### Main parameters
-- **segments_data**: data source, can be:
-  - Cache key (string): references cached segment data (e.g., `"segments.current_regions"`)
-  - Data frame: direct segment data with required columns (`assembly`, `contig`, `start`, `end`, `desc`, `id`)
-- **color**: fill color for segment rectangles (default: `"#2E86AB"`)
-- **height**: vertical size of the profile in pixels (default: 40)
-
-#### Data format
-Segment data requires these columns:
-- **assembly**: assembly identifier (e.g., "EBC", "BAA")  
-- **contig**: contig name within the assembly
-- **start**: start coordinate within contig (local coordinates)
-- **end**: end coordinate within contig (local coordinates)
-- **desc**: description text for hover display
-- **id**: unique identifier displayed as label
-
-#### Display behavior
-- **Assembly filtering**: only shows segments matching current assembly context
-- **Context filtering**: automatically filters segments to current view and contigs
-- **Rectangle display**: segments shown as filled rectangles with black borders
-- **ID labels**: segment IDs displayed to the right of each rectangle in black text
-- **Hover information**: shows contig coordinates and description when hovering over ID labels
-
-#### Usage examples
-```r
-# Basic segments profile with cache data
-segments_profile(
-  id = "regions",
-  name = "Regions", 
-  segments_data = "segments.current_regions"
-)
-
-# Custom segments with direct data and styling
-segments_profile(
-  id = "annotations",
-  name = "Annotations",
-  segments_data = my_segments_df,
-  color = "#FF6B6B",
-  height = 30
-)
-```
-
-**Notes**:
-- Supports string-based IDs for flexible labeling (e.g., "A1", "control", "REG_001")
-- Automatically filters to show only segments relevant to the current assembly and view
