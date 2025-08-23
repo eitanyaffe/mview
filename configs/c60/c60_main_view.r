@@ -53,6 +53,37 @@ for (timepoint in timepoints) {
 # basic gene profile
 ########################################################
 
+get_map_tag_other <- function(assembly, assembly_other, timepoint) {
+  ix = lib.table$ASSEMBLY_ID == assembly_other & lib.table$SAMPLE_TYPE == timepoint
+  if (sum(ix) == 0 || sum(ix) > 1) {
+    return (NULL)
+  }
+  paste0(assembly, "_", lib.table$LIB_ID[ix])
+}
+
+make_align_profile_other <- function(assembly_other, timepoint) {
+  align_profile(
+    id = paste0("align_", assembly_other, "_", timepoint),
+    name = paste0(assembly_other, " ", timepoint),
+    aln_f = function(cxt) {
+      tag <- get_map_tag_other(cxt$assembly, assembly_other, timepoint)
+      ifn = "/Users/eitany/work/makeshift-dev/export/long/pb-b20/default/minimap/v1.08/map-hifi/lib/EBC/EBU_-21/align.aln"
+      aln_load(ifn)
+      # get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
+    },
+    params = default_alignment_params
+  )
+}
+
+subject_ids <- get_current_view_parameter("other_subject_ids")
+for (assembly_other in subject_ids) {
+  make_align_profile_other(assembly_other, timepoint)
+}
+
+########################################################
+# basic gene profile
+########################################################
+
 gene_profile(
   id = "genes",
   name = "Genes",

@@ -141,8 +141,8 @@ default_alignment_params <- list(
   plot_style = list(
     group_id = "align_general",
     type = "select",
-    choices = c("auto_full", "auto_pileup", "bin", "full", "pileup"),
-    default = "auto_full"
+    choices = c("auto", "bin", "full"),
+    default = "auto"
   ),
   mutation_color_mode = list(
     group_id = "align_general",
@@ -207,8 +207,8 @@ default_alignment_params <- list(
     choices = c("none", "by_mutations", "by_strand", "show_mutations"), 
     default = "show_mutations"
   ),
-  full_threshold = list(
-    group_id = "align_full",
+  auto_threshold = list(
+    group_id = "align_general",
     type = "integer",
     default = 50000
   ),
@@ -270,18 +270,18 @@ default_alignment_params <- list(
   pileup_threshold = list(
     group_id = "align_pileup",
     type = "integer",
-    default = 1000
+    default = 200
   ),
   max_col_dist_percent = list(
     group_id = "align_general",
     type = "select",
     choices = c("auto", "0.1", "1", "10"),
     default = "auto"
-  ),  
-  use_gpu = list(
+  ),
+  use_pileup = list(
     group_id = "align_general",
     type = "boolean",
-    default = TRUE
+    default = FALSE
   ),
   show_hover = list(
     group_id = "align_general",
@@ -293,10 +293,11 @@ default_alignment_params <- list(
 align_profile <- function(id, name,
                           aln_f = NULL,
                           bin_type = "auto",
-                          plot_style = "auto_full",
+                          plot_style = "auto",
                           mutation_color_mode = "detailed",
-                          full_threshold = 50000,
-                          pileup_threshold = 1000,
+                          auto_threshold = 50000,
+                          pileup_threshold = 200,
+                          use_pileup = FALSE,
                           target_bins = 100,
                           height_style = "by_mutations",
                           max_mutations = 1000,
@@ -322,19 +323,23 @@ align_profile <- function(id, name,
   }
 
   # Determine display mode based on view range
-  get_display_mode <- function(xlim, full_threshold, pileup_threshold, plot_style) {
+  get_display_mode <- function(xlim, auto_threshold, pileup_threshold, plot_style, use_pileup) {
     if (is.null(xlim) || length(xlim) != 2) {
       return("bin")
     }
 
     range_bp <- (xlim[2] + 1) - xlim[1]
 
-    if (plot_style == "auto_full") {
-      return(if (range_bp <= full_threshold) "full" else "bin")
-    } else if (plot_style == "auto_pileup") {
-      return(if (range_bp <= pileup_threshold) "pileup" else "bin")
+    if (plot_style == "auto") {
+      if (use_pileup && range_bp <= pileup_threshold) {
+        return("pileup")
+      } else if (range_bp <= auto_threshold) {
+        return("full")
+      } else {
+        return("bin")
+      }
     } else {
-      # explicit mode: bin, full, or pileup
+      # explicit mode: bin, full
       return(plot_style)
     }
   }
@@ -362,7 +367,7 @@ align_profile <- function(id, name,
       return(list(plot = gg, legends = list()))
     }
 
-    mode <- get_display_mode(cxt$mapper$xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style)
+    mode <- get_display_mode(cxt$mapper$xlim, profile$auto_threshold, profile$pileup_threshold, profile$plot_style, profile$use_pileup)
     cat(sprintf("mode: %s\n", mode))
 
     # Call mode-specific plot function
@@ -384,8 +389,9 @@ align_profile <- function(id, name,
     bin_type = bin_type,
     plot_style = plot_style,
     mutation_color_mode = mutation_color_mode,
-    full_threshold = full_threshold,
+    auto_threshold = auto_threshold,
     pileup_threshold = pileup_threshold,
+    use_pileup = use_pileup,
     target_bins = target_bins,
     height_style = height_style,
     max_mutations = max_mutations,

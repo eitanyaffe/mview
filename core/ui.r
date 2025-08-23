@@ -179,6 +179,7 @@ ui <- fluidPage(
       verbatimTextOutput("basic_info"),
       h5("Last Key Press"),
       verbatimTextOutput("last_key_output"),
+      actionButton("refreshBtn", "Refresh", icon = icon("refresh")),
       actionButton("helpBtn", "Help"),
       actionButton("aboutBtn", "About")
     ),

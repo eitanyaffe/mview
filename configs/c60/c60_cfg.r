@@ -82,6 +82,8 @@ view_register("pre / post", view_file, timepoints = c("pre", "post"), show_self_
 view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"), show_self_align = FALSE)
 view_register("all", view_file, timepoints = c("early", "pre", "post", "late"), show_self_align = FALSE)
 
+view_register("other subject", view_file, other_subject_ids = c("EBU"), timepoints = c("early"), show_self_align = FALSE)
+
 view_register("self-align", view_file, timepoints = NULL, show_self_align = TRUE)
 
 ########################################################

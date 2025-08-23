@@ -41,8 +41,12 @@ output$profilePlots <- renderUI({
   )
 })
 
+# reactive trigger for manual refresh
+refresh_trigger <- reactiveVal(0)
+
 # Server side: render plots for all registered profiles and cache info_df for hover
 observe({
+  refresh_trigger()  # establish reactive dependency on manual refresh trigger
   cxt <- build_context(
     state_contigs = state$contigs,
     contig_table = get_contigs(state$assembly),
@@ -147,4 +151,11 @@ observeEvent(input$mouse_coords, {
     plot_y = plot_coords$y,
     timestamp = Sys.time()
   )
+})
+
+# refresh button handler
+observeEvent(input$refreshBtn, {
+  current_val <- refresh_trigger()
+  refresh_trigger(current_val + 1)
+  cat("plot refresh triggered manually\n")
 })

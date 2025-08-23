@@ -69,7 +69,7 @@ get_current_view_parameter <- function(id) {
   stopifnot(is.character(id) && length(id) == 1 && nzchar(id))
   params <- get_current_view_parameters()
   if (!(id %in% names(params))) {
-    stop(sprintf("get_current_view_parameter: parameter '%s' not defined for current view", id))
+    return(NULL)
   }
   params[[id]]
 }
