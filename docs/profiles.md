@@ -109,6 +109,7 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
   - `target_bins`: target number of bins when `bin_type=auto`.
   - `bin_style`: visualization mode for bins:
     - `by_mut_density`: traditional mutation density (gray to red scale).
+    - `by_median_mutation_density`: median mutation density across alignments per bin (gray to red scale).
     - `by_seg_density`: segregating sites density (blue scale).
     - `by_nonref_density`: non-reference sites density (yellow to orange scale).
     - `by_seg_clip_density`: segregating clip sites density (purple scale).

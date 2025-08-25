@@ -196,7 +196,41 @@ plot_mutation_density_bins <- function(gg, df, profile) {
   if (profile$show_hover) {
     df$hover_text <- paste0(
       "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Mutations: ", df$mutation_count, " / ", df$sequenced_bp, " bp\n",
       "Mutation density: ", sprintf("%.3f%%", df$mut_density * 100)
+    )
+  } else {
+    df$hover_text <- ""
+  }
+  
+  # plot bins
+  gg <- gg + ggplot2::geom_rect(
+    data = df,
+    ggplot2::aes(
+      xmin = gstart, xmax = gend,
+      ymin = 0, ymax = cov,
+      fill = fill_color, color = fill_color,
+      text = hover_text
+    ),
+    size = 0.1
+  ) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::scale_color_identity()
+  
+  return(gg)
+}
+
+# Plot median mutation density bins with red color scale (same as mutation density)
+plot_median_mutation_density_bins <- function(gg, df, profile) {
+  # median mutation density visualization
+  df$fill_color <- get_mutation_colors(df$median_mutation_density)
+  
+  # create hover text only if enabled
+  if (profile$show_hover) {
+    df$hover_text <- paste0(
+      "Coverage: ", sprintf("%.2f", df$cov), "x\n",
+      "Mutations: ", df$mutation_count, " / ", df$sequenced_bp, " bp\n",
+      "Median mutation density: ", sprintf("%.3f%%", df$median_mutation_density * 100)
     )
   } else {
     df$hover_text <- ""
@@ -428,6 +462,11 @@ create_bin_profile_legends <- function(bin_style, profile, df) {
     if (!is.null(legend_gg)) {
       legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "mutations per bp")))
     }
+  } else if (bin_style == "by_median_mutation_density") {
+    legend_gg <- create_mutation_density_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 190, width = 300, title = "median mutations per bp")))
+    }
   } else if (bin_style == "by_seg_density") {
     max_density <- profile$max_col_dist_percent
     if (is.null(max_density) || identical(max_density, "auto")) {
@@ -531,6 +570,8 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   # choose and call appropriate visualization function
   if (bin_style == "by_mut_density") {
     gg <- plot_mutation_density_bins(gg, df, profile)
+  } else if (bin_style == "by_median_mutation_density") {
+    gg <- plot_median_mutation_density_bins(gg, df, profile)
   } else if (bin_style == "by_seg_density") {
     gg <- plot_segregating_sites_bins(gg, df, profile)
   } else if (bin_style == "by_nonref_density") {
