@@ -140,6 +140,7 @@ Categories are stacked from highest distance (bottom) to lowest distance (top) i
   - `clip_margin`: Margin of error in bases when checking read start/end positions (default 10).
   - `min_mutations_percent`: Minimum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 0%. Filters out alignments with mutation rate below this threshold.
   - `max_mutations_percent`: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%. Special case: 0% = only alignments with zero mutations. Otherwise filters out alignments with mutation rate above this threshold.
+  - `min_indel_length`: Minimum indel length to include in mutation density calculations (default 3). Indels shorter than this threshold are filtered out from mutation counts and density calculations to reduce noise from sequencing artifacts. Set to 0 to include all indels.
 
 #### Full mode parameters
   - `full_style`:

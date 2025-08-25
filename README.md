@@ -231,3 +231,4 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 ### Under development (v1.02)
 
 - Legends tab added
+- Short indel filtering: Added `min_indel_length` parameter to alignment profiles to filter out short indels from mutation density calculations, reducing noise from sequencing artifacts while preserving longer, more meaningful indels.
