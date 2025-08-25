@@ -183,6 +183,11 @@ default_alignment_params <- list(
     type = "integer",
     default = 0
   ),
+  min_indel_length = list(
+    group_id = "align_filter",
+    type = "integer",
+    default = 3
+  ),
   height = list(
     group_id = "align_general",
     type = "integer",
@@ -309,6 +314,7 @@ align_profile <- function(id, name,
                           max_mutations_percent = 10.0,
                           min_alignment_length = 0,
                           max_alignment_length = 0,
+                          min_indel_length = 3,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           use_gpu = TRUE,
@@ -403,6 +409,7 @@ align_profile <- function(id, name,
     max_mutations_percent = max_mutations_percent,
     min_alignment_length = min_alignment_length,
     max_alignment_length = max_alignment_length,
+    min_indel_length = min_indel_length,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
     use_gpu = use_gpu,

@@ -1,6 +1,6 @@
 # Pileup mode for alignment profile
 
-align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0) {
+align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, min_indel_length = 3) {
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
   aln_id <- if (is(aln, "externalptr")) {
@@ -19,12 +19,13 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode
                        min_mutations_percent = min_mutations_percent,
                        max_mutations_percent = max_mutations_percent,
                        min_alignment_length = min_alignment_length,
-                       max_alignment_length = max_alignment_length
+                       max_alignment_length = max_alignment_length,
+                       min_indel_length = min_indel_length
                      ), algo = "md5"))
 
   # Use cache for the pileup query
   df <- cache(cache_key, {
-    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length))
+    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length), min_indel_length = as.integer(min_indel_length))
   })
 
   if (!is.null(df) && nrow(df) > 0) {
@@ -43,7 +44,8 @@ align_profile_pileup <- function(profile, cxt, aln, gg) {
                                 min_mutations_percent = as.numeric(profile$min_mutations_percent), 
                                 max_mutations_percent = as.numeric(profile$max_mutations_percent),
                                 min_alignment_length = as.integer(profile$min_alignment_length),
-                                max_alignment_length = as.integer(profile$max_alignment_length))
+                                max_alignment_length = as.integer(profile$max_alignment_length),
+                                min_indel_length = as.integer(profile$min_indel_length))
   if (is.null(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }
