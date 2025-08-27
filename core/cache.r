@@ -60,8 +60,8 @@ cache_unset <- function(key) {
 }
 
 # Main cache function: evaluates expression or retrieves cached result
-cache <- function(key, expr) {
-  if (cache_exists(key)) {
+cache <- function(key, expr, force = FALSE) {
+  if (cache_exists(key) && !force) {
     return(cache_get(key))
   }
 

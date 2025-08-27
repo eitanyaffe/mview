@@ -4,8 +4,8 @@ source("profiles/align/align_profile_api.r")
 # Load segments profile
 source("profiles/segments_profile.r")
 
-# Initialize alntools with GPU support
-init_alntools(enable_gpu = TRUE, verbose = FALSE)
+# Initialize alntools
+init_alntools(verbose = FALSE)
 
 ########################################################
 # Alignment profiles

@@ -52,21 +52,13 @@ install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui", "
 
 ### Installing alntools (optional)
 
-Install alntools if you wish to visualize read alignments. For optimal performance with large alignment datasets, mview uses threads and GPUs. 
+Install alntools if you wish to visualize read alignments. For optimal performance with large alignment datasets, mview uses multi-threading. 
 
 #### Threads
 
 *   **Linux**: OpenMP library (usually included with gcc as `libgomp`)
 *   **macOS**: Install via Homebrew: `brew install libomp`
 *   **Note**: alntools should compile without OpenMP
-
-#### GPU Acceleration
-
-On macOS with Apple Silicon, alntools uses GPUs to significantly boost performance.
-
-*   **Automatic detection**: GPU acceleration is automatically enabled when Metal is available (run `system_profiler SPDisplaysDataType` to determine if you have GPUs)
-*   **Performance**: 1000x faster bin queries for datasets with >10K alignments
-*   **Fallback**: Automatically falls back to CPU if GPU not available
 
 #### Install alntools
 
@@ -225,7 +217,7 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 - Alignment bin mode enhanced with density of segregating sites, non-reference sites, and distribution of reads by logarithmic mutation distance categories.
 - Enhanced alignment filtering with granular clipping modes and min/max mutations percentage range controls across all query modes.
 - Alignment length filtering: Added minimum and maximum alignment length filters based on read coordinates for precise control over which alignments to include in visualization.
-- GPU support added (Apple Silicon only) for bin queries in the alignment profile.
+
 - Added nucleotide sequence display for axis profiles.
 
 ### Under development (v1.02)

@@ -117,7 +117,7 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
     - `by_genomic_distance`: stacked mutation distance categories (red gradient, logarithmic scale).
   - `seg_threshold`: threshold for segregating sites detection (default: 0.2).
   - `non_ref_threshold`: threshold for non-reference sites detection (default: 0.9).
-  - `use_gpu`: Enable GPU acceleration for bin queries (Apple Silicon only, default: true)
+
 
 #### Mutation distance categories (logarithmic scale)
 When using `bin_style=by_genomic_distance`, alignments are categorized by mutations per bp:

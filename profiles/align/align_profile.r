@@ -292,11 +292,6 @@ default_alignment_params <- list(
     group_id = "align_general",
     type = "boolean",
     default = TRUE
-  ),
-  use_gpu = list(
-    group_id = "align_general",
-    type = "boolean",
-    default = TRUE
   )
 )
 
@@ -322,7 +317,6 @@ align_profile <- function(id, name,
                           min_indel_length = 3,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
-                          use_gpu = TRUE,
                           show_hover = TRUE,
                           params = default_alignment_params,
                           auto_register = TRUE) {
@@ -417,7 +411,6 @@ align_profile <- function(id, name,
     min_indel_length = min_indel_length,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
-    use_gpu = use_gpu,
     show_hover = show_hover
   )
 }

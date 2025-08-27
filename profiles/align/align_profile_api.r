@@ -13,8 +13,8 @@ append_flag <- function(cur, add) {
   paste(cur, add)
 }
 
-# Setup alntools compilation with optional GPU support
-setup_alntools <- function(use_gpu = FALSE, verbose = FALSE) {
+# Setup alntools compilation
+setup_alntools <- function(verbose = FALSE) {
   alntools_dir <- paste0(Sys.getenv("MAKESHIFT_ROOT"), "/tools/alntools/cpp")
   os_name <- Sys.info()["sysname"]
   
@@ -29,31 +29,6 @@ setup_alntools <- function(use_gpu = FALSE, verbose = FALSE) {
       existing_cppflags <- append_flag(existing_cppflags, "-I/opt/homebrew/opt/libomp/include -Xpreprocessor -fopenmp")
       existing_libs <- append_flag(existing_libs, "-L/opt/homebrew/opt/libomp/lib -lomp")
     }
-    
-    # GPU support (Metal on macOS)
-    if (use_gpu) {
-      # Check for both Xcode tools AND actual Metal GPU support
-      xcode_ok <- tryCatch(system("xcode-select -p >/dev/null 2>&1", ignore.stdout = TRUE, ignore.stderr = TRUE) == 0, error = function(e) FALSE)
-      metal_ok <- tryCatch(length(system("system_profiler SPDisplaysDataType | grep 'Metal'", intern = TRUE)) > 0, error = function(e) FALSE)
-      
-      metal_available <- xcode_ok && metal_ok
-      if (metal_available) {
-        existing_cppflags <- append_flag(existing_cppflags, "-DMETAL_SUPPORT")
-        existing_libs <- append_flag(existing_libs, "-framework Metal -framework MetalPerformanceShaders -framework Foundation")
-        # Force Objective-C++ so Foundation/Metal headers compile
-        existing_cxxflags <- append_flag(existing_cxxflags, "-x objective-c++")
-        cat("✓ GPU support enabled (Metal)\n")
-      } else {
-        if (!xcode_ok) {
-          cat("⚠ GPU requested but Xcode Command Line Tools not available, using CPU-only\n")
-        } else if (!metal_ok) {
-          cat("⚠ GPU requested but Metal GPU not detected on this system, using CPU-only\n")
-        } else {
-          cat("⚠ GPU requested but not available, using CPU-only\n")
-        }
-        use_gpu <- FALSE
-      }
-    }
   }
   
   # Set environment variables
@@ -61,21 +36,19 @@ setup_alntools <- function(use_gpu = FALSE, verbose = FALSE) {
   Sys.setenv(PKG_LIBS = existing_libs)
   if (nchar(existing_cxxflags) > 0) Sys.setenv(PKG_CXXFLAGS = existing_cxxflags)
   
-  # Use the unified R bridge file (handles both GPU and CPU)
+  # Use the unified R bridge file
   bridge_file <- "aln_R.cpp"
   bridge_path <- paste0(alntools_dir, "/", bridge_file)
   
-  cat("Loading alntools with", if (use_gpu) "GPU" else "CPU-only", "support...\n")
+  cat("Loading alntools...\n")
   
   # Compile and load (avoid rebuilding unless necessary to prevent duplicates)
   sourceCpp(bridge_path, verbose = verbose, cacheDir = ".Rcpp_dir", rebuild = F)
   
   cat("✓ alntools loaded successfully\n")
-  return(use_gpu)
 }
 
 # Initialize alntools (called by configs)
-# Default to CPU-only for compatibility
-init_alntools <- function(enable_gpu = FALSE, verbose = FALSE) {
-  setup_alntools(use_gpu = enable_gpu, verbose = verbose)
+init_alntools <- function(verbose = FALSE) {
+  setup_alntools(verbose = verbose)
 }
