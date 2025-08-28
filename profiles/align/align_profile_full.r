@@ -11,7 +11,7 @@ get_alignment_colors <- function(alignments, reads, style) {
     
     # xor of read and alignment strand
     alignments$along_contig = !xor(alignments$is_reverse, read_is_reverse)
-    colors <- ifelse(alignments$along_contig, "lightgreen", "#f5d34d")
+    colors <- ifelse(alignments$along_contig, "#dcfbdc", "#efcb39")
     return(colors)
   } else if (style == "by_mutations") {
     # use shared mutation color function
