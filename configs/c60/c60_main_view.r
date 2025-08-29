@@ -89,43 +89,20 @@ for (assembly_other in subject_ids) {
 # synteny profiles
 ########################################################
 
-# synteny data function
-get_synteny_f <- function(cxt, binsize, hide_self = TRUE) {
-  # load sequenced bp data
-  sequenced_bp_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
-                               tag = paste0(cxt$assembly, "_sequenced_bp_", binsize))
+# synteny data function - simple user function
+get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
+  data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
+                   tag = paste0(assembly, "_", field, "_", binsize),
+                   null.on.missing = TRUE)
   
-  # load mutation density data  
-  mutation_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
-                           tag = paste0(cxt$assembly, "_median_mutation_density_", binsize))
-  
-  # filter out self-assembly libraries if hide_self is TRUE
-  if (hide_self && !is.null(sequenced_bp_data) && !is.null(mutation_data)) {
-    # get library columns (exclude contig, start, end)
-    coord_cols <- c("contig", "start", "end")
-    lib_cols <- setdiff(colnames(sequenced_bp_data), coord_cols)
-    
-    # filter out libraries that start with current assembly ID
-    assembly_prefix <- paste0(cxt$assembly, "_")
-    self_libs <- lib_cols[startsWith(lib_cols, assembly_prefix)]
-    keep_libs <- setdiff(lib_cols, self_libs)
-    
-    if (length(self_libs) > 0) {
-      cat(sprintf("hiding %d self-assembly libraries: %s\n", 
-                  length(self_libs), 
-                  paste(self_libs[seq_len(min(3, length(self_libs)))], collapse = ", ")))
-    }
-    
-    # keep only non-self libraries plus coordinate columns
-    keep_cols <- c(coord_cols, keep_libs)
-    sequenced_bp_data <- sequenced_bp_data[, keep_cols, drop = FALSE]
-    mutation_data <- mutation_data[, keep_cols, drop = FALSE]
+  # filter out self-assembly libraries if hide_self is TRUE and data exists
+  if (hide_self && !is.null(data)) {
+    keep_cols <- !grepl(paste0("^", assembly, "_"), colnames(data))
+    keep_cols[1:3] <- TRUE  # always keep contig, start, end
+    data <- data[, keep_cols, drop = FALSE]
   }
   
-  return(list(
-    sequenced_bp = sequenced_bp_data,
-    mutations = mutation_data
-  ))
+  return(data)
 }
 
 # summary synteny profile

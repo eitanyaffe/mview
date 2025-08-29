@@ -194,34 +194,29 @@ Both matrices must have:
 - Remaining columns: library data (one column per library)
 
 #### Data function
-The profile expects a `synteny_f` function that returns both matrices:
+The profile expects a simple `synteny_f` function that loads individual tables:
 ```r
-get_synteny_f <- function(cxt, binsize, hide_self = TRUE) {
-  sequenced_bp_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
-                               tag = paste0(cxt$assembly, "_sequenced_bp_", binsize))
+get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
+  data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
+                   tag = paste0(assembly, "_", field, "_", binsize),
+                   null.on.missing = TRUE)
   
-  mutation_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
-                           tag = paste0(cxt$assembly, "_median_mutation_density_", binsize))
-  
-  # optionally filter out self-assembly libraries
-  if (hide_self) {
-    # filter libraries starting with current assembly ID
-    coord_cols <- c("contig", "start", "end")
-    lib_cols <- setdiff(colnames(sequenced_bp_data), coord_cols)
-    assembly_prefix <- paste0(cxt$assembly, "_")
-    keep_libs <- lib_cols[!startsWith(lib_cols, assembly_prefix)]
-    keep_cols <- c(coord_cols, keep_libs)
-    
-    sequenced_bp_data <- sequenced_bp_data[, keep_cols, drop = FALSE]
-    mutation_data <- mutation_data[, keep_cols, drop = FALSE]
+  # filter out self-assembly libraries if hide_self is TRUE and data exists
+  if (hide_self && !is.null(data)) {
+    keep_cols <- !grepl(paste0("^", assembly, "_"), colnames(data))
+    keep_cols[1:3] <- TRUE  # always keep contig, start, end
+    data <- data[, keep_cols, drop = FALSE]
   }
   
-  return(list(
-    sequenced_bp = sequenced_bp_data,
-    mutations = mutation_data
-  ))
+  return(data)
 }
 ```
+
+The profile automatically:
+- Calls this function twice: once for `"sequenced_bp"` and once for `"median_mutation_density"`
+- Passes the `hide_self` parameter to the user function
+- Handles missing data gracefully (returns `NULL` if either dataset is missing)
+- Validates data structure and provides informative error messages
 
 #### Display behavior
 - **Summary mode**: Y-axis shows count of libraries meeting min_xcov threshold per bin

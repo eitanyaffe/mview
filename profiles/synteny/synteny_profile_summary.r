@@ -2,8 +2,14 @@
 # Shows count of libraries per bin that meet coverage threshold
 
 synteny_profile_summary <- function(profile, cxt, data_list, gg, current_binsize) {
-  sequenced_bp <- data_list$sequenced_bp
-  mutations <- data_list$mutations
+  # filter data to current view first using new function
+  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp, cxt)
+  mutations <- filter_synteny_matrix(data_list$mutations, cxt)
+  
+  if (is.null(sequenced_bp) || is.null(mutations) || nrow(sequenced_bp) == 0) {
+    warning("no data in current view for summary mode")
+    return(list(plot = gg, legends = list()))
+  }
   
   # extract library columns (exclude contig, start, end)
   coord_cols <- c("contig", "start", "end")
@@ -24,8 +30,13 @@ synteny_profile_summary <- function(profile, cxt, data_list, gg, current_binsize
     return(list(plot = gg, legends = list()))
   }
   
-  # add genomic coordinates using the standard filter_segments function
+  # add global coordinates to summary data
   summary_data <- filter_segments(summary_data, cxt, cxt$mapper$xlim)
+  
+  if (is.null(summary_data) || nrow(summary_data) == 0) {
+    warning("no summary data after coordinate mapping")
+    return(list(plot = gg, legends = list()))
+  }
   
   # create summary plot
   if (profile$color_style == "none") {
@@ -255,7 +266,6 @@ plot_summary_stacked_mutations <- function(gg, summary_data, profile) {
         category_data$hover_text <- paste0(
           "Position: ", category_data$contig, ":", category_data$start, "-", category_data$end, "\n",
           "Total libraries: ", category_data$lib_count, "\n",
-          "Avg mutation density: ", sprintf("%.3f%%", category_data$avg_mutation_density * 100), "\n",
           "This segment: ", category_data$count, " libraries\n",
           "Category: ", category_data$description
         )
@@ -288,5 +298,3 @@ plot_summary_stacked_mutations <- function(gg, summary_data, profile) {
   
   return(gg)
 }
-
-# genomic coordinates are now handled by filter_segments function

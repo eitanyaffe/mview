@@ -1,6 +1,10 @@
 # Helper for creating a synteny-based profile
 # Supports detail/summary modes based on style parameter
 
+# Load align profile functions for mutation coloring and legends
+source("profiles/align/align_profile.r")
+source("profiles/align/align_legends.r")
+
 # get current binsize for synteny data
 get_current_synteny_binsize <- function(xlim, binsize, target_bins = 200, 
     binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
@@ -41,8 +45,8 @@ get_current_synteny_binsize <- function(xlim, binsize, target_bins = 200,
   }
 }
 
-# load synteny data using synteny_f function
-load_synteny_data <- function(synteny_f, cxt, binsize, hide_self) {
+# load synteny matrices using user's simple data function
+load_synteny_matrices <- function(synteny_f, cxt, binsize, hide_self) {
   if (is.null(synteny_f)) {
     stop("synteny_f function not provided")
   }
@@ -50,15 +54,59 @@ load_synteny_data <- function(synteny_f, cxt, binsize, hide_self) {
   cache_key <- paste0("synteny_data_", cxt$assembly, "_", binsize, "_hideself_", hide_self)
   
   cache(cache_key, {
-    if (is.function(synteny_f)) {
-      synteny_f(cxt, binsize, hide_self)
-    } else {
-      synteny_f
+    # load both matrices using user's function (which handles hide_self)
+    sequenced_bp_data <- synteny_f(cxt$assembly, "sequenced_bp", binsize, hide_self)
+    mutation_data <- synteny_f(cxt$assembly, "median_mutation_density", binsize, hide_self)
+    
+    # return NULL if either dataset is missing
+    if (is.null(sequenced_bp_data) || is.null(mutation_data)) {
+      cat(sprintf("synteny data incomplete for %s, binsize %s - skipping\n", cxt$assembly, binsize))
+      return(NULL)
     }
+    
+    # check if any libraries remain after user's filtering
+    if (ncol(sequenced_bp_data) <= 3) {
+      cat(sprintf("no libraries found for %s - all libraries filtered out\n", cxt$assembly))
+      return(NULL)
+    }
+    
+    return(list(
+      sequenced_bp = sequenced_bp_data,
+      mutations = mutation_data
+    ))
   })
 }
 
-# filter synteny data to current view range
+# filter synteny matrix to current view (coordinates only, then subset full data)
+filter_synteny_matrix <- function(data_matrix, cxt) {
+  if (is.null(data_matrix) || nrow(data_matrix) == 0) {
+    return(NULL)
+  }
+  
+  # filter just the coordinate structure first
+  coord_data <- data_matrix[, c("contig", "start", "end"), drop = FALSE]
+  filtered_coords <- filter_segments(coord_data, cxt, cxt$mapper$xlim)
+  
+  if (is.null(filtered_coords) || nrow(filtered_coords) == 0) {
+    return(NULL)
+  }
+  
+  # find which rows from original data correspond to filtered coordinates
+  relevant_rows <- which(
+    data_matrix$contig %in% filtered_coords$contig & 
+    data_matrix$start %in% filtered_coords$start &
+    data_matrix$end %in% filtered_coords$end
+  )
+  
+  if (length(relevant_rows) == 0) {
+    return(NULL)
+  }
+  
+  # return filtered matrix with all columns
+  return(data_matrix[relevant_rows, , drop = FALSE])
+}
+
+# validate synteny data structure (no coordinate filtering)
 filter_synteny_data <- function(data_list, cxt, xlim) {
   if (is.null(data_list) || is.null(data_list$sequenced_bp) || is.null(data_list$mutations)) {
     return(NULL)
@@ -67,21 +115,26 @@ filter_synteny_data <- function(data_list, cxt, xlim) {
   sequenced_bp <- data_list$sequenced_bp
   mutations <- data_list$mutations
   
-  # check that both tables have same structure
-  if (!identical(sequenced_bp[, 1:3], mutations[, 1:3])) {
-    warning("sequenced_bp and mutation tables have different genomic coordinates")
+  # check data structure
+  if (nrow(sequenced_bp) == 0 || nrow(mutations) == 0) {
+    cat("synteny data tables are empty\n")
     return(NULL)
   }
   
-  # filter to current contigs and range
-  valid_rows <- sequenced_bp$contig %in% cxt$contigs
-  
-  if (!is.null(xlim) && length(xlim) == 2) {
-    # filter by genomic range
-    valid_rows <- valid_rows & 
-                  sequenced_bp$start < xlim[2] & 
-                  sequenced_bp$end > xlim[1]
+  if (ncol(sequenced_bp) < 4 || ncol(mutations) < 4) {
+    cat("synteny data tables have insufficient columns\n")
+    return(NULL)
   }
+  
+  # check that both tables have same structure
+  if (!identical(sequenced_bp[, 1:3], mutations[, 1:3])) {
+    cat("warning: sequenced_bp and mutation tables have different genomic coordinates\n")
+    return(NULL)
+  }
+  
+  # only filter to available contigs, no coordinate filtering
+  # (coordinate filtering will be handled by filter_segments)
+  valid_rows <- sequenced_bp$contig %in% cxt$contigs
   
   if (!any(valid_rows)) {
     return(NULL)
@@ -122,7 +175,7 @@ default_synteny_params <- list(
     group_id = "synteny",
     type = "select",
     choices = c("none", "mutations"),
-    default = "none"
+    default = "mutations"
   ),
   height = list(
     group_id = "synteny",
@@ -167,16 +220,16 @@ synteny_profile <- function(id, name,
     cat(sprintf("using synteny binsize: %d\n", current_binsize))
 
     # load synteny data
-    data_list <- load_synteny_data(profile$synteny_f, cxt, current_binsize, profile$hide_self)
+    data_list <- load_synteny_matrices(profile$synteny_f, cxt, current_binsize, profile$hide_self)
     if (is.null(data_list)) {
-      warning("failed to load synteny data")
+      cat(sprintf("synteny data not available for %s at binsize %d\n", cxt$assembly, current_binsize))
       return(list(plot = gg, legends = list()))
     }
 
-    # filter data to current view
+    # validate data structure (coordinate filtering handled by filter_segments in plot functions)
     filtered_data <- filter_synteny_data(data_list, cxt, cxt$mapper$xlim)
     if (is.null(filtered_data)) {
-      warning("no synteny data in current view")
+      cat(sprintf("no synteny data available for %s\n", cxt$assembly))
       return(list(plot = gg, legends = list()))
     }
 

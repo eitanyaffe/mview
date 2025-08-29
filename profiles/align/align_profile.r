@@ -233,13 +233,6 @@ default_alignment_params <- list(
     type = "double",
     default = 1
   ),
-
-  # align_bin / align_pileup - parameters for bin and pileup modes
-  target_bins = list(
-    group_id = "align_bin",
-    type = "integer",
-    default = 250
-  ),
   bin_style = list(
     group_id = "align_bin",
     type = "select",
@@ -266,6 +259,11 @@ default_alignment_params <- list(
     group_id = "align_bin",
     type = "integer",
     default = 0
+  ),
+  target_bins = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 250
   ),
   normalize_distrib_bins = list(
     group_id = "align_bin",

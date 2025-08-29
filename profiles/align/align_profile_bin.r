@@ -69,8 +69,17 @@ align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_thr
 
   # Use cache for the bin query
   df <- cache(cache_key, {
-    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, non_ref_threshold, num_threads, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length), min_indel_length = as.integer(min_indel_length))
+    aln_query_bin(aln, cxt$intervals, bin_size, seg_threshold, 
+      non_ref_threshold, num_threads, 
+      clip_mode_str = clip_mode, 
+      clip_margin = clip_margin, 
+      min_mutations_percent = as.numeric(min_mutations_percent), 
+      max_mutations_percent = as.numeric(max_mutations_percent), 
+      min_alignment_length = as.integer(min_alignment_length), 
+      max_alignment_length = as.integer(max_alignment_length), 
+      min_indel_length = as.integer(min_indel_length))
   })
+
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
     df$end <- df$end

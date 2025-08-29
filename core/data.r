@@ -45,7 +45,7 @@ list_lookup <- function() {
 }
 
 # Get data by ID with optional tag and custom read function
-get_data <- function(id, tag = "", read_f = read.delim) {
+get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE) {
   if (!exists("lookups", envir = .data_env) || is.null(.data_env$lookups)) {
     stop("lookup table not set, call set_lookup first")
   }
@@ -54,7 +54,11 @@ get_data <- function(id, tag = "", read_f = read.delim) {
 
   # Check if ID exists in lookup table
   if (!id %in% .data_env$lookups$id) {
-    stop(sprintf("data id not found: %s", id))
+    if (null.on.missing) {
+      return(NULL)
+    } else {
+      stop(sprintf("data id not found: %s", id))
+    }
   }
 
   # Get path from lookup table

@@ -9,8 +9,14 @@ format_library_name <- function(lib_name) {
 }
 
 synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize) {
-  sequenced_bp <- data_list$sequenced_bp
-  mutations <- data_list$mutations
+  # filter data to current view first using new function
+  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp, cxt)
+  mutations <- filter_synteny_matrix(data_list$mutations, cxt)
+  
+  if (is.null(sequenced_bp) || is.null(mutations) || nrow(sequenced_bp) == 0) {
+    warning("no data in current view for detail mode")
+    return(list(plot = gg, legends = list()))
+  }
   
   # extract library columns (exclude contig, start, end)
   coord_cols <- c("contig", "start", "end")
@@ -31,12 +37,11 @@ synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize)
     return(list(plot = gg, legends = list()))
   }
   
-  # add genomic coordinates using the standard filter_segments function
+  # add global coordinates to plot data
   plot_data <- filter_segments(plot_data, cxt, cxt$mapper$xlim)
   
-  # check again after filtering
   if (is.null(plot_data) || nrow(plot_data) == 0) {
-    warning("no data to plot after filtering in detail mode")
+    warning("no plot data after coordinate mapping")
     return(list(plot = gg, legends = list()))
   }
   
@@ -61,7 +66,16 @@ synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize)
       panel.grid = ggplot2::element_blank()
     )
   
-  return(list(plot = gg, legends = list()))
+  # create legends
+  legends <- list()
+  if (profile$color_style == "mutations") {
+    legend_gg <- create_mutation_density_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 210, width = 320, title = "mutation density")))
+    }
+  }
+  
+  return(list(plot = gg, legends = legends))
 }
 
 # prepare data for detail plotting
@@ -198,9 +212,10 @@ add_library_labels <- function(gg, lib_cols) {
       breaks = lib_positions,
       labels = formatted_labels,
       limits = c(0.5, length(lib_cols) + 0.5)
+    ) +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_text(size = ggplot2::rel(0.8))  # 20% smaller
     )
   
   return(gg)
 }
-
-# genomic coordinates are now handled by filter_segments function
