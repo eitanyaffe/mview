@@ -249,7 +249,7 @@ default_alignment_params <- list(
   bin_type = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("auto", "10", "100", "1000", "10000"),
+    choices = c("auto", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
     default = "auto"
   ),
   seg_threshold = list(
@@ -318,6 +318,7 @@ align_profile <- function(id, name,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           show_hover = TRUE,
+                          binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
                           params = default_alignment_params,
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -411,6 +412,7 @@ align_profile <- function(id, name,
     min_indel_length = min_indel_length,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
-    show_hover = show_hover
+    show_hover = show_hover,
+    binsizes = binsizes
   )
 }

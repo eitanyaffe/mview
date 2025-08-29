@@ -1,36 +1,46 @@
 # Bin mode for alignment profile
 
-get_current_bin_size <- function(xlim, bin_type, target_bins = 1024) {
+get_current_bin_size <- function(xlim, bin_type, target_bins = 1024, 
+    binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) {
+  
   if (bin_type != "auto") {
     bs <- as.numeric(bin_type)
-    return(max(1, bs, na.rm = TRUE))
+    if (bs %in% binsizes) {
+      return(bs)
+    } else {
+      warning(sprintf("binsize %d not available, using closest smaller binsize", bs))
+      smaller_binsizes <- binsizes[binsizes <= bs]
+      if (length(smaller_binsizes) > 0) {
+        return(max(smaller_binsizes))
+      } else {
+        return(min(binsizes))
+      }
+    }
   }
 
   if (is.null(xlim) || length(xlim) != 2) {
-    return(500)
+    return(5000)  # default binsize
   }
 
   range_bp <- (xlim[2] + 1) - xlim[1]
   if (range_bp <= 0) {
-    return(100)
+    return(1000)
   }
 
-  # Calculate raw bin size to get close to target_bins
+  # calculate raw bin size to get close to target_bins
   raw_bin_size <- range_bp / target_bins
-
-  # Ensure minimum bin size of 10, but scale down target_bins for very small windows
-  bin_size <- max(10, round(raw_bin_size))
   
-  # For very small windows, use fewer target bins to ensure reasonable bin size
-  if (range_bp < 200) {
-    bin_size <- max(10, round(range_bp / 10))  # aim for ~10 bins minimum
+  # choose the closest smaller binsize to ensure we have enough bins
+  smaller_binsizes <- binsizes[binsizes <= raw_bin_size]
+  if (length(smaller_binsizes) > 0) {
+    return(max(smaller_binsizes))
+  } else {
+    return(min(binsizes))
   }
-  
-  return(bin_size)
 }
 
-align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, min_indel_length = 3) {
-  bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type, target_bins = target_bins)
+align_query_bin_mode <- function(aln, cxt, bin_type, target_bins = 1024, seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, min_indel_length = 3, binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) {
+  bin_size <- get_current_bin_size(cxt$mapper$xlim, bin_type, target_bins = target_bins, binsizes = binsizes)
 
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
@@ -536,7 +546,7 @@ align_profile_bin <- function(profile, cxt, aln, gg) {
   non_ref_threshold <- if (!is.null(profile$non_ref_threshold)) profile$non_ref_threshold else 0.9
   num_threads <- if (!is.null(profile$num_threads)) profile$num_threads else 0
   
-  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length))
+  df <- align_query_bin_mode(aln, cxt, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length), binsizes = profile$binsizes)
   if (is.null(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }

@@ -188,6 +188,114 @@ action = function(regions_module_output, main_state_rv) {
       # trigger the add region input focus
       regions_module_output$focus_add_input()
     }
+  ),
+  "Alt+ArrowDown" = list(
+    description = "Navigate to next contig in contig table",
+    type = "navigation",
+    action = function(regions_module_output, main_state_rv) {
+      # get contig table for current assembly
+      contigs_data <- get_contigs(main_state_rv$assembly)
+      if (is.null(contigs_data) || nrow(contigs_data) == 0) {
+        cat("alt+arrowdown: no contigs available\n")
+        return()
+      }
+      
+      # check if any contigs are currently selected
+      if (length(main_state_rv$contigs) == 0) {
+        # no contigs selected, select the first contig in the table
+        regions_module_output$push_undo_state()
+        main_state_rv$contigs <- contigs_data$contig[1]
+        main_state_rv$zoom <- NULL
+        cat(sprintf("selected first contig: %s\n", contigs_data$contig[1]))
+        return()
+      }
+      
+      # find the position of the last currently selected contig in the table
+      last_contig <- tail(main_state_rv$contigs, 1)
+      current_index <- match(last_contig, contigs_data$contig)
+      
+      if (is.na(current_index)) {
+        # current contig not found in table, select first contig
+        regions_module_output$push_undo_state()
+        main_state_rv$contigs <- contigs_data$contig[1]
+        main_state_rv$zoom <- NULL
+        cat(sprintf("current contig not found, selected first: %s\n", contigs_data$contig[1]))
+        return()
+      }
+      
+      # find next contig
+      if (current_index >= nrow(contigs_data)) {
+        # already at last contig, wrap to first
+        next_index <- 1
+      } else {
+        next_index <- current_index + 1
+      }
+      
+      next_contig <- contigs_data$contig[next_index]
+      
+      # push undo state before changing
+      regions_module_output$push_undo_state()
+      
+      # set to next contig
+      main_state_rv$contigs <- next_contig
+      main_state_rv$zoom <- NULL
+      
+      cat(sprintf("navigated to next contig: %s (index %d)\n", next_contig, next_index))
+    }
+  ),
+  "Alt+ArrowUp" = list(
+    description = "Navigate to previous contig in contig table",
+    type = "navigation",
+    action = function(regions_module_output, main_state_rv) {
+      # get contig table for current assembly
+      contigs_data <- get_contigs(main_state_rv$assembly)
+      if (is.null(contigs_data) || nrow(contigs_data) == 0) {
+        cat("alt+arrowup: no contigs available\n")
+        return()
+      }
+      
+      # check if any contigs are currently selected
+      if (length(main_state_rv$contigs) == 0) {
+        # no contigs selected, select the last contig in the table
+        regions_module_output$push_undo_state()
+        main_state_rv$contigs <- contigs_data$contig[nrow(contigs_data)]
+        main_state_rv$zoom <- NULL
+        cat(sprintf("selected last contig: %s\n", contigs_data$contig[nrow(contigs_data)]))
+        return()
+      }
+      
+      # find the position of the last currently selected contig in the table
+      last_contig <- tail(main_state_rv$contigs, 1)
+      current_index <- match(last_contig, contigs_data$contig)
+      
+      if (is.na(current_index)) {
+        # current contig not found in table, select last contig
+        regions_module_output$push_undo_state()
+        main_state_rv$contigs <- contigs_data$contig[nrow(contigs_data)]
+        main_state_rv$zoom <- NULL
+        cat(sprintf("current contig not found, selected last: %s\n", contigs_data$contig[nrow(contigs_data)]))
+        return()
+      }
+      
+      # find previous contig
+      if (current_index <= 1) {
+        # already at first contig, wrap to last
+        prev_index <- nrow(contigs_data)
+      } else {
+        prev_index <- current_index - 1
+      }
+      
+      prev_contig <- contigs_data$contig[prev_index]
+      
+      # push undo state before changing
+      regions_module_output$push_undo_state()
+      
+      # set to previous contig
+      main_state_rv$contigs <- prev_contig
+      main_state_rv$zoom <- NULL
+      
+      cat(sprintf("navigated to previous contig: %s (index %d)\n", prev_contig, prev_index))
+    }
   )
 )
 
@@ -253,6 +361,10 @@ keyboard_initialize <- function() {
         key = '_';
       } else if (key === 'Equal') {
         key = '=';
+      } else if (key === 'ArrowDown') {
+        key = 'ArrowDown';
+      } else if (key === 'ArrowUp') {
+        key = 'ArrowUp';
       }
       
       if (key === 'Meta' || key === 'Alt' || key === 'Control' || key === 'Shift') return;
@@ -291,6 +403,8 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
             shortcut_details$action(regions_module_output, main_state_rv)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region") {
             shortcut_details$action(regions_module_output)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "navigation") {
+            shortcut_details$action(regions_module_output, main_state_rv)
           } else {
             cat("unknown shortcut type:", shortcut_details$type, "\n")
           }

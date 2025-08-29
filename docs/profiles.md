@@ -105,8 +105,8 @@ Plot read alignments. Depending on zoom or explicit settings, it renders coverag
 - **pileup_threshold**: bp cutoff for `auto_pileup`.
 
 #### Bin mode parameters
-  - `bin_type`: `auto` or a fixed bin size (e.g., `1000`).
-  - `target_bins`: target number of bins when `bin_type=auto`.
+  - `bin_type`: `auto` or a fixed bin size from predefined options (`1000`, `2000`, `5000`, `10000`, `20000`, `50000`, `100000`, `200000`, `500000`).
+  - `target_bins`: target number of bins when `bin_type=auto`. Auto mode selects the largest available binsize ≤ `range_bp / target_bins`.
   - `bin_style`: visualization mode for bins:
     - `by_mut_density`: traditional mutation density (gray to red scale).
     - `by_median_mutation_density`: median mutation density across alignments per bin (gray to red scale).
@@ -162,3 +162,91 @@ Mutation identifiers follow standard notation:
 - **X:Y** - substitution where base X is substituted by base Y
 - **+XYZ** - insertion where sequence XYZ was added
 - **-XYZ** - deletion where sequence XYZ was removed
+
+---
+
+### synteny profile
+
+Visualizes sequencing coverage and mutation density across genomic bins for multiple libraries. Shows which libraries have sufficient coverage in each genomic region and can display mutation patterns.
+
+#### Main parameters
+- **style**: visualization mode
+  - `summary`: shows count of qualifying libraries per genomic bin (bar chart)
+  - `detail`: shows heatmap with libraries as rows and genomic bins as columns
+- **binsize**: bin size for analysis
+  - `auto`: automatically selects optimal binsize based on view range and target_bins
+  - Fixed sizes: `1000`, `2000`, `5000`, `10000`, `20000`, `50000`, `100000`, `200000`, `500000`
+- **target_bins**: target number of bins when binsize is `auto` (default: 200)
+- **min_xcov**: minimum x-coverage threshold (sequenced_bp / binsize) for inclusion (default: 1.0)
+- **color_style**: coloring scheme
+  - `none`: gray coloring for all qualifying data points
+  - `mutations`: colored by mutation density using same red scale as alignment profile
+- **hide_self**: whether to hide libraries that start with current assembly ID (default: true)
+- **height**: vertical size of the profile in pixels (default: 400)
+
+#### Data requirements
+The synteny profile requires two input matrices with identical structure:
+1. **Sequenced bp matrix**: sequencing coverage data (bp sequenced per bin per library)
+2. **Mutation density matrix**: median mutation density per bin per library
+
+Both matrices must have:
+- First 3 columns: `contig`, `start`, `end` (genomic coordinates)
+- Remaining columns: library data (one column per library)
+
+#### Data function
+The profile expects a `synteny_f` function that returns both matrices:
+```r
+get_synteny_f <- function(cxt, binsize, hide_self = TRUE) {
+  sequenced_bp_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
+                               tag = paste0(cxt$assembly, "_sequenced_bp_", binsize))
+  
+  mutation_data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
+                           tag = paste0(cxt$assembly, "_median_mutation_density_", binsize))
+  
+  # optionally filter out self-assembly libraries
+  if (hide_self) {
+    # filter libraries starting with current assembly ID
+    coord_cols <- c("contig", "start", "end")
+    lib_cols <- setdiff(colnames(sequenced_bp_data), coord_cols)
+    assembly_prefix <- paste0(cxt$assembly, "_")
+    keep_libs <- lib_cols[!startsWith(lib_cols, assembly_prefix)]
+    keep_cols <- c(coord_cols, keep_libs)
+    
+    sequenced_bp_data <- sequenced_bp_data[, keep_cols, drop = FALSE]
+    mutation_data <- mutation_data[, keep_cols, drop = FALSE]
+  }
+  
+  return(list(
+    sequenced_bp = sequenced_bp_data,
+    mutations = mutation_data
+  ))
+}
+```
+
+#### Display behavior
+- **Summary mode**: Y-axis shows count of libraries meeting min_xcov threshold per bin
+- **Detail mode**: Y-axis shows library names, X-axis shows genomic position; only displays bins where library meets threshold
+- **X-coverage calculation**: `sequenced_bp / binsize` determines if library qualifies for each bin
+- **Automatic binsize selection**: chooses largest available binsize ≤ `range_bp / target_bins`
+- **Hover information**: shows position, coverage, mutation density, and library details
+
+#### Usage example
+```r
+# Load synteny profile components
+source("profiles/synteny/synteny_profile.r")
+source("profiles/synteny/synteny_profile_detail.r") 
+source("profiles/synteny/synteny_profile_summary.r")
+
+# Create synteny profile
+synteny_profile(
+  id = "synteny",
+  name = "synteny",
+  synteny_f = get_synteny_f,
+  params = default_synteny_params
+)
+```
+
+**Notes**:
+- Uses standard mview genomic coordinate mapping and filtering
+- Integrates with parameter system for interactive control
+- Compatible with mview's caching and view management
