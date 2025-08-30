@@ -215,7 +215,7 @@ default_alignment_params <- list(
   auto_threshold = list(
     group_id = "align_general",
     type = "integer",
-    default = 50000
+    default = 100000
   ),
   max_reads = list(
     group_id = "align_full",
@@ -298,7 +298,7 @@ align_profile <- function(id, name,
                           bin_type = "auto",
                           plot_style = "auto",
                           mutation_color_mode = "detailed",
-                          auto_threshold = 50000,
+                          auto_threshold = 100000,
                           pileup_threshold = 200,
                           use_pileup = FALSE,
                           target_bins = 100,
@@ -337,7 +337,7 @@ align_profile <- function(id, name,
     if (plot_style == "auto") {
       if (use_pileup && range_bp <= pileup_threshold) {
         return("pileup")
-      } else if (range_bp <= auto_threshold) {
+      } else if (range_bp <= (auto_threshold + 1)) {
         return("full")
       } else {
         return("bin")
