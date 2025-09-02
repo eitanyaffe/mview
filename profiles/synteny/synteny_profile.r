@@ -7,7 +7,7 @@ source("profiles/align/align_legends.r")
 
 # get current binsize for synteny data
 get_current_synteny_binsize <- function(xlim, binsize, target_bins = 200, 
-    binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
+    binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
 {  
   if (binsize != "auto") {
     bs <- as.numeric(binsize)
@@ -158,7 +158,7 @@ default_synteny_params <- list(
   binsize = list(
     group_id = "synteny",
     type = "select",
-    choices = c("auto", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
+    choices = c("auto", "200", "500", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
     default = "auto"
   ),
   target_bins = list(
@@ -204,7 +204,7 @@ synteny_profile <- function(id, name,
                            height = 400,
                            show_hover = TRUE,
                            hide_self = TRUE,
-                           binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
+                           binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
                            params = default_synteny_params,
                            auto_register = TRUE) {
                            

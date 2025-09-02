@@ -1,7 +1,7 @@
 # Bin mode for alignment profile
 
 get_current_bin_size <- function(xlim, bin_type, target_bins = 1024, 
-    binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) {
+    binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) {
   
   if (bin_type != "auto") {
     bs <- as.numeric(bin_type)
