@@ -49,6 +49,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       create_empty_region_table <- function() {
         data.frame(
           id = character(),
+          level = integer(),
           description = character(),
           assembly = character(),
           contigs = character(),
@@ -62,26 +63,39 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         )
       }
       
-      # migrate region table to add segment columns if missing
+      # migrate region table to add missing columns
       migrate_region_table <- function(rt) {
-        required_new_cols <- c("segment_contig", "segment_start", "segment_end", "single_contig")
+        required_new_cols <- c("level", "segment_contig", "segment_start", "segment_end", "single_contig")
         missing_cols <- setdiff(required_new_cols, colnames(rt))
         
         if (length(missing_cols) == 0) {
           return(rt)
         }
         
-        cat("migrating regions table: adding segment columns\n")
+        cat("migrating regions table: adding", paste(missing_cols, collapse = ", "), "columns\n")
         
         # add missing columns with default values
         for (col in missing_cols) {
-          if (col == "segment_contig") {
+          if (col == "level") {
+            rt[[col]] <- rep(3L, nrow(rt))  # default level is 1
+          } else if (col == "segment_contig") {
             rt[[col]] <- character(nrow(rt))
           } else if (col %in% c("segment_start", "segment_end")) {
             rt[[col]] <- integer(nrow(rt))
           } else if (col == "single_contig") {
             rt[[col]] <- logical(nrow(rt))
           }
+        }
+        
+        # ensure level column is in correct position (second column after id)
+        if ("level" %in% missing_cols && "id" %in% colnames(rt)) {
+          col_order <- colnames(rt)
+          id_pos <- which(col_order == "id")
+          level_pos <- which(col_order == "level")
+          
+          # reorder columns to put level right after id
+          new_order <- c(col_order[1:id_pos], "level", col_order[setdiff(seq_along(col_order), c(id_pos, level_pos))])
+          rt <- rt[, new_order, drop = FALSE]
         }
         
         # compute segment information for each row
@@ -425,6 +439,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
+          shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
@@ -437,8 +452,10 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       observeEvent(input$confirm_add_region, {
         req(input$add_region_description)
         req(input$add_region_id)
+        req(input$add_region_level)
         description <- trimws(input$add_region_description)
         custom_id <- trimws(input$add_region_id)
+        level <- as.integer(input$add_region_level)
         
         if (description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
@@ -447,6 +464,11 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         if (custom_id == "") {
           shiny::showNotification("ID cannot be empty", type = "error")
+          return()
+        }
+        
+        if (is.na(level) || level < 1 || level > 10) {
+          shiny::showNotification("level must be between 1 and 10", type = "error")
           return()
         }
         
@@ -471,6 +493,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         new_row <- data.frame(
           id = custom_id,
+          level = level,
           description = description,
           assembly = current_app_state$assembly %||% "",
           contigs = contigs_str,
@@ -510,6 +533,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         shiny::showModal(shiny::modalDialog(
           title = "Edit Region",
           shiny::textInput(ns("edit_id_input"), "Region ID:", value = row_data$id, placeholder = "Enter region ID"),
+          shiny::numericInput(ns("edit_level_input"), "Level:", value = if("level" %in% colnames(row_data)) row_data$level else 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("edit_description_input"), "Description:", value = row_data$description),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
@@ -522,11 +546,13 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       observeEvent(input$confirm_edit_region, {
         req(input$edit_description_input)
         req(input$edit_id_input)
+        req(input$edit_level_input)
         selected_rows <- input$region_table_display_rows_selected
         if (length(selected_rows) == 0) return()
         
         new_description <- trimws(input$edit_description_input)
         new_id <- trimws(input$edit_id_input)
+        new_level <- as.integer(input$edit_level_input)
         
         if (new_description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
@@ -535,6 +561,11 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         if (new_id == "") {
           shiny::showNotification("ID cannot be empty", type = "error")
+          return()
+        }
+        
+        if (is.na(new_level) || new_level < 1 || new_level > 10) {
+          shiny::showNotification("level must be between 1 and 10", type = "error")
           return()
         }
         
@@ -548,6 +579,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         current_table[selected_rows[1], "id"] <- new_id
+        current_table[selected_rows[1], "level"] <- new_level
         current_table[selected_rows[1], "description"] <- new_description
         region_table(current_table)
         save_region_table(current_regions_file())
@@ -662,6 +694,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         # create display table with formatted columns
         display_table <- data.frame(
           ID = rt$id,
+          Level = if("level" %in% colnames(rt)) rt$level else rep(1L, nrow(rt)),
           Description = rt$description,
           Assembly = rt$assembly,
           Contigs = sapply(rt$contigs, function(x) {
@@ -767,6 +800,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
+          shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
