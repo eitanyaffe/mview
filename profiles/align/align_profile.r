@@ -153,7 +153,7 @@ default_alignment_params <- list(
   clip_mode = list(
     group_id = "align_filter",
     type = "select",
-    choices = c("all", "complete", "allow_one_side_clip", "only_one_side_clipped", "only_two_side_clipped", "only_clipped"),
+    choices = c("all", "complete", "allow_one_side_clip", "only_one_side_clipped", "only_two_side_clipped", "only_clipped", "local_align"),
     default = "all"
   ),
   clip_margin = list(
