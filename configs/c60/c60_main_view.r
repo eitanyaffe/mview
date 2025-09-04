@@ -109,8 +109,7 @@ get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
 get_consensus_f <- function(assembly) {
   data <- get_data("MINIMAP_SYNTENY_CONSENSUS_MERGED", 
                    tag = assembly,
-                   read_f = readRDS,
-                   force.read = TRUE)
+                   read_f = readRDS)
   return(data)
 }
 
