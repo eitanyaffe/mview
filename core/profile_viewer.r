@@ -10,7 +10,6 @@ library(plotly)
 #' @param profile The profile object
 #' @return A ggplot object with base layers (grid, y-label, etc.)
 pre_plot <- function(cxt, profile) {
-  # Minimal base plot with xlim from cxt$mapper, y-label from profile$attr$title
   gg <- ggplot2::ggplot() +
     ggplot2::coord_cartesian(xlim = cxt$mapper$xlim) +
     ggplot2::theme(
@@ -179,7 +178,7 @@ plot_profiles <- function(cxt) {
 
   # Configure the combined plot
   layout_args <- list(
-    xaxis = list(title = ""),
+    xaxis = list(title = "", range = cxt$mapper$xlim),
     margin = list(l = 150, r = 20, t = 30, b = 30)
   )
   
