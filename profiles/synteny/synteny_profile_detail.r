@@ -230,10 +230,10 @@ plot_detail_bins <- function(gg, plot_data, profile, color_mode = "gray", bin_ga
   # set colors and hover text based on mode
   if (color_mode == "gray") {
     plot_data$fill_color <- "#c0c0c0"
-    # plot_data$hover_text <- create_detail_hover_text(plot_data, profile, include_mutations = FALSE)
+    plot_data$hover_text <- create_detail_hover_text(plot_data, profile, include_mutations = FALSE)
   } else { # mutations mode
     plot_data$fill_color <- get_mutation_colors(plot_data$mutation_density)
-    # plot_data$hover_text <- create_detail_hover_text(plot_data, profile, include_mutations = TRUE)
+    plot_data$hover_text <- create_detail_hover_text(plot_data, profile, include_mutations = TRUE)
   }
   
   # add rectangles for each library-bin combination

@@ -7,7 +7,15 @@ get_intervals <- function(mapper, zoom) {
   }
   start_rr <- mapper$g2l(cdf$start + 1)
   end_rr <- mapper$g2l(cdf$end)
-  rr <- data.frame(contig = cdf$contig, start = start_rr$coord + 1, end = end_rr$coord)
+  
+  # create intervals dataframe with validation
+  start_coords <- start_rr$coord + 1
+  end_coords <- end_rr$coord
+  
+  # ensure end >= start for all intervals
+  end_coords <- pmax(end_coords, start_coords)
+  
+  rr <- data.frame(contig = cdf$contig, start = start_coords, end = end_coords)
 }
 
 build_context <- function(state_contigs, contig_table, zoom, assembly) {

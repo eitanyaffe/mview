@@ -405,6 +405,10 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
             shortcut_details$action(regions_module_output)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "navigation") {
             shortcut_details$action(regions_module_output, main_state_rv)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "state_load") {
+            shortcut_details$action(shortcut_details$state_number, session)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "state_save") {
+            shortcut_details$action(shortcut_details$state_number, session)
           } else {
             cat("unknown shortcut type:", shortcut_details$type, "\n")
           }
@@ -475,18 +479,17 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
 
 # Generate keyboard shortcuts documentation for help
 keyboard_summary <- function() {
-  # separate alt+N zoom shortcuts for cleaner display
+  # separate different types of shortcuts for cleaner display
   alt_zoom_shortcuts <- grep("^Alt\\+[2-7]$", names(keyboard_shortcuts), value = TRUE)
-  other_shortcuts <- setdiff(names(keyboard_shortcuts), alt_zoom_shortcuts)
+  state_load_shortcuts <- grep("^Ctrl\\+[1-9]$", names(keyboard_shortcuts), value = TRUE)
+  state_save_shortcuts <- grep("^Ctrl\\+Alt\\+[1-9]$", names(keyboard_shortcuts), value = TRUE)
+  tab_shortcuts <- names(keyboard_shortcuts)[sapply(keyboard_shortcuts, function(x) x$type == "tab_switch")]
+  other_shortcuts <- setdiff(names(keyboard_shortcuts), c(alt_zoom_shortcuts, state_load_shortcuts, state_save_shortcuts, tab_shortcuts))
   
   html_content <- "<h5>Actions</h5><ul>"
   
-  # add non-tab switch, non-alt+N shortcuts first
+  # add main action shortcuts first
   for (shortcut_name in other_shortcuts) {
-    type <- keyboard_shortcuts[[shortcut_name]]$type
-    if (type == "tab_switch") {
-      next
-    }
     html_content <- paste0(
       html_content,
       "<li><strong>", shortcut_name, ":</strong> ",
@@ -494,10 +497,20 @@ keyboard_summary <- function() {
     )
   }
   
-  # add alt+N shortcuts as a group
+  # add grouped shortcuts
   if (length(alt_zoom_shortcuts) > 0) {
     html_content <- paste0(html_content, 
       "<li><strong>Alt+N (N=2-7):</strong> zoom to 10^N basepairs around current center</li>")
+  }
+  
+  if (length(state_load_shortcuts) > 0) {
+    html_content <- paste0(html_content, 
+      "<li><strong>Ctrl+N (N=1-9):</strong> load state N</li>")
+  }
+  
+  if (length(state_save_shortcuts) > 0) {
+    html_content <- paste0(html_content, 
+      "<li><strong>Ctrl+Alt+N (N=1-9):</strong> save state N</li>")
   }
   
   html_content <- paste0(html_content, "</ul>")

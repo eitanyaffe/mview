@@ -77,6 +77,11 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler('updateReadonlyInput', function(data) {
         document.getElementById(data.id).value = data.value;
       });
+      
+      // handle triggering save dialog from keyboard shortcuts
+      Shiny.addCustomMessageHandler('triggerStateSave', function(stateNumber) {
+        document.getElementById('save_state_' + stateNumber).click();
+      });
     "))
   ),
   tags$style(HTML("
@@ -181,7 +186,9 @@ ui <- fluidPage(
       verbatimTextOutput("last_key_output"),
       actionButton("refreshBtn", "Refresh", icon = icon("refresh")),
       actionButton("helpBtn", "Help"),
-      actionButton("aboutBtn", "About")
+      actionButton("aboutBtn", "About"),
+      br(), br(),
+      uiOutput("state_buttons_ui")
     ),
     column(
       width = 10,

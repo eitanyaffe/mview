@@ -6,6 +6,7 @@ get_server <- function() {
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
+        source("core/server_states.r", local = TRUE)
 
         # load tabs
         load_tabs()
@@ -58,6 +59,9 @@ rl_core <- function(project_id) {
 
     # keyboard
     source("core/keyboard.r", local = FALSE)
+
+    # states
+    source("core/states.r", local = FALSE)
 
     # profiles
     source("core/profile_manager.r", local = FALSE)
