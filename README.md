@@ -200,6 +200,27 @@ Region files are saved as `[name].txt` with automatic backup versions stored in 
 
 Saved regions are automatically displayed in the segments profile, which shows each single-contig region as a colored rectangle with its ID label. This provides immediate visual feedback when navigating between regions and helps identify overlapping or adjacent saved areas. The regions profile appears between the gene and axis profiles in both the c60 and minimal configurations.
 
+### States
+
+The States feature allows you to save and restore complete visualization configurations, including the selected view and all profile parameter settings. This enables quick switching between different analysis setups.
+
+#### Managing states
+
+**Save states**: Use the save buttons (S1-S9) in the left panel or press Ctrl+Alt+N (N=1-9) to save the current view and all parameter values. You'll be prompted to enter a descriptive title for the state.
+
+**Load states**: Use the load buttons (L1-L9) in the left panel or press Ctrl+N (N=1-9) to restore a previously saved state. The visualization will switch to the saved view and apply all saved parameter settings.
+
+**State display**: The title of each saved state is displayed next to its buttons. Empty states show "empty".
+
+#### State files
+
+States are automatically saved as JSON files in the `.states/` directory as `state_1.json` through `state_9.json`. Each state file contains:
+- View selection
+- All profile parameter values  
+- Metadata (title, timestamp, mview version)
+
+States provide a powerful way to maintain different analysis workflows and quickly switch between visualization setups without manually reconfiguring parameters.
+
 ## Working with your data
 
 See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing data files and configuration.
