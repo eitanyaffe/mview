@@ -1,13 +1,12 @@
 # Helper for creating a synteny-based profile
 # Supports detail/summary modes based on style parameter
 
-# Load align profile functions for mutation coloring and legends
-source("profiles/align/align_profile.r")
-source("profiles/align/align_legends.r")
+# Load shared utilities for mutation coloring and legends
+source("profiles/align/align_utils.r")
 
 # get current binsize for synteny data
 get_current_synteny_binsize <- function(xlim, binsize, target_bins = 200, 
-    binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
+    binsizes = c(500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
 {  
   if (binsize != "auto") {
     bs <- as.numeric(binsize)
@@ -74,6 +73,50 @@ load_synteny_matrices <- function(synteny_f, cxt, binsize, hide_self) {
       sequenced_bp = sequenced_bp_data,
       mutations = mutation_data
     ))
+  })
+}
+
+# load consensus data using user's consensus function and create efficient key structure
+load_consensus_data <- function(consensus_f, cxt, current_binsize) {
+  if (is.null(consensus_f)) {
+    return(NULL)
+  }
+  
+  cache_key <- paste0("consensus_data_", cxt$assembly, "_binsize_", current_binsize)
+  cache(cache_key, {
+    # load consensus data using user's function
+    consensus_data <- consensus_f(cxt$assembly)
+
+    if (is.null(consensus_data)) {
+      cat(sprintf("consensus data not available for %s\n", cxt$assembly))
+      return(NULL)
+    }
+    
+    # validate that it's a data frame (new structure)
+    if (!is.data.frame(consensus_data)) {
+      cat(sprintf("consensus data for %s is not a data frame\n", cxt$assembly))
+      return(NULL)
+    }
+    
+    if (nrow(consensus_data) == 0) {
+      cat(sprintf("no consensus data found for %s\n", cxt$assembly))
+      return(NULL)
+    }
+    
+    # validate required columns
+    required_cols <- c("lib_id", "contig", "position", "variant_type", "variant_desc", "count", "coverage", "frequency")
+    missing_cols <- required_cols[!required_cols %in% names(consensus_data)]
+    if (length(missing_cols) > 0) {
+      stop(sprintf("missing required columns in consensus data: %s", paste(missing_cols, collapse = ", ")))
+    }
+    
+    # create bin keys for efficient filtering
+    consensus_data$bin_start <- floor(consensus_data$position / current_binsize) * current_binsize
+    consensus_data$key <- paste(consensus_data$lib_id, consensus_data$contig, consensus_data$bin_start, sep = "_")
+    
+    cat(sprintf("loaded consensus data for %s (%d mutations)\n", 
+                cxt$assembly, nrow(consensus_data)))
+    return(consensus_data)
   })
 }
 
@@ -158,7 +201,7 @@ default_synteny_params <- list(
   binsize = list(
     group_id = "synteny",
     type = "select",
-    choices = c("auto", "200", "500", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
+    choices = c("auto", "500", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
     default = "auto"
   ),
   target_bins = list(
@@ -191,11 +234,38 @@ default_synteny_params <- list(
     group_id = "synteny",
     type = "boolean",
     default = TRUE
+  ),
+  show_mutations = list(
+    group_id = "synteny",
+    type = "boolean",
+    default = FALSE
+  ),
+  lib_grepl = list(
+    group_id = "synteny",
+    type = "string",
+    default = ""
+  ),
+  mutation_color_mode = list(
+    group_id = "mutations",
+    type = "select", 
+    choices = c("detailed", "type"),
+    default = "detailed"
+  ),
+  full_threshold = list(
+    group_id = "mutations",
+    type = "integer",
+    default = 200000
+  ),
+  full_mutation_lwd = list(
+    group_id = "mutations", 
+    type = "double",
+    default = 1
   )
 )
 
 synteny_profile <- function(id, name,
                            synteny_f = NULL,
+                           consensus_f = NULL,
                            style = "summary",
                            binsize = "auto",
                            target_bins = 200,
@@ -204,7 +274,12 @@ synteny_profile <- function(id, name,
                            height = 400,
                            show_hover = TRUE,
                            hide_self = TRUE,
-                           binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
+                           lib_grepl = "",
+                           full_threshold = 200000,
+                           mutation_color_mode = "detailed",
+                           show_mutations = FALSE,
+                           full_mutation_lwd = 1,
+                           binsizes = c(500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
                            params = default_synteny_params,
                            auto_register = TRUE) {
                            
@@ -247,6 +322,7 @@ synteny_profile <- function(id, name,
     params = params, plot_f = plot_f,
     auto_register = auto_register,
     synteny_f = synteny_f,
+    consensus_f = consensus_f,
     style = style,
     binsize = binsize,
     target_bins = target_bins,
@@ -254,6 +330,12 @@ synteny_profile <- function(id, name,
     color_style = color_style,
     show_hover = show_hover,
     hide_self = hide_self,
+    lib_grepl = lib_grepl,
+    full_threshold = full_threshold,
+    mutation_color_mode = mutation_color_mode,
+    show_mutations = show_mutations,
+    full_mutation_lwd = full_mutation_lwd,
     binsizes = binsizes
   )
 }
+

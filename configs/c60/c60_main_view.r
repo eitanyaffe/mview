@@ -105,11 +105,21 @@ get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
   return(data)
 }
 
+# consensus data function - loads the merged consensus RDS file
+get_consensus_f <- function(assembly) {
+  data <- get_data("MINIMAP_SYNTENY_CONSENSUS_MERGED", 
+                   tag = assembly,
+                   read_f = readRDS,
+                   force.read = TRUE)
+  return(data)
+}
+
 # summary synteny profile
 synteny_profile(
   id = "synteny",
   name = "synteny",
   synteny_f = get_synteny_f,
+  consensus_f = get_consensus_f,
   params = default_synteny_params
 )
 
@@ -128,13 +138,31 @@ gene_profile(
 )
 
 ########################################################
+# assembly segments profile
+########################################################
+
+segments_profile(
+  id = "assembly_segments",
+  name = "Assembly Segments",
+  height = 40,
+  segments_f = function(assembly) {
+    data <- get_data("CAV_REFINE_SEGMENT_TABLE", 
+                     tag = assembly,
+                     null.on.missing = TRUE)
+    data$desc <- data$segment        
+    data$id <- ""
+    data
+  }
+)
+
+########################################################
 # regions segments profile
 ########################################################
 
 segments_profile(
   id = "regions",
   name = "Regions",
-  segments_data = "segments.current_regions"
+  segments_f = "segments.current_regions"
 )
 
 ########################################################

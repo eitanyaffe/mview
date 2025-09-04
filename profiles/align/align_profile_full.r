@@ -71,7 +71,8 @@ min_indel_length = 3) {
   if (!is.null(df$alignments) && nrow(df$alignments) > 0) {
     alns <- df$alignments
     alns$contig <- alns$contig_id
-    alns$start <- alns$contig_start + 1
+    # alntools full mode outputs 1-based coordinates  
+    alns$start <- alns$contig_start
     alns$end <- alns$contig_end
     alignments <- filter_segments(alns, cxt, cxt$mapper$xlim)
   }
@@ -81,7 +82,8 @@ min_indel_length = 3) {
   if (!is.null(df$mutations) && nrow(df$mutations) > 0) {
     muts <- df$mutations
     muts$contig <- muts$contig_id
-    muts$coord <- muts$position + 1
+    # alntools full mode outputs 1-based coordinates
+    muts$coord <- muts$position
     mutations <- filter_coords(muts, cxt, cxt$mapper$xlim)
   }
 
@@ -90,7 +92,8 @@ min_indel_length = 3) {
   if (!is.null(df$reads) && nrow(df$reads) > 0) {
     reads <- df$reads
     reads$contig <- reads$contig_id
-    reads$start <- reads$span_start + 1
+    # alntools full mode outputs 1-based coordinates
+    reads$start <- reads$span_start
     reads$end <- reads$span_end
     reads <- filter_segments(reads, cxt, cxt$mapper$xlim)
   }
@@ -122,9 +125,6 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
     cat(sprintf("plotting %d reads\n", nrow(df$reads)))
     reads <- df$reads
-    # clip gstart and gend to xlim
-    reads$gstart <- pmax(reads$gstart, cxt$mapper$xlim[1])
-    reads$gend <- pmin(reads$gend, cxt$mapper$xlim[2])
 
     # create hover text only if enabled
     if (profile$show_hover) {
@@ -168,9 +168,6 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     alignments$clipped_left <- ifelse(!alignments$is_reverse, clip_read_start, clip_read_end) & left_in_plot
     alignments$clipped_right <- ifelse(!alignments$is_reverse, clip_read_end, clip_read_start) & right_in_plot
     
-    # clip gstart and gend to xlim
-    alignments$gstart <- pmax(alignments$gstart, cxt$mapper$xlim[1])
-    alignments$gend <- pmin(alignments$gend, cxt$mapper$xlim[2])
 
     # set colors based on color mode
     alignments$color <- get_alignment_colors(alignments, reads, profile$full_style)
@@ -236,27 +233,12 @@ align_profile_full <- function(profile, cxt, aln, gg) {
   # baseline at y=0
   gg <- gg + ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
 
-  # Plot mutations
+  # Plot mutations using unified function
   if (!is.null(df$mutations) && nrow(df$mutations) > 0 && profile$full_style == "show_mutations") {
-    cat(sprintf("plotting %d mutations\n", nrow(df$mutations)))
     mutations <- df$mutations
     mutations = mutations[is.element(mutations$read_id, df$reads$read_id), ]
 
-    # sample if too many mutations
-    if (nrow(mutations) > profile$max_mutations) {
-      mutations <- mutations[sample(nrow(mutations), profile$max_mutations), ]
-      cat(sprintf("sampled to %d mutations\n", profile$max_mutations))
-    }
-    
-    # choose color function based on mutation_color_mode
-    if (profile$mutation_color_mode == "type") {
-      mutations$fill_color <- get_mutation_type_colors(mutations$desc)
-    } else {
-      # detailed mode (default)
-      mutations$fill_color <- get_variant_type_colors(mutations$desc)
-    }
-
-    # create hover text only if enabled
+    # build hover text for align-specific format
     if (profile$show_hover) {
       mutations$hover_text <- paste0(
         "Read: ", mutations$read_id, "\n",
@@ -267,35 +249,12 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       mutations$hover_text <- ""
     }
 
-    # show rectangles when zoomed in under 100bp, otherwise segments
-    xlim_range <- cxt$mapper$xlim[2] - cxt$mapper$xlim[1]
-    if (xlim_range < 1000) {
-      # plot mutation rectangles
-      gg <- gg + ggplot2::geom_rect(
-        data = mutations,
-        ggplot2::aes(
-          xmin = gcoord - 0.5, xmax = gcoord + 0.5,
-          ymin = height, ymax = height + 1,
-          fill = fill_color,
-          text = hover_text
-        ),
-        color = NA
-      ) +
-        ggplot2::scale_fill_identity()
-    } else {
-      # plot mutation segments
-      gg <- gg + ggplot2::geom_segment(
-        data = mutations,
-        ggplot2::aes(
-          x = gcoord, xend = gcoord,
-          y = height, yend = height + 1,
-          color = fill_color,
-          text = hover_text
-        ),
-        size = profile$full_mutation_lwd
-      ) +
-        ggplot2::scale_color_identity()
-    }
+    # add ybottom and ytop for align profile (height and height + 1)
+    mutations$ybottom <- mutations$height
+    mutations$ytop <- mutations$height + 1
+
+    # use unified mutation plotting function
+    gg <- plot_mutations_unified(gg, mutations, profile, cxt)
   }
   
   # apply force_max_y if set

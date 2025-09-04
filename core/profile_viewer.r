@@ -12,7 +12,7 @@ library(plotly)
 pre_plot <- function(cxt, profile) {
   # Minimal base plot with xlim from cxt$mapper, y-label from profile$attr$title
   gg <- ggplot2::ggplot() +
-    ggplot2::xlim(cxt$mapper$xlim) +
+    ggplot2::coord_cartesian(xlim = cxt$mapper$xlim) +
     ggplot2::theme(
       axis.title.x = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_blank(),

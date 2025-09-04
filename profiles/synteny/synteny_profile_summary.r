@@ -1,6 +1,9 @@
 # Summary mode for synteny profile  
 # Shows count of libraries per bin that meet coverage threshold
 
+# Load shared utilities for mutation coloring and legends
+source("profiles/align/align_utils.r")
+
 synteny_profile_summary <- function(profile, cxt, data_list, gg, current_binsize) {
   # filter data to current view first using new function
   sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp, cxt)
@@ -74,6 +77,16 @@ categorize_mutation_density <- function(mut_density) {
 
 # prepare summary data by counting libraries per bin and mutation category
 prepare_summary_data <- function(sequenced_bp, mutations, lib_cols, profile, current_binsize) {
+  # apply lib_grepl filtering to library columns early
+  if (!is.null(profile$lib_grepl) && profile$lib_grepl != "") {
+    lib_cols <- lib_cols[grepl(profile$lib_grepl, lib_cols)]
+    if (length(lib_cols) == 0) {
+      cat(sprintf("no libraries match grepl pattern '%s'\n", profile$lib_grepl))
+      return(data.frame())
+    }
+    cat(sprintf("filtered to %d libraries matching pattern '%s'\n", length(lib_cols), profile$lib_grepl))
+  }
+  
   summary_data <- data.frame()
   
   for (i in seq_len(nrow(sequenced_bp))) {

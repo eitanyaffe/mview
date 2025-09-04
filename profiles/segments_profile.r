@@ -8,7 +8,7 @@ default_segments_params <- list(
 )
 
 segments_profile <- function(id, name, height = 40,
-                            segments_data = NULL,
+                            segments_f = NULL,
                             color = "#2E86AB",
                             params = default_segments_params,
                             auto_register = TRUE) {
@@ -16,24 +16,31 @@ segments_profile <- function(id, name, height = 40,
   plot_f <- function(profile, cxt, gg) {
     # get segments data
     segments <- NULL
-    if (is.character(profile$segments_data)) {
+    if (is.function(profile$segments_f)) {
+      # function provided
+      segments <- profile$segments_f(cxt$assembly)
+    } else if (is.character(profile$segments_f)) {
       # cache key provided
-      if (cache_exists(profile$segments_data)) {
-        segments <- cache_get(profile$segments_data)
+      if (cache_exists(profile$segments_f)) {
+        segments <- cache_get(profile$segments_f)
       }
-    } else if (is.data.frame(profile$segments_data)) {
+    } else if (is.data.frame(profile$segments_f)) {
       # direct data frame provided
-      segments <- profile$segments_data
+      segments <- profile$segments_f
     }
     
     if (is.null(segments) || nrow(segments) == 0) {
       return(list(plot = gg, legends = list()))
     }
     
-    # filter segments by current assembly first
-    assembly_segments <- segments[segments$assembly == cxt$assembly, ]
-    if (is.null(assembly_segments) || nrow(assembly_segments) == 0) {
-      return(list(plot = gg, legends = list()))
+    # filter segments by current assembly first (if assembly column exists)
+    if ("assembly" %in% colnames(segments)) {
+      assembly_segments <- segments[segments$assembly == cxt$assembly, ]
+      if (is.null(assembly_segments) || nrow(assembly_segments) == 0) {
+        return(list(plot = gg, legends = list()))
+      }
+    } else {
+      assembly_segments <- segments
     }
     
     # filter segments using context
@@ -41,6 +48,7 @@ segments_profile <- function(id, name, height = 40,
     if (is.null(filtered_segments) || nrow(filtered_segments) == 0) {
       return(list(plot = gg, legends = list()))
     }
+    
     
     # use profile settings directly (minimal approach)
     current_color <- profile$color
@@ -58,7 +66,8 @@ segments_profile <- function(id, name, height = 40,
         data = filtered_segments,
         ggplot2::aes(
           xmin = gstart, xmax = gend,
-          ymin = -0.15, ymax = 0.15
+          ymin = -0.15, ymax = 0.15,
+          text = hover_text
         ),
         fill = current_color,
         color = "black",
@@ -87,7 +96,7 @@ segments_profile <- function(id, name, height = 40,
     id = id, name = name, type = "segments", height = height,
     attr = list(hide_y_ticks = TRUE),
     params = params, plot_f = plot_f,
-    segments_data = segments_data,
+    segments_f = segments_f,
     color = color,
     auto_register = auto_register
   )

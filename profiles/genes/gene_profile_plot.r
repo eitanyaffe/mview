@@ -61,9 +61,6 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
     return(list(plot = gg, legends = list()))
   }
 
-  # clip so that genes are not plotted outside of the visible range
-  df$gstart <- pmax(df$gstart, cxt$mapper$xlim[1])
-  df$gend <- pmin(df$gend, cxt$mapper$xlim[2])
 
   # assign colors based on color field
   df <- assign_gene_colors(df, profile)

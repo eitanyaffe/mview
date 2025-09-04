@@ -309,7 +309,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         region_table(df)
         set_current_regions_file(filename)
-        shiny::showNotification(paste("loaded regions from", filename), type = "message")
       }
 
       # --- Event Handlers ---

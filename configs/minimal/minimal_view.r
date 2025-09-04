@@ -51,7 +51,7 @@ gene_profile(
 segments_profile(
   id = "regions",
   name = "Regions",
-  segments_data = "segments.current_regions"
+  segments_f = "segments.current_regions"
 )
 
 ########################################################

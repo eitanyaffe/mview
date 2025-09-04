@@ -18,7 +18,8 @@ Hover is available in all profiles to reveal information about the plotted eleme
 Display genomic segments as colored rectangles with customizable data sources. Designed for visualizing regions, annotations, or any segmented genomic features.
 
 #### Main parameters
-- **segments_data**: data source, can be:
+- **segments_f**: data source, can be:
+  - Function: takes assembly as parameter and returns segment data (e.g., `function(assembly) get_data("CAV_REFINE_SEGMENT_TABLE", tag = assembly)`)
   - Cache key (string): references cached segment data (e.g., `"segments.current_regions"`)
   - Data frame: direct segment data with required columns (`assembly`, `contig`, `start`, `end`, `desc`, `id`)
 - **color**: fill color for segment rectangles (default: `"#2E86AB"`)
@@ -42,18 +43,27 @@ Segment data requires these columns:
 
 #### Usage examples
 ```r
+# Assembly segments with function
+segments_profile(
+  id = "assembly_segments",
+  name = "Assembly Segments",
+  segments_f = function(assembly) {
+    get_data("CAV_REFINE_SEGMENT_TABLE", tag = assembly)
+  }
+)
+
 # Basic segments profile with cache data
 segments_profile(
   id = "regions",
   name = "Regions", 
-  segments_data = "segments.current_regions"
+  segments_f = "segments.current_regions"
 )
 
 # Custom segments with direct data and styling
 segments_profile(
   id = "annotations",
   name = "Annotations",
-  segments_data = my_segments_df,
+  segments_f = my_segments_df,
   color = "#FF6B6B",
   height = 30
 )

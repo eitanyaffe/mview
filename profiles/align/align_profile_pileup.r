@@ -29,7 +29,7 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode
   })
 
   if (!is.null(df) && nrow(df) > 0) {
-    # position from alntools is already 1-based, no need to add 1
+    # alntools pileup outputs 1-based coordinates
     df$coord <- df$position
     return(filter_coords(df, cxt, cxt$mapper$xlim))
   }

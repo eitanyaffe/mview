@@ -45,7 +45,7 @@ list_lookup <- function() {
 }
 
 # Get data by ID with optional tag and custom read function
-get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE) {
+get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE, force.read = FALSE) {
   if (!exists("lookups", envir = .data_env) || is.null(.data_env$lookups)) {
     stop("lookup table not set, call set_lookup first")
   }
@@ -63,6 +63,11 @@ get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE)
 
   # Get path from lookup table
   path <- .data_env$lookups$path[.data_env$lookups$id == id]
+
+  if (force.read) {
+    cat(sprintf("reading %s data from %s (force.read)\n", id, path))
+    return(read_f(path))
+  }
 
   # Use the cache module to load or retrieve from cache
   cache(path, {

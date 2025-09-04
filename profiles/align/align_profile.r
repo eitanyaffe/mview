@@ -1,140 +1,8 @@
 # Helper for creating an alignment-based profile
 # Supports bin/pileup/full modes based on zoom level
 
-# define the shared red color palette used across all mutation visualizations
-get_red_palette <- function() {
-  return(c("#fee0d2", "#fc9272", "#fb6a4a", "#cb181d", "#a50f15", "#67000d"))
-}
-
-# shared red color scale function for both continuous and discrete red colors
-get_shared_red_scale <- function(continuous = TRUE, num_colors = 6) {
-  red_palette <- get_red_palette()
-  
-  if (continuous) {
-    # return the base colors for continuous scale
-    return(c(red_palette[1], red_palette[6]))
-  } else {
-    # return discrete red colors from light to dark
-    return(red_palette[seq_len(min(num_colors, length(red_palette)))])
-  }
-}
-
-# Get mutation density colors (shared between bin and full modes)
-get_mutation_colors <- function(mutations_per_bp) {
-  # use shared red palette
-  red_palette <- get_red_palette()
-  
-  # apply same thresholds as discrete scale using vectorized ifelse for efficiency
-  colors <- ifelse(mutations_per_bp <= 0, red_palette[1],
-            ifelse(mutations_per_bp <= 0.0001, red_palette[2],
-            ifelse(mutations_per_bp <= 0.001, red_palette[3],
-            ifelse(mutations_per_bp <= 0.01, red_palette[4],
-            ifelse(mutations_per_bp <= 0.1, red_palette[5],
-                   red_palette[6])))))
-  
-  return(colors)
-}
-
-# Get fixed colors for variant types (shared between full and pileup modes)
-get_variant_type_colors <- function(variants) {
-  # define vibrant and lively colors for all 12 nucleotide substitutions
-  substitution_colors <- c(
-    "A:T" = "#ffcc00", "A:C" = "#00ccff", "A:G" = "#cc00ff",
-    "T:A" = "#ff6600", "T:C" = "#00ff66", "T:G" = "#6600ff",
-    "C:A" = "#ff0066", "C:T" = "#66ff00", "C:G" = "#ff3399",
-    "G:A" = "#ff9900", "G:T" = "#0099ff", "G:C" = "#9900ff"
-  )
-  
-  # colors for gains (3 red shades, darker range, squeezed)
-  gain_light <- "#c0c0c0"   # gray color slightly darker than ref for +1
-  gain_medium <- "#b30000"  # darker medium red for +2 to +3
-  gain_dark <- "#800000"    # darkest red for +4 or more
-  
-  # colors for losses (3 blue shades, darker range, squeezed)  
-  loss_light <- "#c0c0c0"   # gray color slightly darker than ref for -1
-  loss_medium <- "#0000b3"  # darker medium blue for -2 to -3
-  loss_dark <- "#000080"    # darkest blue for -4 or more
-  
-  # ref and unknown colors
-  ref_color <- "#e0dede"   # light gray
-  unknown_color <- "#000000" # black
-  
-  # assign colors based on variant pattern
-  colors <- character(length(variants))
-  
-  for (i in seq_along(variants)) {
-    variant <- variants[i]
-    
-    if (variant == "REF") {
-      colors[i] <- ref_color
-    } else if (variant %in% names(substitution_colors)) {
-      # direct substitution match
-      colors[i] <- substitution_colors[variant]
-    } else if (grepl("^\\+", variant)) {
-      # gain pattern: +XXX
-      gain_length <- nchar(gsub("^\\+", "", variant))
-      colors[i] <- if (gain_length == 1) {
-        gain_light
-      } else if (gain_length <= 3) {
-        gain_medium
-      } else {
-        gain_dark
-      }
-    } else if (grepl("^-", variant)) {
-      # loss pattern: -XXX
-      loss_length <- nchar(gsub("^-", "", variant))
-      colors[i] <- if (loss_length == 1) {
-        loss_light
-      } else if (loss_length <= 3) {
-        loss_medium
-      } else {
-        loss_dark
-      }
-    } else {
-      # unknown variant type
-      colors[i] <- unknown_color
-    }
-  }
-  
-  return(colors)
-}
-
- 
-
-# get simplified colors for variant types (type mode: sub=orange, deletion=blue, addition=red)
-get_mutation_type_colors <- function(variants) {
-  # define simplified color scheme
-  substitution_color <- "#ff8c00"  # orange for all substitutions
-  deletion_color <- "#0066cc"      # blue for all deletions  
-  addition_color <- "#cc0000"      # red for all additions
-  ref_color <- "#e0dede"           # light gray
-  unknown_color <- "#000000"       # black
-  
-  # assign colors based on variant pattern
-  colors <- character(length(variants))
-  
-  for (i in seq_along(variants)) {
-    variant <- variants[i]
-    
-    if (variant == "REF") {
-      colors[i] <- ref_color
-    } else if (grepl(":", variant)) {
-      # substitution pattern: X:Y
-      colors[i] <- substitution_color
-    } else if (grepl("^\\+", variant)) {
-      # addition pattern: +XXX
-      colors[i] <- addition_color
-    } else if (grepl("^-", variant)) {
-      # deletion pattern: -XXX
-      colors[i] <- deletion_color
-    } else {
-      # unknown variant type
-      colors[i] <- unknown_color
-    }
-  }
-  
-  return(colors)
-}
+# Load shared utilities for mutation coloring and legends
+source("profiles/align/align_utils.r")
 
 default_alignment_params <- list(
   # align_general - parameters used across multiple modes
@@ -145,10 +13,15 @@ default_alignment_params <- list(
     default = "auto"
   ),
   mutation_color_mode = list(
-    group_id = "align_general",
+    group_id = "mutations",
     type = "select", 
     choices = c("detailed", "type"),
     default = "detailed"
+  ),
+  full_threshold = list(
+    group_id = "mutations",
+    type = "integer",
+    default = 200000
   ),
   clip_mode = list(
     group_id = "align_filter",
@@ -212,11 +85,7 @@ default_alignment_params <- list(
     choices = c("none", "by_mutations", "by_strand", "show_mutations"), 
     default = "show_mutations"
   ),
-  auto_threshold = list(
-    group_id = "align_general",
-    type = "integer",
-    default = 100000
-  ),
+
   max_reads = list(
     group_id = "align_full",
     type = "integer",
@@ -242,7 +111,7 @@ default_alignment_params <- list(
   bin_type = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("auto", "200", "500", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
+    choices = c("auto", "500", "1000", "2000", "5000", "10000", "20000", "50000", "100000", "200000", "500000"),
     default = "auto"
   ),
   seg_threshold = list(
@@ -298,7 +167,7 @@ align_profile <- function(id, name,
                           bin_type = "auto",
                           plot_style = "auto",
                           mutation_color_mode = "detailed",
-                          auto_threshold = 100000,
+                          full_threshold = 100000,
                           pileup_threshold = 200,
                           use_pileup = FALSE,
                           target_bins = 100,
@@ -316,7 +185,7 @@ align_profile <- function(id, name,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           show_hover = TRUE,
-                          binsizes = c(200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
+                          binsizes = c(500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
                           params = default_alignment_params,
                           auto_register = TRUE) {
   # Check for required alignment functions
@@ -327,7 +196,7 @@ align_profile <- function(id, name,
   }
 
   # Determine display mode based on view range
-  get_display_mode <- function(xlim, auto_threshold, pileup_threshold, plot_style, use_pileup) {
+  get_display_mode <- function(xlim, full_threshold, pileup_threshold, plot_style, use_pileup) {
     if (is.null(xlim) || length(xlim) != 2) {
       return("bin")
     }
@@ -337,7 +206,7 @@ align_profile <- function(id, name,
     if (plot_style == "auto") {
       if (use_pileup && range_bp <= pileup_threshold) {
         return("pileup")
-      } else if (range_bp <= (auto_threshold + 1)) {
+      } else if (range_bp <= (full_threshold + 1)) {
         return("full")
       } else {
         return("bin")
@@ -371,7 +240,7 @@ align_profile <- function(id, name,
       return(list(plot = gg, legends = list()))
     }
 
-    mode <- get_display_mode(cxt$mapper$xlim, profile$auto_threshold, profile$pileup_threshold, profile$plot_style, profile$use_pileup)
+    mode <- get_display_mode(cxt$mapper$xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style, profile$use_pileup)
     cat(sprintf("mode: %s\n", mode))
 
     # Call mode-specific plot function
@@ -393,7 +262,7 @@ align_profile <- function(id, name,
     bin_type = bin_type,
     plot_style = plot_style,
     mutation_color_mode = mutation_color_mode,
-    auto_threshold = auto_threshold,
+    full_threshold = full_threshold,
     pileup_threshold = pileup_threshold,
     use_pileup = use_pileup,
     target_bins = target_bins,
