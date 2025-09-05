@@ -246,6 +246,8 @@ plot_profiles <- function(cxt) {
   cat(sprintf("plotting done, total height: %dpx\n", total_height))
   return(list(plot = combined_plot, total_height = total_height, legends = legends))
 }
+
+#' Plot all registered profiles as ggplot objects for PDF export
 #' @param cxt The context object containing mapper and other dynamic info
 #' @return A list with combined ggplot object and total height: list(plot = ggplot_obj, total_height = numeric)
 plot_profiles_ggplot <- function(cxt) {
