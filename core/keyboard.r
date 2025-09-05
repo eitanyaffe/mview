@@ -296,6 +296,136 @@ action = function(regions_module_output, main_state_rv) {
       
       cat(sprintf("navigated to previous contig: %s (index %d)\n", prev_contig, prev_index))
     }
+  ),
+  "Ctrl+Alt+ArrowUp" = list(
+    description = "Navigate to previous region",
+    type = "region_navigation",
+    action = function(regions_module_output, main_state_rv) {
+      # get current regions table
+      region_table_data <- regions_module_output$get_region_table()
+      if (is.null(region_table_data) || nrow(region_table_data) == 0) {
+        cat("ctrl+alt+arrowup: no regions available\n")
+        return()
+      }
+      
+      # determine current region by matching current state
+      current_assembly <- main_state_rv$assembly
+      current_contigs <- main_state_rv$contigs
+      current_zoom <- main_state_rv$zoom
+      
+      # find matching region or get first one if none match
+      current_index <- -1
+      
+      # try to find current region by matching state
+      for (i in seq_len(nrow(region_table_data))) {
+        region_row <- region_table_data[i, ]
+        
+        # check if this region matches current state
+        region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
+          character(0)
+        } else {
+          trimws(strsplit(region_row$contigs, ",")[[1]])
+        }
+        
+        region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
+          NULL
+        } else {
+          c(region_row$zoom_start, region_row$zoom_end)
+        }
+        
+        # check for match
+        assembly_match <- identical(current_assembly, region_row$assembly)
+        contigs_match <- identical(sort(current_contigs), sort(region_contigs))
+        zoom_match <- identical(current_zoom, region_zoom)
+        
+        if (assembly_match && contigs_match && zoom_match) {
+          current_index <- i
+          break
+        }
+      }
+      
+      # determine previous region index
+      if (current_index == -1) {
+        # no current region found, go to last region
+        prev_index <- nrow(region_table_data)
+      } else if (current_index <= 1) {
+        # at first region, wrap to last
+        prev_index <- nrow(region_table_data)
+      } else {
+        prev_index <- current_index - 1
+      }
+      
+      # navigate to previous region
+      region_row <- region_table_data[prev_index, ]
+      regions_module_output$goto_region(region_row)
+      
+      cat(sprintf("navigated to previous region: %s (index %d)\n", region_row$description, prev_index))
+    }
+  ),
+  "Ctrl+Alt+ArrowDown" = list(
+    description = "Navigate to next region",
+    type = "region_navigation",
+    action = function(regions_module_output, main_state_rv) {
+      # get current regions table
+      region_table_data <- regions_module_output$get_region_table()
+      if (is.null(region_table_data) || nrow(region_table_data) == 0) {
+        cat("ctrl+alt+arrowdown: no regions available\n")
+        return()
+      }
+      
+      # determine current region by matching current state
+      current_assembly <- main_state_rv$assembly
+      current_contigs <- main_state_rv$contigs
+      current_zoom <- main_state_rv$zoom
+      
+      # find matching region or get first one if none match
+      current_index <- -1
+      
+      # try to find current region by matching state
+      for (i in seq_len(nrow(region_table_data))) {
+        region_row <- region_table_data[i, ]
+        
+        # check if this region matches current state
+        region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
+          character(0)
+        } else {
+          trimws(strsplit(region_row$contigs, ",")[[1]])
+        }
+        
+        region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
+          NULL
+        } else {
+          c(region_row$zoom_start, region_row$zoom_end)
+        }
+        
+        # check for match
+        assembly_match <- identical(current_assembly, region_row$assembly)
+        contigs_match <- identical(sort(current_contigs), sort(region_contigs))
+        zoom_match <- identical(current_zoom, region_zoom)
+        
+        if (assembly_match && contigs_match && zoom_match) {
+          current_index <- i
+          break
+        }
+      }
+      
+      # determine next region index
+      if (current_index == -1) {
+        # no current region found, go to first region
+        next_index <- 1
+      } else if (current_index >= nrow(region_table_data)) {
+        # at last region, wrap to first
+        next_index <- 1
+      } else {
+        next_index <- current_index + 1
+      }
+      
+      # navigate to next region
+      region_row <- region_table_data[next_index, ]
+      regions_module_output$goto_region(region_row)
+      
+      cat(sprintf("navigated to next region: %s (index %d)\n", region_row$description, next_index))
+    }
   )
 )
 
@@ -404,6 +534,8 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region") {
             shortcut_details$action(regions_module_output)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "navigation") {
+            shortcut_details$action(regions_module_output, main_state_rv)
+          } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region_navigation") {
             shortcut_details$action(regions_module_output, main_state_rv)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "state_load") {
             shortcut_details$action(shortcut_details$state_number, session)

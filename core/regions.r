@@ -809,12 +809,18 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         ))
       }
 
+      # get current region table data (for external use)
+      get_region_table <- function() {
+        return(region_table())
+      }
+
       # return functions for external use
       return(list(
         undo_last_action = undo_last_action,
         push_undo_state = push_undo_state,
         goto_region = goto_region,
-        focus_add_input = focus_add_input
+        focus_add_input = focus_add_input,
+        get_region_table = get_region_table
       ))
     }
   )
