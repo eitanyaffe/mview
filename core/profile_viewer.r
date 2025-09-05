@@ -4,6 +4,7 @@
 # For each profile, it calls pre_plot, profile$plot_f, and post_plot, and collects the results.
 
 library(plotly)
+library(patchwork)
 
 #' Pre-plot function: sets up the base ggplot object for a profile
 #' @param cxt Context object
@@ -243,5 +244,164 @@ plot_profiles <- function(cxt) {
   
   combined_plot <- do.call(plotly::layout, c(list(combined_plot), layout_args))
   cat(sprintf("plotting done, total height: %dpx\n", total_height))
+  return(list(plot = combined_plot, total_height = total_height, legends = legends))
+}
+#' @param cxt The context object containing mapper and other dynamic info
+#' @return A list with combined ggplot object and total height: list(plot = ggplot_obj, total_height = numeric)
+plot_profiles_ggplot <- function(cxt) {
+  profiles <- profiles_get_all()
+  if (length(profiles) == 0) {
+    return(NULL)
+  }
+
+  ggplot_list <- list()
+  heights <- numeric()
+  legends <- list()
+
+  for (id in names(profiles)) {
+    cat(sprintf("plotting profile for PDF: %s\n", id))
+    profile <- profiles[[id]]
+
+    if (length(profile$params) > 0) {
+      for (i in seq_along(profile$params)) {
+        param_id <- names(profile$params)[i]
+        group_id <- profile$params[[i]]$group
+        if (is.null(group_id)) {
+          next
+        }
+        param_value <- get_param(group_id, param_id)()
+        profile[[param_id]] <- param_value
+      }
+    }
+    
+    # update height from parameters if it exists
+    if ("height" %in% names(profile$params)) {
+      height_param <- profile$params[["height"]]
+      if (!is.null(height_param) && !is.null(height_param$group)) {
+        height_value <- get_param(height_param$group, "height")()
+        profile$height <- height_value
+      }
+    }
+
+    # Create base ggplot
+    gg <- pre_plot(cxt, profile)
+
+    # Get the profile's plot result
+    pf_result <- profile$plot_f(profile, cxt, gg)
+
+    # profiles must return list(plot = gg, legends = list_of_legends)
+    if (is.list(pf_result)) {
+      gg_plot <- pf_result$plot
+      profile_legends <- pf_result$legends
+      if (!is.null(profile_legends) && length(profile_legends) > 0) {
+        legends[[id]] <- profile_legends
+      }
+    } else {
+      gg_plot <- pf_result
+    }
+
+    # validate that we have a plot object (not NULL)
+    if (is.null(gg_plot)) {
+      warning(sprintf("Profile '%s' returned NULL plot object, skipping", id))
+      next
+    }
+
+    # Add overlays
+    gg_final <- post_plot(cxt, gg_plot, profile)
+    
+    # Apply styling for PDF export (ensure it's not overridden)
+    if (!isTRUE(profile$attr$hide_y_label)) {
+      gg_final <- gg_final + 
+        ggplot2::labs(y = profile$attr$title) +
+        ggplot2::theme(
+          axis.title.y = ggplot2::element_text(angle = 0, hjust = 1, vjust = 0.5),
+          axis.text.x = ggplot2::element_blank(),
+          axis.title.x = ggplot2::element_blank(),
+          axis.ticks.x = ggplot2::element_blank()
+        )
+    } else {
+      gg_final <- gg_final + 
+        ggplot2::theme(
+          axis.title.y = ggplot2::element_blank(),
+          axis.text.x = ggplot2::element_blank(),
+          axis.title.x = ggplot2::element_blank(),
+          axis.ticks.x = ggplot2::element_blank()
+        )
+    }
+
+    # Store the ggplot object directly (no plotly conversion)
+    ggplot_list[[id]] <- gg_final
+    heights <- c(heights, profile$height)
+  }
+
+  if (length(ggplot_list) == 0) {
+    return(NULL)
+  }
+
+  # Calculate height ratios for patchwork
+  total_height <- sum(heights)
+  if (total_height > 0) {
+    height_ratios <- heights / total_height
+  } else {
+    height_ratios <- rep(1 / length(heights), length(heights))
+  }
+
+  cat(sprintf("combining %d profiles using patchwork for PDF\n", length(ggplot_list)))
+
+  # Combine plots using patchwork
+  if (length(ggplot_list) > 1) {
+    # Use patchwork to stack plots vertically with height ratios
+    combined_plot <- Reduce(`/`, ggplot_list) + 
+      patchwork::plot_layout(heights = height_ratios)
+  } else {
+    combined_plot <- ggplot_list[[1]]
+  }
+  
+  # Add coordinate annotations to the bottom plot (similar to plotly version)
+  if (length(ggplot_list) > 0) {
+    profiles <- profiles_get_all()
+    coord_annotations <- list()
+    
+    # collect coordinate annotations from profiles
+    for (i in seq_along(profiles)) {
+      profile <- profiles[[i]]
+      get_ann_f <- profile$get_annotations
+      if (is.null(get_ann_f) || !is.function(get_ann_f)) next
+      
+      coord_data <- get_ann_f(profile, cxt)
+      if (is.null(coord_data) || nrow(coord_data) == 0) next
+      
+      coord_annotations <- rbind(coord_annotations, coord_data)
+    }
+    
+    # Add coordinate annotations to the last (bottom) plot if we have any
+    if (length(coord_annotations) > 0 && nrow(coord_annotations) > 0) {
+      bottom_plot_name <- names(ggplot_list)[length(ggplot_list)]
+      bottom_plot <- ggplot_list[[bottom_plot_name]]
+      
+      # Add coordinate labels as text annotations
+      bottom_plot <- bottom_plot + 
+        ggplot2::annotate("text", 
+                         x = coord_annotations$x, 
+                         y = -Inf, 
+                         label = coord_annotations$label,
+                         angle = 90, 
+                         hjust = 0, 
+                         vjust = 0.5,
+                         size = 3)
+      
+      # Update the plot in the list
+      ggplot_list[[bottom_plot_name]] <- bottom_plot
+      
+      # Recreate the combined plot with annotations
+      if (length(ggplot_list) > 1) {
+        combined_plot <- Reduce(`/`, ggplot_list) + 
+          patchwork::plot_layout(heights = height_ratios)
+      } else {
+        combined_plot <- ggplot_list[[1]]
+      }
+    }
+  }
+
   return(list(plot = combined_plot, total_height = total_height, legends = legends))
 }

@@ -48,7 +48,17 @@ Install required packages in R:
 
 ```r
 install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui", "seqinr"))
+
+# For PDF export functionality, install patchwork package
+install.packages("patchwork")
 ```
+
+**PDF Export:**
+
+mview includes built-in PDF export functionality with two options:
+
+- **Export**: Save the current view to a single PDF file with custom filename
+- **Export All**: Save all regions from the current regions table as separate PDF files
 
 ### Installing alntools (optional)
 
