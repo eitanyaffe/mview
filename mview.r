@@ -12,9 +12,18 @@ get_server <- function() {
         load_tabs()
         source("core/server_tabs.r", local = TRUE)
         source("core/server_legend.r", local = TRUE)
+        
+        # load gene regions module
+        source("core/gene_regions.r", local = TRUE)
 
         regions_module_output <- regions_server(
             id = "regions_module",
+            main_state_rv = state,
+            session = session
+        )
+        
+        gene_regions_module_output <- gene_regions_server(
+            id = "gene_regions_module",
             main_state_rv = state,
             session = session
         )

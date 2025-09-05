@@ -7,7 +7,8 @@ set_tab_panel_f(function() {
     div(
       style = "margin-bottom: 10px;",
       actionButton("showGeneDetailsBtn", "Show Details"),
-      actionButton("zoomToGeneBtn", "Navigate to Gene")
+      actionButton("zoomToGeneBtn", "Navigate to Gene"),
+      actionButton("createRegionsBtn", "Create Regions")
     ),
     DTOutput("genesTable")
   )
@@ -213,4 +214,21 @@ observeEvent(input$zoomToGeneBtn, {
       )      
     }
   }
+})
+
+observeEvent(input$createRegionsBtn, {
+  # get all genes in context
+  all_genes_df <- get_genes_for_context(state$assembly, state$contigs, state$zoom)
+  
+  # get indices of currently visible/filtered rows
+  visible_indices <- input$genesTable_rows_all
+  
+  # filter to only visible genes (those shown after search/filter)
+  if (is.null(visible_indices) || length(visible_indices) == 0) {
+    genes_df <- NULL
+  } else {
+    genes_df <- all_genes_df[visible_indices, ]
+  }
+  
+  gene_regions_module_output$show_create_regions_dialog(genes_df)
 })
