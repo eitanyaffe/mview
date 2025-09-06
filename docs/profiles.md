@@ -100,6 +100,19 @@ Notes
 
 ---
 
+### rrna profile
+
+Display rRNA genes from barrnap GFF output with automatic type-based coloring and strand visualization.
+
+#### Data requirements
+The `get_gff_f` function should return a data frame with parsed GFF columns:
+- **contig**: contig/sequence name
+- **start/end**: gene coordinates  
+- **strand**: strand direction (+ or -)
+- **name**: rRNA gene name (e.g., "16S_rRNA")
+- **product**: gene product description
+- **rrna_type**: rRNA type for coloring (e.g., "16S", "23S", "5S")
+
 ### alignment profile
 
 Plot read alignments. Depending on zoom or explicit settings, it renders coverage bins, full read alignments, or per-position pileups.
