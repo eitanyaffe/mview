@@ -99,7 +99,7 @@ keyboard_shortcuts <- list(
       }
     }
   ),
-  "Alt+>" = list(
+  "Alt+ArrowRight" = list(
     description = "Move zoom area one window to the right",
     type = "zoom",
     action = function(regions_module_output, main_state_rv) {
@@ -113,7 +113,7 @@ keyboard_shortcuts <- list(
       }
     }
   ),
-  "Alt+<" = list(
+  "Alt+ArrowLeft" = list(
     description = "Move zoom area one window to the left",
     type = "zoom",
     action = function(regions_module_output, main_state_rv) {
@@ -124,9 +124,9 @@ keyboard_shortcuts <- list(
           main_state_rv$zoom[1] - zoom_range,
           main_state_rv$zoom[2] - zoom_range
         )
-        cat("moved zoom area left by Alt+<\n")
+        cat("moved zoom area left by Alt+ArrowLeft\n")
       } else {
-        cat("Alt+<: zoom is null, cannot move zoom area\n")
+        cat("Alt+ArrowLeft: zoom is null, cannot move zoom area\n")
       }
     }
   ),
@@ -483,10 +483,10 @@ keyboard_initialize <- function() {
         key = key.replace('Digit', '');
       } else if (key === 'Backspace') {
         key = 'backspace';
-      } else if (key === 'Comma') {
-        key = '<';
-      } else if (key === 'Period') {
-        key = '>';
+      } else if (key === 'ArrowLeft') {
+        key = 'ArrowLeft';
+      } else if (key === 'ArrowRight') {
+        key = 'ArrowRight';
       } else if (key === 'Minus') {
         key = '_';
       } else if (key === 'Equal') {
