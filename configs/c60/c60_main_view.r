@@ -4,6 +4,9 @@ source("profiles/align/align_profile_api.r")
 # Load segments profile
 source("profiles/segments_profile.r")
 
+# Load rRNA profile
+source("profiles/rrna_profile.r")
+
 # Load synteny profile
 source("profiles/synteny/synteny_profile.r")
 source("profiles/synteny/synteny_profile_detail.r") 
@@ -134,6 +137,18 @@ gene_profile(
   color_field = "tax",
   label_field = "label",
   params = default_gene_params
+)
+
+########################################################
+# rRNA gene profile
+########################################################
+
+rrna_profile(
+  id = "rrna",
+  name = "rRNA",
+  get_gff_f = function(cxt) {
+    get_data("BARRNAP_TABLE", tag = cxt$assembly, null.on.missing = TRUE, read_f = read_gff_f)
+  }
 )
 
 ########################################################
