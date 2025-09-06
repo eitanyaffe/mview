@@ -40,7 +40,8 @@ state <- reactiveValues(
   current_xlim = NULL,
   assembly = get_assemblies()[1],
   clicked_read_alignments = NULL,
-  mouse_coords = NULL
+  mouse_coords = NULL,
+  last_selected_contig = NULL
 )
 
 # Project info output

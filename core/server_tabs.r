@@ -13,6 +13,7 @@ output$mainTabsPanel <- renderUI({
       "Contigs",
       actionButton("addContigsBtn", "add selected"),
       actionButton("setContigsBtn", "only selected"),
+      actionButton("goToLastSelectedBtn", "only last contigselected"),
       actionButton("removeContigsFromListBtn", "remove selected"),
       actionButton("clearContigSelectionBtn", "clear selected"),
       DTOutput("contigTable")
