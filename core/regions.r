@@ -432,11 +432,27 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
+        # get available region files
+        regions_dir <- tryCatch(get_regions_dir(), error = function(e) {
+          shiny::showNotification("regions directory not configured", type = "error")
+          return(NULL)
+        })
+        
+        if (is.null(regions_dir)) return()
+        
+        available_files <- list.files(regions_dir, pattern = "\\.txt$", full.names = FALSE)
+        if (length(available_files) == 0) {
+          available_files <- current_regions_file()
+        }
+        
         # suggest next ID
         next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
         
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
+          shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
+                           choices = available_files, 
+                           selected = current_regions_file()),
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
@@ -452,9 +468,11 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         req(input$add_region_description)
         req(input$add_region_id)
         req(input$add_region_level)
+        req(input$add_region_file)
         description <- trimws(input$add_region_description)
         custom_id <- trimws(input$add_region_id)
         level <- as.integer(input$add_region_level)
+        selected_file <- input$add_region_file
         
         if (description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
@@ -471,9 +489,27 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
-        # check for duplicate ID
-        if (custom_id %in% region_table()$id) {
-          shiny::showNotification(paste("ID", custom_id, "already exists"), type = "error")
+        # load target file to check for duplicate IDs
+        target_table <- if (selected_file == current_regions_file()) {
+          region_table()
+        } else {
+          tryCatch({
+            regions_dir <- get_regions_dir()
+            file_path <- file.path(regions_dir, selected_file)
+            if (file.exists(file_path)) {
+              read.table(file_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+            } else {
+              create_empty_region_table()
+            }
+          }, error = function(e) {
+            shiny::showNotification(paste("error loading target file:", e$message), type = "error")
+            return()
+          })
+        }
+        
+        # check for duplicate ID in target file
+        if (custom_id %in% target_table$id) {
+          shiny::showNotification(paste("ID", custom_id, "already exists in", selected_file), type = "error")
           return()
         }
         
@@ -512,11 +548,35 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         new_row$segment_end <- segment_info$end
         new_row$single_contig <- segment_info$single_contig
         
-        region_table(rbind(region_table(), new_row))
-        save_region_table(current_regions_file())
+        # add region to target table and save
+        updated_target_table <- rbind(target_table, new_row)
+        
+        # save to selected file
+        regions_dir <- get_regions_dir()
+        file_path <- file.path(regions_dir, selected_file)
+        
+        # create backup version if file exists
+        if (file.exists(file_path)) {
+          versions_dir <- file.path(regions_dir, "versions")
+          if (!dir.exists(versions_dir)) {
+            dir.create(versions_dir, recursive = TRUE)
+          }
+          base_name <- sub("\\.txt$", "", selected_file)
+          existing_versions <- list.files(versions_dir, pattern = paste0("^", base_name, "_v\\d+\\.txt$"))
+          version_num <- length(existing_versions) + 1
+          version_filename <- paste0(base_name, "_v", version_num, ".txt")
+          file.copy(file_path, file.path(versions_dir, version_filename))
+        }
+        
+        write.table(updated_target_table, file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        
+        # update current table if we saved to the current file
+        if (selected_file == current_regions_file()) {
+          region_table(updated_target_table)
+        }
         
         shiny::removeModal()
-        shiny::showNotification(paste("region '", description, "' added."), type = "message")
+        shiny::showNotification(paste("region '", description, "' added to", selected_file), type = "message")
       })
 
       # edit region description
@@ -793,11 +853,27 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
+        # get available region files
+        regions_dir <- tryCatch(get_regions_dir(), error = function(e) {
+          shiny::showNotification("regions directory not configured", type = "error")
+          return(NULL)
+        })
+        
+        if (is.null(regions_dir)) return()
+        
+        available_files <- list.files(regions_dir, pattern = "\\.txt$", full.names = FALSE)
+        if (length(available_files) == 0) {
+          available_files <- current_regions_file()
+        }
+        
         # suggest next ID
         next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
         
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
+          shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
+                           choices = available_files, 
+                           selected = current_regions_file()),
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
