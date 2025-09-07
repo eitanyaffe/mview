@@ -44,6 +44,174 @@ zoom_to_power_of_ten <- function(n, regions_module_output, main_state_rv) {
 }
 
 # Define keyboard shortcuts globally
+# Helper function for contig navigation
+change_contig_action <- function(regions_module_output, main_state_rv, input, direction) {
+  # check if DataTable is initialized
+  if (is.null(input$contigTable_rows_all)) {
+    cat(sprintf("alt+arrow%s: contig table not initialized\n", direction))
+    return()
+  }
+  
+  # get current table data (filtered/sorted as displayed)
+  contigs_data <- get_contigs(main_state_rv$assembly)
+  if (is.null(contigs_data) || nrow(contigs_data) == 0) {
+    cat(sprintf("alt+arrow%s: no contigs available\n", direction))
+    return()
+  }
+  
+  # apply same filtering as the table
+  if (!is.null(contigs_data) && "length" %in% names(contigs_data)) {
+    min_length_kb <- if (is.null(input$min_contig_length)) 0 else input$min_contig_length
+    max_length_kb <- input$max_contig_length
+    min_length_bp <- min_length_kb * 1000
+    max_length_bp <- if (!is.null(max_length_kb) && !is.na(max_length_kb)) max_length_kb * 1000 else NULL
+    contigs_data <- contigs_data[contigs_data$length >= min_length_bp, ]
+    if (!is.null(max_length_bp)) {
+      contigs_data <- contigs_data[contigs_data$length <= max_length_bp, ]
+    }
+  }
+  
+  # get current row selection
+  selected_rows <- input$contigTable_rows_selected
+  
+  if (is.null(selected_rows) || length(selected_rows) == 0) {
+    # no selection, select first row
+    regions_module_output$push_undo_state()
+    contig_proxy <- DT::dataTableProxy("contigTable")
+    DT::selectRows(contig_proxy, 1)
+    main_state_rv$contigs <- contigs_data$contig[input$contigTable_rows_all[1]]
+    main_state_rv$zoom <- NULL
+    cat("selected first contig in table\n")
+    return()
+  }
+  
+  if (length(selected_rows) != 1) {
+    # multiple rows selected, do nothing
+    cat(sprintf("alt+arrow%s: multiple rows selected, doing nothing\n", direction))
+    return()
+  }
+  
+  # find current position in sorted table
+  current_table_index <- which(input$contigTable_rows_all == selected_rows[1])
+  
+  # find next/previous position based on direction
+  if (direction == "down") {
+    # find next position (wrap to first if at end)
+    if (current_table_index >= length(input$contigTable_rows_all)) {
+      new_table_index <- 1
+    } else {
+      new_table_index <- current_table_index + 1
+    }
+  } else {
+    # find previous position (wrap to last if at beginning)
+    if (current_table_index <= 1) {
+      new_table_index <- length(input$contigTable_rows_all)
+    } else {
+      new_table_index <- current_table_index - 1
+    }
+  }
+  
+  # get the actual row index for the new position
+  new_row_index <- input$contigTable_rows_all[new_table_index]
+  new_contig <- contigs_data$contig[new_row_index]
+  
+  # push undo state before changing
+  regions_module_output$push_undo_state()
+  
+  # update selection and contig
+  contig_proxy <- DT::dataTableProxy("contigTable")
+  DT::selectRows(contig_proxy, new_row_index)
+  main_state_rv$contigs <- new_contig
+  main_state_rv$zoom <- NULL
+  
+  cat(sprintf("navigated to %s contig: %s\n", 
+              if (direction == "down") "next" else "previous", 
+              new_contig))
+}
+
+# Helper function for region navigation
+change_region_action <- function(regions_module_output, main_state_rv, direction) {
+  # get current regions table
+  region_table_data <- regions_module_output$get_region_table()
+  if (is.null(region_table_data) || nrow(region_table_data) == 0) {
+    cat(sprintf("ctrl+alt+arrow%s: no regions available\n", direction))
+    return()
+  }
+  
+  # determine current region by matching current state
+  current_assembly <- main_state_rv$assembly
+  current_contigs <- main_state_rv$contigs
+  current_zoom <- main_state_rv$zoom
+  
+  # find matching region or get first one if none match
+  current_index <- -1
+  
+  # try to find current region by matching state
+  for (i in seq_len(nrow(region_table_data))) {
+    region_row <- region_table_data[i, ]
+    
+    # check if this region matches current state
+    region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
+      character(0)
+    } else {
+      trimws(strsplit(region_row$contigs, ",")[[1]])
+    }
+    
+    region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
+      NULL
+    } else {
+      c(region_row$zoom_start, region_row$zoom_end)
+    }
+    
+    # check for match
+    assembly_match <- identical(current_assembly, region_row$assembly)
+    contigs_match <- identical(sort(current_contigs), sort(region_contigs))
+    zoom_match <- identical(current_zoom, region_zoom)
+    
+    if (assembly_match && contigs_match && zoom_match) {
+      current_index <- i
+      break
+    }
+  }
+  
+  # determine next/previous region index based on direction
+  if (direction == "down") {
+    # find next region
+    if (current_index == -1) {
+      # no current region found, go to first region
+      new_index <- 1
+    } else if (current_index >= nrow(region_table_data)) {
+      # at last region, wrap to first
+      new_index <- 1
+    } else {
+      new_index <- current_index + 1
+    }
+  } else {
+    # find previous region
+    if (current_index == -1) {
+      # no current region found, go to last region
+      new_index <- nrow(region_table_data)
+    } else if (current_index <= 1) {
+      # at first region, wrap to last
+      new_index <- nrow(region_table_data)
+    } else {
+      new_index <- current_index - 1
+    }
+  }
+  
+  # navigate to new region
+  region_row <- region_table_data[new_index, ]
+  regions_module_output$goto_region(region_row)
+  
+  # update the regions table selection
+  regions_proxy <- DT::dataTableProxy("regions_module-region_table_display")
+  DT::selectRows(regions_proxy, new_index)
+  
+  cat(sprintf("navigated to %s region: %s (index %d)\n", 
+              if (direction == "down") "next" else "previous", 
+              region_row$description, new_index))
+}
+
 keyboard_shortcuts <- list(
   "Alt+backspace" = list(
     description = "Undo last action",
@@ -133,7 +301,7 @@ keyboard_shortcuts <- list(
   "Alt+C" = list(
     description = "Clear selected contigs",
     type = "zoom",
-action = function(regions_module_output, main_state_rv) {
+    action = function(regions_module_output, main_state_rv) {
       regions_module_output$push_undo_state()
       main_state_rv$contigs <- character()
       cat("cleared selected contigs by Alt+C\n")
@@ -192,239 +360,29 @@ action = function(regions_module_output, main_state_rv) {
   "Alt+ArrowDown" = list(
     description = "Navigate to next contig in contig table",
     type = "navigation",
-    action = function(regions_module_output, main_state_rv) {
-      # get contig table for current assembly
-      contigs_data <- get_contigs(main_state_rv$assembly)
-      if (is.null(contigs_data) || nrow(contigs_data) == 0) {
-        cat("alt+arrowdown: no contigs available\n")
-        return()
-      }
-      
-      # check if any contigs are currently selected
-      if (length(main_state_rv$contigs) == 0) {
-        # no contigs selected, select the first contig in the table
-        regions_module_output$push_undo_state()
-        main_state_rv$contigs <- contigs_data$contig[1]
-        main_state_rv$zoom <- NULL
-        cat(sprintf("selected first contig: %s\n", contigs_data$contig[1]))
-        return()
-      }
-      
-      # find the position of the last currently selected contig in the table
-      last_contig <- tail(main_state_rv$contigs, 1)
-      current_index <- match(last_contig, contigs_data$contig)
-      
-      if (is.na(current_index)) {
-        # current contig not found in table, select first contig
-        regions_module_output$push_undo_state()
-        main_state_rv$contigs <- contigs_data$contig[1]
-        main_state_rv$zoom <- NULL
-        cat(sprintf("current contig not found, selected first: %s\n", contigs_data$contig[1]))
-        return()
-      }
-      
-      # find next contig
-      if (current_index >= nrow(contigs_data)) {
-        # already at last contig, wrap to first
-        next_index <- 1
-      } else {
-        next_index <- current_index + 1
-      }
-      
-      next_contig <- contigs_data$contig[next_index]
-      
-      # push undo state before changing
-      regions_module_output$push_undo_state()
-      
-      # set to next contig
-      main_state_rv$contigs <- next_contig
-      main_state_rv$zoom <- NULL
-      
-      cat(sprintf("navigated to next contig: %s (index %d)\n", next_contig, next_index))
+    action = function(regions_module_output, main_state_rv, input) {
+      change_contig_action(regions_module_output, main_state_rv, input, "down")
     }
   ),
   "Alt+ArrowUp" = list(
     description = "Navigate to previous contig in contig table",
     type = "navigation",
-    action = function(regions_module_output, main_state_rv) {
-      # get contig table for current assembly
-      contigs_data <- get_contigs(main_state_rv$assembly)
-      if (is.null(contigs_data) || nrow(contigs_data) == 0) {
-        cat("alt+arrowup: no contigs available\n")
-        return()
-      }
-      
-      # check if any contigs are currently selected
-      if (length(main_state_rv$contigs) == 0) {
-        # no contigs selected, select the last contig in the table
-        regions_module_output$push_undo_state()
-        main_state_rv$contigs <- contigs_data$contig[nrow(contigs_data)]
-        main_state_rv$zoom <- NULL
-        cat(sprintf("selected last contig: %s\n", contigs_data$contig[nrow(contigs_data)]))
-        return()
-      }
-      
-      # find the position of the last currently selected contig in the table
-      last_contig <- tail(main_state_rv$contigs, 1)
-      current_index <- match(last_contig, contigs_data$contig)
-      
-      if (is.na(current_index)) {
-        # current contig not found in table, select last contig
-        regions_module_output$push_undo_state()
-        main_state_rv$contigs <- contigs_data$contig[nrow(contigs_data)]
-        main_state_rv$zoom <- NULL
-        cat(sprintf("current contig not found, selected last: %s\n", contigs_data$contig[nrow(contigs_data)]))
-        return()
-      }
-      
-      # find previous contig
-      if (current_index <= 1) {
-        # already at first contig, wrap to last
-        prev_index <- nrow(contigs_data)
-      } else {
-        prev_index <- current_index - 1
-      }
-      
-      prev_contig <- contigs_data$contig[prev_index]
-      
-      # push undo state before changing
-      regions_module_output$push_undo_state()
-      
-      # set to previous contig
-      main_state_rv$contigs <- prev_contig
-      main_state_rv$zoom <- NULL
-      
-      cat(sprintf("navigated to previous contig: %s (index %d)\n", prev_contig, prev_index))
+    action = function(regions_module_output, main_state_rv, input) {
+      change_contig_action(regions_module_output, main_state_rv, input, "up")
     }
   ),
   "Ctrl+Alt+ArrowUp" = list(
     description = "Navigate to previous region",
     type = "region_navigation",
     action = function(regions_module_output, main_state_rv) {
-      # get current regions table
-      region_table_data <- regions_module_output$get_region_table()
-      if (is.null(region_table_data) || nrow(region_table_data) == 0) {
-        cat("ctrl+alt+arrowup: no regions available\n")
-        return()
-      }
-      
-      # determine current region by matching current state
-      current_assembly <- main_state_rv$assembly
-      current_contigs <- main_state_rv$contigs
-      current_zoom <- main_state_rv$zoom
-      
-      # find matching region or get first one if none match
-      current_index <- -1
-      
-      # try to find current region by matching state
-      for (i in seq_len(nrow(region_table_data))) {
-        region_row <- region_table_data[i, ]
-        
-        # check if this region matches current state
-        region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
-          character(0)
-        } else {
-          trimws(strsplit(region_row$contigs, ",")[[1]])
-        }
-        
-        region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
-          NULL
-        } else {
-          c(region_row$zoom_start, region_row$zoom_end)
-        }
-        
-        # check for match
-        assembly_match <- identical(current_assembly, region_row$assembly)
-        contigs_match <- identical(sort(current_contigs), sort(region_contigs))
-        zoom_match <- identical(current_zoom, region_zoom)
-        
-        if (assembly_match && contigs_match && zoom_match) {
-          current_index <- i
-          break
-        }
-      }
-      
-      # determine previous region index
-      if (current_index == -1) {
-        # no current region found, go to last region
-        prev_index <- nrow(region_table_data)
-      } else if (current_index <= 1) {
-        # at first region, wrap to last
-        prev_index <- nrow(region_table_data)
-      } else {
-        prev_index <- current_index - 1
-      }
-      
-      # navigate to previous region
-      region_row <- region_table_data[prev_index, ]
-      regions_module_output$goto_region(region_row)
-      
-      cat(sprintf("navigated to previous region: %s (index %d)\n", region_row$description, prev_index))
+      change_region_action(regions_module_output, main_state_rv, "up")
     }
   ),
   "Ctrl+Alt+ArrowDown" = list(
     description = "Navigate to next region",
     type = "region_navigation",
     action = function(regions_module_output, main_state_rv) {
-      # get current regions table
-      region_table_data <- regions_module_output$get_region_table()
-      if (is.null(region_table_data) || nrow(region_table_data) == 0) {
-        cat("ctrl+alt+arrowdown: no regions available\n")
-        return()
-      }
-      
-      # determine current region by matching current state
-      current_assembly <- main_state_rv$assembly
-      current_contigs <- main_state_rv$contigs
-      current_zoom <- main_state_rv$zoom
-      
-      # find matching region or get first one if none match
-      current_index <- -1
-      
-      # try to find current region by matching state
-      for (i in seq_len(nrow(region_table_data))) {
-        region_row <- region_table_data[i, ]
-        
-        # check if this region matches current state
-        region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
-          character(0)
-        } else {
-          trimws(strsplit(region_row$contigs, ",")[[1]])
-        }
-        
-        region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
-          NULL
-        } else {
-          c(region_row$zoom_start, region_row$zoom_end)
-        }
-        
-        # check for match
-        assembly_match <- identical(current_assembly, region_row$assembly)
-        contigs_match <- identical(sort(current_contigs), sort(region_contigs))
-        zoom_match <- identical(current_zoom, region_zoom)
-        
-        if (assembly_match && contigs_match && zoom_match) {
-          current_index <- i
-          break
-        }
-      }
-      
-      # determine next region index
-      if (current_index == -1) {
-        # no current region found, go to first region
-        next_index <- 1
-      } else if (current_index >= nrow(region_table_data)) {
-        # at last region, wrap to first
-        next_index <- 1
-      } else {
-        next_index <- current_index + 1
-      }
-      
-      # navigate to next region
-      region_row <- region_table_data[next_index, ]
-      regions_module_output$goto_region(region_row)
-      
-      cat(sprintf("navigated to next region: %s (index %d)\n", region_row$description, next_index))
+      change_region_action(regions_module_output, main_state_rv, "down")
     }
   )
 )
@@ -534,7 +492,7 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region") {
             shortcut_details$action(regions_module_output)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "navigation") {
-            shortcut_details$action(regions_module_output, main_state_rv)
+            shortcut_details$action(regions_module_output, main_state_rv, input)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "region_navigation") {
             shortcut_details$action(regions_module_output, main_state_rv)
           } else if (!is.null(shortcut_details$type) && shortcut_details$type == "state_load") {
