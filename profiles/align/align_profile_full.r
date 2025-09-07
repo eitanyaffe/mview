@@ -187,6 +187,11 @@ align_profile_full <- function(profile, cxt, aln, gg) {
       alignments$hover_text <- ""
     }
 
+    # determine if we should show gray borders based on view range
+    range_bp <- (cxt$mapper$xlim[2] + 1) - cxt$mapper$xlim[1]
+    show_borders <- range_bp <= 1000001  # show borders only under 1Mb
+    border_color <- if (show_borders) "gray50" else NA
+    
     # draw alignment rectangles
     gg <- gg + ggplot2::geom_rect(
       data = alignments,
@@ -196,7 +201,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         text = hover_text,
         key = read_id
       ),
-      fill = alignments$color, color = "gray50", size = 0.2
+      fill = alignments$color, color = border_color, size = 0.2
     )
 
     # draw left clipping indicators
