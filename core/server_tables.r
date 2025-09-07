@@ -44,16 +44,23 @@ output$contigTable <- renderDT({
     index <- which(names(dat) == "contig")
     # check if highlighting is enabled in options
     enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
+    
+    # determine selection mode based on checkbox state
+    selection_mode <- if (!is.null(input$allowMultipleContigsChk) && !input$allowMultipleContigsChk) "single" else "multiple"
+    
     datatable(
         dat,
         rownames = FALSE,
-        selection = list(mode = "multiple", target = "row"),
+        selection = list(mode = selection_mode, target = "row"),
         options = get.highlight.options(state$contigs, index, enable_highlighting)
     )
 })
 
 output$genomeTable <- renderDT({
-    datatable(get_genomes(state$assembly), selection = list(mode = "multiple", target = "row"))
+    # determine selection mode based on checkbox state
+    selection_mode <- if (!is.null(input$allowMultipleGenomesChk) && !input$allowMultipleGenomesChk) "single" else "multiple"
+    
+    datatable(get_genomes(state$assembly), selection = list(mode = selection_mode, target = "row"))
 })
 
 output$mapTable <- renderDT({

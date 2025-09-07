@@ -11,19 +11,22 @@ output$mainTabsPanel <- renderUI({
     ),
     tabPanel(
       "Contigs",
-      actionButton("addContigsBtn", "add selected"),
-      actionButton("setContigsBtn", "only selected"),
-      actionButton("goToLastSelectedBtn", "only last contigselected"),
-      actionButton("removeContigsFromListBtn", "remove selected"),
-      actionButton("clearContigSelectionBtn", "clear selected"),
+      checkboxInput("allowMultipleContigsChk", "allow multiple", 
+                    value = cache_get_if_exists("allow_multiple_contigs", TRUE)),
+      actionButton("setContigsBtn", "set"),
+      actionButton("addContigsBtn", "add"),
+      actionButton("removeContigsFromListBtn", "remove"),
+      actionButton("clearContigSelectionBtn", "clear selection"),
       DTOutput("contigTable")
     ),
     tabPanel(
       "Genomes",
-      actionButton("addGenomesBtn", "add selected"),
-      actionButton("setGenomesBtn", "only selected"),
-      actionButton("removeGenomesFromListBtn", "remove selected"),
-      actionButton("clearGenomeSelectionBtn", "clear selected"),
+      checkboxInput("allowMultipleGenomesChk", "allow multiple", 
+                    value = cache_get_if_exists("allow_multiple_genomes", TRUE)),
+      actionButton("setGenomesBtn", "set"),
+      actionButton("addGenomesBtn", "add"),
+      actionButton("removeGenomesFromListBtn", "remove"),
+      actionButton("clearGenomeSelectionBtn", "clear selection"),
       DTOutput("genomeTable")
     ),
     tabPanel(
@@ -32,7 +35,7 @@ output$mainTabsPanel <- renderUI({
     ),
     tabPanel(
       "Selected Contigs",
-      actionButton("removeContigsBtn", "Remove selected contigs"),
+      actionButton("removeContigsBtn", "Remove contigs"),
       DTOutput("selectedTable")
     ),
     tabPanel(

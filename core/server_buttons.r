@@ -128,6 +128,16 @@ observeEvent(input$removeGenomesFromListBtn, {
 contigTableProxy <- DT::dataTableProxy("contigTable")
 genomeTableProxy <- DT::dataTableProxy("genomeTable")
 
+# persist checkbox states in cache
+observeEvent(input$allowMultipleContigsChk, {
+  cache_set("allow_multiple_contigs", input$allowMultipleContigsChk)
+})
+
+observeEvent(input$allowMultipleGenomesChk, {
+  cache_set("allow_multiple_genomes", input$allowMultipleGenomesChk)
+})
+
+
 observeEvent(input$clearContigSelectionBtn, {
   # clear the selected rows in the contig table
   DT::selectRows(contigTableProxy, NULL)
@@ -138,30 +148,4 @@ observeEvent(input$clearGenomeSelectionBtn, {
   DT::selectRows(genomeTableProxy, NULL)
 })
 
-# track last selected contig from table selections
-observeEvent(input$contigTable_rows_selected, {
-  rows <- input$contigTable_rows_selected
-  if (length(rows) > 0) {
-    contigs_data <- get_contigs(state$assembly)
-    if (!is.null(contigs_data) && nrow(contigs_data) >= max(rows)) {
-      # store the last selected contig (most recently selected)
-      last_row <- max(rows)
-      state$last_selected_contig <- contigs_data$contig[last_row]
-    }
-  }
-})
 
-observeEvent(input$goToLastSelectedBtn, {
-  if (!is.null(state$last_selected_contig)) {
-    # check if the last selected contig exists in the current assembly
-    contigs_data <- get_contigs(state$assembly)
-    if (!is.null(contigs_data) && state$last_selected_contig %in% contigs_data$contig) {
-      # push current region to undo before changing
-      regions_module_output$push_undo_state()
-      # set contigs to only the last selected one
-      state$contigs <- state$last_selected_contig
-      # reset zoom to see full range of the selected contig
-      state$zoom <- NULL
-    }
-  }
-})
