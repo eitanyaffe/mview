@@ -268,29 +268,31 @@ keyboard_shortcuts <- list(
     }
   ),
   "Alt+ArrowRight" = list(
-    description = "Move zoom area one window to the right",
+    description = "Move zoom area 3/4 window to the right",
     type = "zoom",
     action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
         regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        move_distance <- zoom_range * 0.75
         main_state_rv$zoom <- c(
-          main_state_rv$zoom[1] + zoom_range,
-          main_state_rv$zoom[2] + zoom_range
+          main_state_rv$zoom[1] + move_distance,
+          main_state_rv$zoom[2] + move_distance
         )
       }
     }
   ),
   "Alt+ArrowLeft" = list(
-    description = "Move zoom area one window to the left",
+    description = "Move zoom area 3/4 window to the left",
     type = "zoom",
     action = function(regions_module_output, main_state_rv) {
       if (!is.null(main_state_rv$zoom)) {
         regions_module_output$push_undo_state()
         zoom_range <- main_state_rv$zoom[2] - main_state_rv$zoom[1]
+        move_distance <- zoom_range * 0.75
         main_state_rv$zoom <- c(
-          main_state_rv$zoom[1] - zoom_range,
-          main_state_rv$zoom[2] - zoom_range
+          main_state_rv$zoom[1] - move_distance,
+          main_state_rv$zoom[2] - move_distance
         )
         cat("moved zoom area left by Alt+ArrowLeft\n")
       } else {
