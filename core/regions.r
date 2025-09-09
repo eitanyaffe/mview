@@ -337,7 +337,14 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         filename <- paste0(table_name, ".txt")
-        region_table(create_empty_region_table())
+        empty_table <- create_empty_region_table()
+        region_table(empty_table)
+        
+        # immediately create the physical file with headers
+        regions_dir <- ensure_regions_dir()
+        file_path <- file.path(regions_dir, filename)
+        write.table(empty_table, file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        
         set_current_regions_file(filename)
         shiny::removeModal()
         shiny::showNotification(paste("created new regions table:", filename), type = "message")
@@ -445,14 +452,22 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           available_files <- current_regions_file()
         }
         
-        # suggest next ID
-        next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
+        # determine default selection - use last used for adding, fallback to current
+        default_selection <- if (cache_exists("regions.last_used_for_add")) {
+          last_used <- cache_get("regions.last_used_for_add")
+          if (last_used %in% available_files) last_used else current_regions_file()
+        } else {
+          current_regions_file()
+        }
+        
+        # suggest next ID based on row count
+        next_id <- as.character(nrow(region_table()) + 1)
         
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
           shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
                            choices = available_files, 
-                           selected = current_regions_file()),
+                           selected = default_selection),
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
@@ -462,6 +477,36 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           ),
           easyClose = TRUE
         ))
+      })
+
+      # update region ID when file selection changes in add dialog
+      observeEvent(input$add_region_file, {
+        req(input$add_region_file)
+        
+        # get next ID for the selected file
+        selected_file <- input$add_region_file
+        
+        target_table <- if (selected_file == current_regions_file()) {
+          region_table()
+        } else {
+          tryCatch({
+            regions_dir <- get_regions_dir()
+            file_path <- file.path(regions_dir, selected_file)
+            if (file.exists(file_path)) {
+              read.table(file_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+            } else {
+              create_empty_region_table()
+            }
+          }, error = function(e) {
+            create_empty_region_table()
+          })
+        }
+        
+        # calculate next ID based on row count
+        next_id <- as.character(nrow(target_table) + 1)
+        
+        # update the ID input
+        shiny::updateTextInput(session, "add_region_id", value = next_id)
       })
 
       observeEvent(input$confirm_add_region, {
@@ -569,6 +614,9 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         write.table(updated_target_table, file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        
+        # cache the file as last used for adding
+        cache_set("regions.last_used_for_add", selected_file)
         
         # update current table if we saved to the current file
         if (selected_file == current_regions_file()) {
@@ -816,8 +864,9 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           escape = FALSE,
           rownames = FALSE,
           options = list(
-            pageLength = 10,
-            dom = "tip",
+            pageLength = 20,
+            lengthMenu = c(20, 50, 100),
+            dom = "ltip",
             columnDefs = list(
               list(targets = ncol(display_table) - 1, orderable = FALSE, width = "80px")
             )
@@ -866,14 +915,22 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           available_files <- current_regions_file()
         }
         
-        # suggest next ID
-        next_id <- if (nrow(region_table()) == 0) "1" else as.character(max(as.numeric(region_table()$id[!is.na(as.numeric(region_table()$id))]), 0, na.rm = TRUE) + 1)
+        # determine default selection - use last used for adding, fallback to current
+        default_selection <- if (cache_exists("regions.last_used_for_add")) {
+          last_used <- cache_get("regions.last_used_for_add")
+          if (last_used %in% available_files) last_used else current_regions_file()
+        } else {
+          current_regions_file()
+        }
+        
+        # suggest next ID based on row count
+        next_id <- as.character(nrow(region_table()) + 1)
         
         shiny::showModal(shiny::modalDialog(
           title = "Add Current Region",
           shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
                            choices = available_files, 
-                           selected = current_regions_file()),
+                           selected = default_selection),
           shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
           shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
           shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),

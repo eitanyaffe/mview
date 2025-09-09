@@ -187,3 +187,35 @@ register_tab(
   tab_label = "Alignments",
   tab_code = "tabs/alignment_tab.r"
 )
+
+########################################################
+# register variants tab
+########################################################
+
+# define shared get_map_tag function (used by both main_view and variants)
+lib.table <- get_data("LONG_LIB_TABLE")
+get_map_tag <- function(assembly, timepoint) {
+  ix = lib.table$ASSEMBLY_ID == assembly & lib.table$SAMPLE_TYPE == timepoint
+  if (sum(ix) == 0 || sum(ix) > 1) {
+    return (NULL)
+  }
+  paste0(assembly, "_", lib.table$LIB_ID[ix])
+}
+
+# simple function to get alignment for any assembly/library_id combination
+get_aln_f <- function(assembly, library_id) {
+  tag <- get_map_tag(assembly, library_id)
+  get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
+}
+
+register_tab(
+  tab_id = "variants",
+  tab_label = "Variants",
+  tab_code = "tabs/variants_tab.r",
+  min_reads = 5,
+  min_coverage = 10,
+  min_libraries = 0,
+  get_aln_f = get_aln_f,
+  library_ids = c("early", "pre", "post", "late"),
+  max_variants = 1000
+)

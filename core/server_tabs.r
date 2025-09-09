@@ -12,7 +12,7 @@ output$mainTabsPanel <- renderUI({
     tabPanel(
       "Contigs",
       checkboxInput("allowMultipleContigsChk", "allow multiple", 
-                    value = cache_get_if_exists("allow_multiple_contigs", TRUE)),
+                    value = cache_get_if_exists("allow_multiple_contigs", FALSE)),
       actionButton("setContigsBtn", "set"),
       actionButton("addContigsBtn", "add"),
       actionButton("removeContigsFromListBtn", "remove"),
@@ -22,7 +22,7 @@ output$mainTabsPanel <- renderUI({
     tabPanel(
       "Genomes",
       checkboxInput("allowMultipleGenomesChk", "allow multiple", 
-                    value = cache_get_if_exists("allow_multiple_genomes", TRUE)),
+                    value = cache_get_if_exists("allow_multiple_genomes", FALSE)),
       actionButton("setGenomesBtn", "set"),
       actionButton("addGenomesBtn", "add"),
       actionButton("removeGenomesFromListBtn", "remove"),

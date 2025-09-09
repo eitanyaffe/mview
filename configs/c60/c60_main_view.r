@@ -19,14 +19,7 @@ init_alntools(verbose = FALSE)
 # Alignment profiles
 ########################################################
 
-lib.table <- get_data("LONG_LIB_TABLE")
-get_map_tag <- function(assembly, timepoint) {
-  ix = lib.table$ASSEMBLY_ID == assembly & lib.table$SAMPLE_TYPE == timepoint
-  if (sum(ix) == 0 || sum(ix) > 1) {
-    return (NULL)
-  }
-  paste0(assembly, "_", lib.table$LIB_ID[ix])
-}
+# get_map_tag is now defined in c60_cfg.r
 
 # self-align profile (assembly only, no timepoint)
 if (get_current_view_parameter("show_self_align")) {
