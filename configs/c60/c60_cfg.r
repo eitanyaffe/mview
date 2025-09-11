@@ -231,7 +231,7 @@ get_variants_gene_table_f <- function(assembly) {
 register_tab(
   tab_id = "variants",
   tab_label = "Variants",
-  tab_code = "tabs/variants_tab.r",
+  tab_code = "tabs/variants/variants_tab.r",
   min_reads = 2,
   min_coverage = 10,
   min_libraries = 0,

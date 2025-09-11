@@ -28,8 +28,8 @@ get_server <- function() {
             session = session
         )
 
-        # load PDF server with access to regions module
-        source("core/server_pdf.r", local = TRUE)
+        # load enhanced export dialogs with access to regions module
+        source("core/export_dialogs.r", local = TRUE)
 
         keyboard_module_output <- keyboard_server(
             input = input,

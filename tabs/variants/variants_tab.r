@@ -1,3 +1,7 @@
+# load variant utilities (only loaded when variants tab is registered)
+source("tabs/variants/variants_utils.r", local = TRUE)
+source("tabs/variants/variants_plots.r", local = TRUE)
+
 # validate and extract tab parameters
 tab <- get_tab_by_id("variants")
 if (is.null(tab)) {
@@ -73,276 +77,31 @@ set_tab_panel_f(function() {
   )
 })
 
-# ---- Gene Object Creation ----
-
-# create genes object for variant annotation
-create_genes_object <- function(assembly, use_genes, get_gene_table_f, get_fasta_f, codon_table_path) {
-  genes_object <- NULL
-
-  if (use_genes) {
-    if (!is.function(get_gene_table_f) || !is.function(get_fasta_f)) {
-      stop("get_gene_table_f and get_fasta_f must be functions")
-    }
-
-    # create genes object with caching
-    genes_object <- cache(paste0(assembly, "_genes_object"), {
-      # get gene table data directly
-      gene_table_data <- get_gene_table_f(assembly)
-      if (!is.null(gene_table_data) && nrow(gene_table_data) > 0) {
-        # get reference sequences directly
-        reference_sequences_data <- get_fasta_f(assembly)
-        
-        genes_obj <- aln_genes(
-          gene_table = gene_table_data,
-          reference_sequences = reference_sequences_data,
-          codon_table_path = codon_table_path
-        )
-        
-        cat(sprintf("using gene annotation: %d genes loaded, %d reference sequences\n", 
-                   nrow(gene_table_data), length(reference_sequences_data)))
-        
-        genes_obj
-      } else {
-        cat("gene table function returned no data, proceeding without gene annotation\n")
-        NULL
-      }
-    })
-  }
-
-  return(genes_object)
-}
-
-# enhance variants with gene annotation data
-enhance_variants_with_gene_annotation <- function(variants_results, use_genes) {
-  # if genes were used, enhance variants data with gene annotation from alntools output
-  if (use_genes) {
-    variants_df <- variants_results$variants
-    
-    # only add gene annotation columns if there are variants
-    if (nrow(variants_df) > 0) {
-      # check if gene annotation data is available
-      if (!is.null(variants_results$genic) && nrow(variants_results$genic) > 0) {
-        genic_data <- variants_results$genic
-        # match variant_id with row_id in genic data
-        ix <- match(variants_df$variant_id, genic_data$row_id)
-        
-        # add gene columns using vectorized operations
-        variants_df$gene_desc <- ifelse(!is.na(ix), genic_data$gene_desc[ix], "none")
-        variants_df$mutation_desc <- ifelse(!is.na(ix), genic_data$mutation_desc[ix], "")
-        
-        cat(sprintf("enhanced %d variants with gene annotation data\n", sum(!is.na(ix))))
-      } else {
-        # no gene data available, add default columns
-        variants_df$gene_desc <- "none"
-        variants_df$mutation_desc <- ""
-        cat("no gene annotation data available\n")
-      }
-      
-      # update the variants results
-      variants_results$variants <- variants_df
-    } else {
-      cat("no variants found, skipping gene annotation\n")
-    }
-  }
-  
-  return(variants_results)
-}
-
 # ---- Variant Data Management ----
+# (utility functions moved to variants_utils.r)
 
-# add color information to variants dataframe
-add_variant_colors <- function(variants_df) {
-  if (is.null(variants_df) || nrow(variants_df) == 0) {
-    return(variants_df)
-  }
-  
-  # load alignment color functions if not available
-  if (!exists("get_variant_type_colors") || !exists("get_mutation_type_colors")) {
-    source("profiles/align/align_utils.r")
-  }
-  
-  # get mutation color mode from alignment profiles
-  mutation_color_mode <- profile_get_param("mutation_color_mode", "align", "detailed")
-  
-  # apply coloring based on mutation mode and add colors to variants dataframe
-  if (mutation_color_mode == "detailed") {
-    unique_descs <- unique(variants_df$desc)
-    type_colors <- get_variant_type_colors(unique_descs)
-    names(type_colors) <- unique_descs
-    
-    missing_descs <- unique_descs[!unique_descs %in% names(type_colors)]
-    if (length(missing_descs) > 0) {
-      black_colors <- rep("#000000", length(missing_descs))
-      names(black_colors) <- missing_descs
-      type_colors <- c(type_colors, black_colors)
-    }
-    
-    # add color column to variants dataframe
-    variants_df$color <- type_colors[variants_df$desc]
-  } else {
-    type_mapping <- c("sub" = "substitution", "ins" = "addition", "del" = "deletion")
-    color_type <- type_mapping[variants_df$type]
-    color_type[is.na(color_type)] <- "clip"
-    
-    color_types <- unique(color_type)
-    type_colors <- get_mutation_type_colors(color_types)
-    names(type_colors) <- color_types
-    type_colors["clip"] <- "#000000"
-    
-    # add color column to variants dataframe
-    variants_df$color <- type_colors[color_type]
-  }
-  
-  return(variants_df)
-}
-
-# get alignment stores for variant querying using configured get_aln_f function
-get_variant_alignment_stores <- function(assembly, contigs, zoom) {
-  if (is.null(assembly) || length(contigs) == 0) {
-    return(NULL)
-  }
-  
-  # get alignment stores from all configured library_ids
-  stores <- list()
-  
-  for (library_id in library_ids) {
-    tryCatch({
-      aln <- get_aln_f(assembly, library_id)
-      if (!is.null(aln) && inherits(aln, "externalptr")) {
-        stores[[library_id]] <- aln
-      } else {
-        warning(sprintf("get_aln_f returned invalid alignment for library_id '%s'", library_id))
-      }
-    }, error = function(e) {
-      warning(sprintf("error getting alignment for library_id '%s': %s", library_id, e$message))
-    })
-  }
-  
-  if (length(stores) == 0) {
-    return(NULL)
-  }
-  
-  return(stores)
-}
-
-# query variants using alntools
+# simplified query function that uses the utility function
 query_variants <- function(assembly, contigs, zoom) {
-  # early return if no context
-  if (is.null(assembly) || length(contigs) == 0) {
-    return(NULL)
-  }
-  
-  # get alignment stores using the new function
-  stores <- get_variant_alignment_stores(assembly, contigs, zoom)
-  if (is.null(stores) || length(stores) == 0) {
-    return(NULL)
-  }
-  
-  # get contigs data and build context for intervals
-  contigs_table <- get_contigs(assembly)
-  if (is.null(contigs_table)) {
-    return(NULL)
-  }
-  
-  # build context for intervals
-  cxt <- build_context(contigs, contigs_table, zoom, assembly)
-  if (is.null(cxt) || is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
-    return(NULL)
-  }
-  
-  # get alignment filter parameters from UI
-  get_filter_param <- function(param_id, default_value, type_converter = identity) {
-    param_key <- paste0("align_filter_", param_id)
-    if (!param_key %in% names(param_registry)) {
-      warning(sprintf("alignment filter parameter '%s' not found, using default: %s", param_id, default_value))
-      return(default_value)
-    }
-    
-    param_accessor <- get_param("align_filter", param_id)
-    value <- param_accessor()
-    return(type_converter(value))
-  }
-  
-  clip_mode <- get_filter_param("clip_mode", "all")
-  clip_margin <- get_filter_param("clip_margin", 10L, as.integer)
-  min_mutations_percent <- get_filter_param("min_mutations_percent", 0.0, as.numeric)
-  max_mutations_percent <- get_filter_param("max_mutations_percent", 10.0, as.numeric)
-  min_alignment_length <- get_filter_param("min_alignment_length", 0L, as.integer)
-  max_alignment_length <- get_filter_param("max_alignment_length", 0L, as.integer)
-  min_indel_length <- get_filter_param("min_indel_length", 3L, as.integer)
-
-  # print filter parameters before query
-  cat(sprintf("variant query filters: clip_mode=%s, clip_margin=%d, min_mutations_percent=%.1f%%, max_mutations_percent=%.1f%%, min_alignment_length=%d, max_alignment_length=%d, min_indel_length=%d\n",
-              clip_mode, clip_margin, min_mutations_percent, max_mutations_percent, 
-              min_alignment_length, max_alignment_length, min_indel_length))
-  
-  # prepare gene annotation data if genes are enabled
-  genes_object <- create_genes_object(assembly, use_genes, get_gene_table_f, get_fasta_f, codon_table_path)
-
-  # call aln_query_variants with alignment filter parameters from UI
-  variants_results <- aln_query_variants(
-    store_list = stores,
-    intervals_df = cxt$intervals,
-    min_variants_variant_support = min_reads,
-    min_variants_library_support = min_libraries,
-    min_variants_coverage_support = min_coverage,
-    clip_mode_str = clip_mode,
-    clip_margin = clip_margin,
-    min_mutations_percent = min_mutations_percent,
-    max_mutations_percent = max_mutations_percent,
-    min_alignment_length = min_alignment_length,
-    max_alignment_length = max_alignment_length,
-    min_indel_length = min_indel_length,
-    genes = genes_object
+  # create tab config object for the utility function
+  tab_config <- list(
+    min_reads = min_reads,
+    min_coverage = min_coverage,
+    min_libraries = min_libraries,
+    get_aln_f = get_aln_f,
+    library_ids = library_ids,
+    use_genes = use_genes,
+    get_gene_table_f = get_gene_table_f,
+    get_fasta_f = get_fasta_f,
+    codon_table_path = codon_table_path
   )
   
-  # enhance variants with gene annotation if genes were used
-  variants_results <- enhance_variants_with_gene_annotation(variants_results, use_genes)
-  
-  return(variants_results)
-}
-
-# filter variants by span (frequency range)
-filter_variants_by_span <- function(variant_data, min_span) {
-  if (is.null(variant_data) || is.null(variant_data$support) || is.null(variant_data$coverage)) {
-    return(variant_data)
-  }
-  
-  # calculate frequency for each variant across libraries
-  support_matrix <- variant_data$support
-  coverage_matrix <- variant_data$coverage
-  
-  # avoid division by zero
-  freq_matrix <- ifelse(coverage_matrix > 0, support_matrix / coverage_matrix, 0)
-  
-  # calculate span (max - min frequency) for each variant
-  variant_spans <- apply(freq_matrix, 1, function(row) {
-    valid_freqs <- row[!is.na(row) & is.finite(row)]
-    if (length(valid_freqs) == 0) return(0)
-    max(valid_freqs) - min(valid_freqs)
-  })
-  
-  # filter variants meeting span threshold
-  keep_variants <- variant_spans >= min_span
-  
-  # filter all components
-  filtered_data <- list(
-    variants = variant_data$variants[keep_variants, ],
-    support = variant_data$support[keep_variants, , drop = FALSE],
-    coverage = variant_data$coverage[keep_variants, , drop = FALSE],
-    library_ids = variant_data$library_ids
-  )
-  
-  return(filtered_data)
+  return(query_variants_for_context(assembly, contigs, zoom, tab_config))
 }
 
 # ---- Event Handlers ----
 
 # reactive value to track selected variants for highlighting
 selected_variants <- reactiveVal(NULL)
-
-# reactive value to track if profiles are out of sync
-profiles_out_of_sync <- reactiveVal(FALSE)
 
 # observer for table row selection
 observeEvent(input$variantsTable_rows_selected, {
@@ -362,8 +121,14 @@ observeEvent(input$variantsTable_rows_selected, {
         refresh_trigger(current_val + 1)
       }
     } else {
-      # mark profiles as out of sync when highlighting changes but auto-update is disabled
-      profiles_out_of_sync(TRUE)
+      # mark plots as needing refresh when highlighting changes but auto-update is disabled
+      # but only if there was a previous selection (don't invalidate on startup with no selection)
+      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+        previous_selection <- selected_variants()
+        if (!is.null(previous_selection)) {
+          invalidate_plot()
+        }
+      }
     }
     return()
   }
@@ -386,8 +151,10 @@ observeEvent(input$variantsTable_rows_selected, {
           refresh_trigger(current_val + 1)
         }
       } else {
-        # mark profiles as out of sync when highlighting changes but auto-update is disabled
-        profiles_out_of_sync(TRUE)
+        # mark plots as needing refresh when highlighting changes but auto-update is disabled
+        if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+          invalidate_plot()
+        }
       }
     } else {
       # clear selection when no valid rows are selected
@@ -431,12 +198,11 @@ observeEvent(input$variantsTable_state, {
 observeEvent(input$autoUpdateProfilesChk, {
   cache_set("auto_update_profiles", input$autoUpdateProfilesChk)
   
-  # if auto-update is enabled and profiles were out of sync, refresh now
-  if (input$autoUpdateProfilesChk && profiles_out_of_sync()) {
-    if (exists("refresh_trigger")) {
+  # if auto-update is enabled and plots were out of sync, refresh now
+  if (input$autoUpdateProfilesChk && exists("plot_updated") && is.function(plot_updated)) {
+    if (!plot_updated() && exists("refresh_trigger")) {
       current_val <- refresh_trigger()
       refresh_trigger(current_val + 1)
-      profiles_out_of_sync(FALSE)
     }
   }
 })
@@ -510,11 +276,6 @@ observeEvent(input$gotoVariantsBtn, {
   showNotification(sprintf("Navigated to %d selected variants", length(valid_rows)), type = "message")
 })
 
-# output for sync status indicator
-output$variantsOutOfSync <- reactive({
-  profiles_out_of_sync()
-})
-outputOptions(output, "variantsOutOfSync", suspendWhenHidden = FALSE)
 
 # update button handler
 observeEvent(input$updateVariantsBtn, {
@@ -550,17 +311,21 @@ observeEvent(input$updateVariantsBtn, {
         current_val <- refresh_trigger()
         refresh_trigger(current_val + 1)
       }
-      profiles_out_of_sync(FALSE)
     } else {
-      profiles_out_of_sync(TRUE)
+      # mark plots as needing refresh when auto-update is disabled
+      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+        invalidate_plot()
+      }
     }
   } else {
     state$filtered_variant_data <- NULL
     state$variants <- NULL
     cache_set("variants.current", NULL)
-    # still mark as out of sync even if no data
+    # still mark as needing refresh even if no data
     if (!(input$autoUpdateProfilesChk %||% FALSE)) {
-      profiles_out_of_sync(TRUE)
+      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+        invalidate_plot()
+      }
     }
   }
 })
@@ -591,9 +356,11 @@ observeEvent(input$variantSpanFilter, {
         current_val <- refresh_trigger()
         refresh_trigger(current_val + 1)
       }
-      profiles_out_of_sync(FALSE)
     } else {
-      profiles_out_of_sync(TRUE)
+      # mark plots as needing refresh when auto-update is disabled
+      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+        invalidate_plot()
+      }
     }
   }
 })

@@ -44,6 +44,14 @@ output$profilePlots <- renderUI({
 # reactive trigger for manual refresh
 refresh_trigger <- reactiveVal(0)
 
+# reactive value to track plot sync status (TRUE = up to date, FALSE = needs refresh)
+plot_updated <- reactiveVal(TRUE)
+
+# global function to invalidate plots (called from tabs when changes occur)
+invalidate_plot <- function() {
+  plot_updated(FALSE)
+}
+
 # Server side: render plots for all registered profiles and cache info_df for hover
 observe({
   refresh_trigger()  # establish reactive dependency on manual refresh trigger
@@ -62,14 +70,8 @@ observe({
   plot_result <- plot_profiles(cxt)
   combined_plotly_obj <- if (!is.null(plot_result)) plot_result$plot else NULL
   
-  # reset out of sync status after profiles are plotted
-  if (exists("profiles_out_of_sync") && is.function(profiles_out_of_sync)) {
-    tryCatch({
-      profiles_out_of_sync(FALSE)
-    }, error = function(e) {
-      # ignore error if function doesn't exist
-    })
-  }
+  # mark plots as up to date after successful plotting
+  plot_updated(TRUE)
   
   # Store legends in state for the legend tab
   state$current_legends <- if (!is.null(plot_result)) plot_result$legends else list()
@@ -162,20 +164,11 @@ observeEvent(input$mouse_coords, {
   )
 })
 
-# refresh button UI with conditional styling
+# refresh button UI with conditional styling based on plot_updated status
 output$refreshBtnUI <- renderUI({
-  # check if variants are out of sync (only if variants tab exists)
-  out_of_sync <- FALSE
-  if (exists("profiles_out_of_sync") && is.function(profiles_out_of_sync)) {
-    tryCatch({
-      out_of_sync <- profiles_out_of_sync()
-    }, error = function(e) {
-      out_of_sync <- FALSE
-    })
-  }
-  
-  # choose button class based on sync status
-  btn_class <- if (out_of_sync) "btn-warning" else "btn-default"
+  # observe plot_updated to determine button style
+  is_updated <- plot_updated()
+  btn_class <- if (is_updated) "btn-default" else "btn-warning"
   
   actionButton("refreshBtn", "Refresh", icon = icon("refresh"), class = btn_class)
 })
@@ -185,25 +178,5 @@ observeEvent(input$refreshBtn, {
   current_val <- refresh_trigger()
   refresh_trigger(current_val + 1)
   cat("plot refresh triggered manually\n")
-  
-  # reset out of sync status when refresh is pressed
-  if (exists("profiles_out_of_sync") && is.function(profiles_out_of_sync)) {
-    tryCatch({
-      profiles_out_of_sync(FALSE)
-    }, error = function(e) {
-      # ignore error if function doesn't exist
-    })
-  }
 })
 
-# observer to reset sync status after any profile plot is rendered
-observeEvent(refresh_trigger(), {
-  # reset out of sync status when profiles are actually refreshed
-  if (exists("profiles_out_of_sync") && is.function(profiles_out_of_sync)) {
-    tryCatch({
-      profiles_out_of_sync(FALSE)
-    }, error = function(e) {
-      # ignore error if function doesn't exist
-    })
-  }
-}, ignoreInit = TRUE)
