@@ -107,9 +107,23 @@ output$mainTabsPanel <- renderUI({
   # combine fixed and dynamic tabs
   all_tabs <- c(fixed_tabs, dynamic_tab_panels)
   
+  # get cached recent tab for initial selection
+  cached_tab <- cache_get_if_exists("recent_tab", NULL)
+  
   # create the tabsetPanel with all tabs
-  do.call(tabsetPanel, c(list(id = "mainTabs"), all_tabs))
+  if (!is.null(cached_tab)) {
+    do.call(tabsetPanel, c(list(id = "mainTabs", selected = cached_tab), all_tabs))
+  } else {
+    do.call(tabsetPanel, c(list(id = "mainTabs"), all_tabs))
+  }
 })
+
+# observer to cache recent tab selection
+observeEvent(input$mainTabs, {
+  if (!is.null(input$mainTabs)) {
+    cache_set("recent_tab", input$mainTabs)
+  }
+}, ignoreInit = TRUE)
 
 # observers to cache contig length filter values
 observeEvent(input$min_contig_length, {

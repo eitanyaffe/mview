@@ -1,9 +1,17 @@
 output$viewSelect <- renderUI({
   ids <- get_view_ids()
   selected_id <- isolate(input$view_id)
+  
+  # use cached recent view if no current selection
   if (is.null(selected_id)) {
-    selected_id <- ids[1]
+    cached_view <- cache_get_if_exists("recent_view", NULL)
+    if (!is.null(cached_view) && cached_view %in% ids) {
+      selected_id <- cached_view
+    } else {
+      selected_id <- ids[1]
+    }
   }
+  
   selectInput(
     inputId = "view_id",
     label = "View:",
@@ -21,6 +29,10 @@ observeEvent(input$view_id,
       cat("skipping set_view - programmatic update\n")
       return()
     }
+    
+    # cache the selected view
+    cache_set("recent_view", input$view_id)
+    
     set_view(input$view_id)
   },
   ignoreInit = TRUE

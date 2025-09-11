@@ -37,16 +37,25 @@ set_tab_panel_f(function() {
     fluidRow(
       column(3,
         wellPanel(
-          h5("Update Variants"),
-          actionButton("updateVariantsBtn", "Update", class = "btn-primary", width = "100%"),
+          h5("Variant Controls"),
+          actionButton("updateVariantsBtn", "Update Variants", class = "btn-primary", width = "100%"),
           br(), br(),
+          verbatimTextOutput("variantCountText", placeholder = TRUE),
+          br(),
+          checkboxInput("autoUpdateProfilesChk", "Auto-update profiles", 
+                       value = cache_get_if_exists("auto_update_profiles", FALSE), width = "100%"),
+          br(),
+          actionButton("gotoVariantsBtn", "Goto", class = "btn-secondary", width = "100%"),
+          br(), br(),
+          h5("Filtering"),
+          numericInput("variantSpanFilter", "Min Span:", 
+                      value = 0.5, min = 0, max = 1, step = 0.1, width = "100%"),
+          br(),
           selectInput("variantPlotMode", "Plot Mode:", 
                      choices = c("Frequency" = "frequency", 
                                 "Variant Support" = "variant_support", 
                                 "Variant Coverage" = "variant_coverage"),
-                     selected = "frequency", width = "100%"),
-          numericInput("variantSpanFilter", "Min Span:", 
-                      value = 0.5, min = 0, max = 1, step = 0.1, width = "100%")
+                     selected = "frequency", width = "100%")
         )
       ),
       column(9,
@@ -332,6 +341,9 @@ filter_variants_by_span <- function(variant_data, min_span) {
 # reactive value to track selected variants for highlighting
 selected_variants <- reactiveVal(NULL)
 
+# reactive value to track if profiles are out of sync
+profiles_out_of_sync <- reactiveVal(FALSE)
+
 # observer for table row selection
 observeEvent(input$variantsTable_rows_selected, {
   variant_data <- state$filtered_variant_data
@@ -343,10 +355,15 @@ observeEvent(input$variantsTable_rows_selected, {
     selected_variants(NULL)
     cache_set("variants.selected", NULL)
     
-    # refresh plots to remove highlighting
-    if (exists("refresh_trigger")) {
-      current_val <- refresh_trigger()
-      refresh_trigger(current_val + 1)
+    # refresh plots to remove highlighting only if auto-update is enabled
+    if (input$autoUpdateProfilesChk %||% FALSE) {
+      if (exists("refresh_trigger")) {
+        current_val <- refresh_trigger()
+        refresh_trigger(current_val + 1)
+      }
+    } else {
+      # mark profiles as out of sync when highlighting changes but auto-update is disabled
+      profiles_out_of_sync(TRUE)
     }
     return()
   }
@@ -362,10 +379,15 @@ observeEvent(input$variantsTable_rows_selected, {
       # store in cache for profile access
       cache_set("variants.selected", selected_vars)
       
-      # refresh plots to show highlighting
-      if (exists("refresh_trigger")) {
-        current_val <- refresh_trigger()
-        refresh_trigger(current_val + 1)
+      # refresh plots to show highlighting only if auto-update is enabled
+      if (input$autoUpdateProfilesChk %||% FALSE) {
+        if (exists("refresh_trigger")) {
+          current_val <- refresh_trigger()
+          refresh_trigger(current_val + 1)
+        }
+      } else {
+        # mark profiles as out of sync when highlighting changes but auto-update is disabled
+        profiles_out_of_sync(TRUE)
       }
     } else {
       # clear selection when no valid rows are selected
@@ -405,6 +427,95 @@ observeEvent(input$variantsTable_state, {
   }
 }, ignoreNULL = FALSE)
 
+# observer for auto-update profiles checkbox
+observeEvent(input$autoUpdateProfilesChk, {
+  cache_set("auto_update_profiles", input$autoUpdateProfilesChk)
+  
+  # if auto-update is enabled and profiles were out of sync, refresh now
+  if (input$autoUpdateProfilesChk && profiles_out_of_sync()) {
+    if (exists("refresh_trigger")) {
+      current_val <- refresh_trigger()
+      refresh_trigger(current_val + 1)
+      profiles_out_of_sync(FALSE)
+    }
+  }
+})
+
+# goto button handler  
+observeEvent(input$gotoVariantsBtn, {
+  variant_data <- state$filtered_variant_data
+  selected_rows <- input$variantsTable_rows_selected
+  
+  if (is.null(selected_rows) || length(selected_rows) == 0) {
+    showNotification("Please select variants to navigate to", type = "warning")
+    return()
+  }
+  
+  if (is.null(variant_data) || is.null(variant_data$variants)) {
+    showNotification("No variant data available", type = "error")
+    return()
+  }
+  
+  # filter valid row indices
+  valid_rows <- selected_rows[selected_rows <= nrow(variant_data$variants)]
+  if (length(valid_rows) == 0) {
+    showNotification("Invalid variant selection", type = "error")
+    return()
+  }
+  
+  # get selected variants
+  selected_vars <- variant_data$variants[valid_rows, ]
+  
+  # build context to get global coordinates
+  contigs_table <- get_contigs(state$assembly)
+  if (is.null(contigs_table)) {
+    showNotification("Cannot get contig information", type = "error")
+    return()
+  }
+  
+  cxt <- build_context(state$contigs, contigs_table, state$zoom, state$assembly)
+  if (is.null(cxt)) {
+    showNotification("Cannot build context for navigation", type = "error")
+    return()
+  }
+  
+  # convert to global coordinates using the context mapper
+  selected_vars$gcoord <- cxt$mapper$l2g(selected_vars$contig, selected_vars$coord)
+  
+  # calculate spanning range with appropriate margin
+  min_coord <- min(selected_vars$gcoord)
+  max_coord <- max(selected_vars$gcoord)
+  
+  if (length(valid_rows) == 1) {
+    # single variant: minimum 10kb window
+    window_size <- 10000  # 10kb minimum window
+    center <- selected_vars$gcoord[1]
+    half_window <- window_size / 2
+    zoom_start <- center - half_window
+    zoom_end <- center + half_window
+  } else {
+    # multiple variants: 10% margin on each side
+    span <- max_coord - min_coord
+    margin <- span * 0.1
+    zoom_start <- min_coord - margin
+    zoom_end <- max_coord + margin
+  }
+  
+  # push current region to undo before changing
+  regions_module_output$push_undo_state()
+  
+  # set zoom to calculated range
+  state$zoom <- c(zoom_start, zoom_end)
+  
+  showNotification(sprintf("Navigated to %d selected variants", length(valid_rows)), type = "message")
+})
+
+# output for sync status indicator
+output$variantsOutOfSync <- reactive({
+  profiles_out_of_sync()
+})
+outputOptions(output, "variantsOutOfSync", suspendWhenHidden = FALSE)
+
 # update button handler
 observeEvent(input$updateVariantsBtn, {
   
@@ -433,15 +544,24 @@ observeEvent(input$updateVariantsBtn, {
       cache_set("variants.current", NULL)
     }
     
-    # refresh plots to show updated variants
-    if (exists("refresh_trigger")) {
-      current_val <- refresh_trigger()
-      refresh_trigger(current_val + 1)
+    # refresh profile plots only if auto-update is enabled
+    if (input$autoUpdateProfilesChk %||% FALSE) {
+      if (exists("refresh_trigger")) {
+        current_val <- refresh_trigger()
+        refresh_trigger(current_val + 1)
+      }
+      profiles_out_of_sync(FALSE)
+    } else {
+      profiles_out_of_sync(TRUE)
     }
   } else {
     state$filtered_variant_data <- NULL
     state$variants <- NULL
     cache_set("variants.current", NULL)
+    # still mark as out of sync even if no data
+    if (!(input$autoUpdateProfilesChk %||% FALSE)) {
+      profiles_out_of_sync(TRUE)
+    }
   }
 })
 
@@ -465,15 +585,45 @@ observeEvent(input$variantSpanFilter, {
       cache_set("variants.current", NULL)
     }
     
-    # refresh plots to show updated variants
-    if (exists("refresh_trigger")) {
-      current_val <- refresh_trigger()
-      refresh_trigger(current_val + 1)
+    # refresh profile plots only if auto-update is enabled
+    if (input$autoUpdateProfilesChk %||% FALSE) {
+      if (exists("refresh_trigger")) {
+        current_val <- refresh_trigger()
+        refresh_trigger(current_val + 1)
+      }
+      profiles_out_of_sync(FALSE)
+    } else {
+      profiles_out_of_sync(TRUE)
     }
   }
 })
 
-# ---- Table Renderer ----
+# ---- Output Renderers ----
+
+# variant count text output
+output$variantCountText <- renderText({
+  variant_data <- state$filtered_variant_data
+  raw_data <- state$raw_variant_data
+  
+  if (is.null(variant_data) || is.null(variant_data$variants)) {
+    return("No variants loaded")
+  }
+  
+  filtered_count <- nrow(variant_data$variants)
+  
+  # always show total and filtered when we have raw data
+  if (!is.null(raw_data) && !is.null(raw_data$variants)) {
+    total_count <- nrow(raw_data$variants)
+    return(sprintf("Total: %d, Filtered: %d", total_count, filtered_count))
+  }
+  
+  # fallback when no raw data
+  if (filtered_count == 0) {
+    return("0 variants found")
+  }
+  
+  return(sprintf("%d variants found", filtered_count))
+})
 
 output$variantsTable <- renderDT({
   variant_data <- state$filtered_variant_data
