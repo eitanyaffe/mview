@@ -80,6 +80,30 @@ get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE,
   })
 }
 
+# Get file path by ID with optional tag (without reading the file)
+get_path <- function(id, tag = "") {
+  if (!exists("lookups", envir = .data_env) || is.null(.data_env$lookups)) {
+    stop("lookup table not set, call set_lookup first")
+  }
+
+  id <- if (tag != "") paste(id, tag, sep = ":") else id
+
+  # Check if ID exists in lookup table
+  if (!id %in% .data_env$lookups$id) {
+    stop(sprintf("data id not found: %s", id))
+  }
+
+  # Get path from lookup table
+  path <- .data_env$lookups$path[.data_env$lookups$id == id]
+  
+  # Check if file exists
+  if (!file.exists(path)) {
+    stop(sprintf("data file not found: %s", path))
+  }
+  
+  return(path)
+}
+
 make_get_data_f <- function(id, tag = "", read_f = read.delim) {
   function(cxt) {
     get_data(id, tag, read_f)

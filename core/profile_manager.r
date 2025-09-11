@@ -178,6 +178,36 @@ profiles_get_all <- function() {
   .profile_env$registered_profiles
 }
 
+#' Get a parameter value from profiles of a specific type
+#' Searches through all registered profiles for the first one matching the type
+#' and returns the specified parameter value, or the default if not found.
+#' @param param_name Character, name of the parameter to retrieve.
+#' @param profile_type Character, type of profile to search (optional).
+#' @param default_value Any, value to return if parameter not found.
+#' @return The parameter value if found, otherwise default_value.
+profile_get_param <- function(param_name, profile_type = NULL, default_value = NULL) {
+  stopifnot(is.character(param_name) && length(param_name) == 1 && nzchar(param_name))
+  
+  profiles <- .profile_env$registered_profiles
+  if (length(profiles) == 0) {
+    return(default_value)
+  }
+  
+  for (profile in profiles) {
+    # check if profile type matches (if specified)
+    if (!is.null(profile_type) && profile$type != profile_type) {
+      next
+    }
+    
+    # check if parameter exists in this profile
+    if (!is.null(profile[[param_name]])) {
+      return(profile[[param_name]])
+    }
+  }
+  
+  return(default_value)
+}
+
 #' Clear all registered profiles
 #' Removes all profiles from the registry.
 profiles_clear_all <- function() {

@@ -57,16 +57,16 @@ register_contig_map_f(function(assembly = NULL) {
   data.frame(contig = df$contig, gid = df$contig)
 })
 
+read_fasta_f <- function(path) {
+  seqinr::read.fasta(file = path, seqtype = "DNA", as.string = TRUE)
+}
+
+get_fasta_f <- function(assembly = NULL) {
+  get_data("ASSEMBLY_CONTIG_FILE", tag = assembly, read_f = read_fasta_f)
+}
+
 # Register fasta function
-register_fasta_f(function(assembly = NULL) {
-  get_data("ASSEMBLY_CONTIG_FILE", tag = assembly, read_f = function(path) {
-    # check if seqinr is available
-    if (!requireNamespace("seqinr", quietly = TRUE)) {
-      stop("seqinr package not available, install with: install.packages('seqinr')")
-    }
-    seqinr::read.fasta(file = path, seqtype = "DNA", as.string = TRUE)
-  })
-})
+register_fasta_f(get_fasta_f)
 
 ########################################################
 # register views
@@ -208,14 +208,38 @@ get_aln_f <- function(assembly, library_id) {
   get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
 }
 
+# define get_gene_table_f function for variant queries
+get_variants_gene_table_f <- function(assembly) {
+  # get genes data using the existing get_genes_f function
+  cxt <- list(assembly = assembly)
+  genes_data <- get_genes_f(cxt)
+
+  # convert to alntools gene table format
+  gene_table <- data.frame(
+    gene = genes_data$gene,
+    contig = genes_data$contig,
+    start = genes_data$start,
+    end = genes_data$end,
+    strand = genes_data$strand,
+    desc = genes_data$prot_desc,
+    stringsAsFactors = FALSE
+  )
+  
+  return(gene_table)
+}
+
 register_tab(
   tab_id = "variants",
   tab_label = "Variants",
   tab_code = "tabs/variants_tab.r",
-  min_reads = 5,
+  min_reads = 2,
   min_coverage = 10,
   min_libraries = 0,
   get_aln_f = get_aln_f,
   library_ids = c("early", "pre", "post", "late"),
-  max_variants = 1000
+  max_variants = 1000,
+  get_gene_table_f = get_variants_gene_table_f,
+  codon_table_path = "codon_tables/table11",
+  get_fasta_f = get_fasta_f,
+  use_genes = TRUE
 )

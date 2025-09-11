@@ -76,7 +76,7 @@ segments_profile <- function(id, name, height = 40,
       ggplot2::geom_text(
         data = filtered_segments,
         ggplot2::aes(
-          x = gend + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.01,
+          x = gend + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
           y = -0.05,
           label = id,
           text = hover_text

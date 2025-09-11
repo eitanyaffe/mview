@@ -4,6 +4,9 @@ source("profiles/align/align_profile_api.r")
 # Load segments profile
 source("profiles/segments_profile.r")
 
+# Load variants profile
+source("profiles/variants_profile.r")
+
 # Load rRNA profile
 source("profiles/rrna_profile.r")
 
@@ -170,6 +173,15 @@ segments_profile(
   id = "regions",
   name = "Regions",
   segments_f = "segments.current_regions"
+)
+
+########################################################
+# variants profile
+########################################################
+
+variants_profile(
+  id = "variants",
+  name = "Variants"
 )
 
 ########################################################

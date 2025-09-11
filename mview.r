@@ -53,6 +53,9 @@ rl_core <- function(project_id) {
 
     # initialize cache
     cache_init(project_id = project_id)
+    
+    # reset variant cache on startup
+    cache_set("variants.current", NULL)
 
     # data
     source("core/data.r", local = FALSE)

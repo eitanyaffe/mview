@@ -189,7 +189,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
     # determine if we should show gray borders based on view range
     range_bp <- (cxt$mapper$xlim[2] + 1) - cxt$mapper$xlim[1]
-    show_borders <- range_bp <= 1000001  # show borders only under 1Mb
+    show_borders <- range_bp <= 200000  # show borders only under 1Mb
     border_color <- if (show_borders) "gray50" else NA
     
     # draw alignment rectangles

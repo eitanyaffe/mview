@@ -203,10 +203,12 @@ align_profile <- function(id, name,
 
     range_bp <- (xlim[2] + 1) - xlim[1]
 
-    if (plot_style == "auto") {
-      if (use_pileup && range_bp <= pileup_threshold) {
+    if (use_pileup && range_bp <= pileup_threshold) {
         return("pileup")
-      } else if (range_bp <= (full_threshold + 1)) {
+    }
+
+    if (plot_style == "auto") {
+      if (range_bp <= (full_threshold + 1)) {
         return("full")
       } else {
         return("bin")
