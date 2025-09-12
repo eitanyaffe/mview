@@ -17,13 +17,14 @@ sanitize_filename <- function(name) {
 
 # get context window options
 get_context_options <- function() {
-  c("Precise", "1kb margin", "10kb margin", "100kb margin", "1mb margin", "All")
+  c("Precise", "-10kb margin", "1kb margin", "10kb margin", "100kb margin", "1mb margin", "All")
 }
 
 # convert context option to folder name
 context_to_folder_name <- function(context_option) {
   folder_names <- c(
     "Precise" = "precise",
+    "-10kb margin" = "minus_10kb_margin",
     "1kb margin" = "1kb_margin", 
     "10kb margin" = "10kb_margin",
     "100kb margin" = "100kb_margin",
@@ -63,6 +64,19 @@ calculate_context_zoom <- function(current_zoom, context_option, contigs_table) 
   
   switch(context_option,
     "Precise" = current_zoom,
+    "-10kb margin" = {
+      # negative margin makes region smaller
+      margin <- 10000
+      new_start <- current_zoom[1] + margin
+      new_end <- current_zoom[2] - margin
+      
+      # skip regions that would become zero or negative
+      if (new_end <= new_start) {
+        return(NULL)
+      }
+      
+      c(new_start, new_end)
+    },
     "1kb margin" = {
       margin <- 1000
       c(current_zoom[1] - margin, current_zoom[2] + margin)
@@ -156,6 +170,11 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   
   # calculate context zoom for this region and context
   context_zoom <- calculate_context_zoom(region_zoom, context_option, get_contigs(state$assembly))
+  
+  # skip regions that would have zero or negative size (e.g., with negative margins)
+  if (context_option == "-10kb margin" && is.null(context_zoom)) {
+    return(FALSE)
+  }
   
   # build context and plot profiles
   cxt <- build_context(
