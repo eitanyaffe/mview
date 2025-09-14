@@ -7,6 +7,7 @@ get_server <- function() {
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)
         source("core/server_states.r", local = TRUE)
+        source("core/server_navigation.r", local = TRUE)
 
         # load tabs
         load_tabs()

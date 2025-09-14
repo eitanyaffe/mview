@@ -167,6 +167,31 @@ ui <- fluidPage(
     .expanded #profilePlots {
       width: 100% !important;
     }
+    .navigation-panel {
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .nav-button-group {
+      display: flex;
+      gap: 3px;
+    }
+    .nav-button-group .btn-sm {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nav-button-group .context-zoom-btn {
+      width: 40px;
+    }
   ")),
   fluidRow(
     column(
@@ -184,7 +209,6 @@ ui <- fluidPage(
       verbatimTextOutput("basic_info"),
       h5("Last Key Press"),
       verbatimTextOutput("last_key_output"),
-      uiOutput("refreshBtnUI"),
       actionButton("plotViewBtn", "Export", icon = icon("file-pdf")),
       actionButton("plotRegionsBtn", "Export All", icon = icon("file-pdf")),
       actionButton("helpBtn", "Help"),
@@ -201,6 +225,7 @@ ui <- fluidPage(
         div(
           id = "profile-plots-column",
           style = "flex: 1 1 auto; width: 79.17%;",
+          uiOutput("navigationPanelUI"),
           uiOutput("profilePlots")
         ),
         div(

@@ -164,19 +164,5 @@ observeEvent(input$mouse_coords, {
   )
 })
 
-# refresh button UI with conditional styling based on plot_updated status
-output$refreshBtnUI <- renderUI({
-  # observe plot_updated to determine button style
-  is_updated <- plot_updated()
-  btn_class <- if (is_updated) "btn-default" else "btn-warning"
-  
-  actionButton("refreshBtn", "Refresh", icon = icon("refresh"), class = btn_class)
-})
-
-# refresh button handler
-observeEvent(input$refreshBtn, {
-  current_val <- refresh_trigger()
-  refresh_trigger(current_val + 1)
-  cat("plot refresh triggered manually\n")
-})
+# refresh button functionality moved to server_navigation.r
 
