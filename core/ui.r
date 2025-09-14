@@ -207,8 +207,6 @@ ui <- fluidPage(
       uiOutput("viewSelect"),
       h5("Info"),
       verbatimTextOutput("basic_info"),
-      h5("Last Key Press"),
-      verbatimTextOutput("last_key_output"),
       actionButton("plotViewBtn", "Export", icon = icon("file-pdf")),
       actionButton("plotRegionsBtn", "Export All", icon = icon("file-pdf")),
       actionButton("helpBtn", "Help"),

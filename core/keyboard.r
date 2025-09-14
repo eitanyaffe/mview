@@ -479,8 +479,11 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
     # Check if the key combo matches any of our shortcuts
     if (!is.null(key_combo) && key_combo != "") {
       current_shortcut_names <- names(keyboard_shortcuts) # Use a local copy of names
+      shortcut_found <- FALSE
+      
       for (shortcut_name in current_shortcut_names) {
         if (tolower(key_combo) == tolower(shortcut_name)) {
+          shortcut_found <- TRUE
           shortcut_details <- keyboard_shortcuts[[shortcut_name]]
 
           # Dispatch action based on type
@@ -507,6 +510,15 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
 
           keyboard_events(keyboard_events() + 1)
           break
+        }
+      }
+      
+      # log unknown key combinations with modifier keys to terminal
+      # but ignore modifier-only combinations (like Ctrl+ControlLeft, Alt+AltRight, etc.)
+      if (!shortcut_found && grepl("(Ctrl|Alt|Command)\\+", key_combo)) {
+        # ignore modifier-only key combinations
+        if (!grepl("(Ctrl|Alt|Command)\\+(Control|Alt|Meta)(Left|Right)?$", key_combo)) {
+          cat(sprintf("unknown key pressed: %s\n", key_combo))
         }
       }
     }
@@ -554,11 +566,6 @@ keyboard_server <- function(input, output, session, main_state_rv, regions_modul
       )),
       easyClose = TRUE
     ))
-  })
-
-  # Output for the last key pressed
-  output$last_key_output <- renderText({
-    paste(input$key_pressed, " ")
   })
 
   return(list(
