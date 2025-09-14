@@ -49,7 +49,7 @@ default_alignment_params <- list(
   min_alignment_length = list(
     group_id = "align_filter",
     type = "integer",
-    default = 0
+    default = 1000
   ),
   max_alignment_length = list(
     group_id = "align_filter",
