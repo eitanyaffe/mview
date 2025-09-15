@@ -26,7 +26,7 @@
 #' @return Profile object
 axis_profile <- function(id = "simple_axis",
                          name = "simple axis",
-                         height = 100,
+                         height = 100, is_fixed = TRUE,
                          params = default_axis_params,
                          auto_register = TRUE) {
 
@@ -213,10 +213,6 @@ axis_profile <- function(id = "simple_axis",
               size_factor <- max(0.1, min(2.0, 100.0 / window_size))
               font_size <- scale_factor * size_factor
               
-              # debug output
-              cat(sprintf("axis nucleotides: window_size=%.1f, nt_threshold=%d, scale_factor=%.2f, size_factor=%.2f, font_size=%.2f\n", 
-                         window_size, nt_threshold, scale_factor, size_factor, font_size))
-              
               nt_data <- data.frame(x = global_nt_positions, y = 0.85, label = toupper(nt_chars))
               gg <- gg + ggplot2::geom_text(data = nt_data, 
                                           ggplot2::aes(x = x, y = y, label = label), 
@@ -235,7 +231,7 @@ axis_profile <- function(id = "simple_axis",
     id = id,
     name = name,
     type = "axis",
-    height = height,
+    height = height, is_fixed = is_fixed,
     attr = list(hide_y_label = TRUE, hide_y_ticks = TRUE),
     params = params,
     data_f = data_f,

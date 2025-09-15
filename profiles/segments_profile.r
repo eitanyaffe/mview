@@ -1,16 +1,6 @@
-# default parameters for segments profile
-default_segments_params <- list(
-  height = list(
-    group_id = "segments",
-    type = "integer",
-    default = 40
-  )
-)
-
-segments_profile <- function(id, name, height = 40,
+segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
                             segments_f = NULL,
                             color = "#2E86AB",
-                            params = default_segments_params,
                             auto_register = TRUE) {
 
   plot_f <- function(profile, cxt, gg) {
@@ -93,9 +83,9 @@ segments_profile <- function(id, name, height = 40,
 
   # create profile
   profile_create(
-    id = id, name = name, type = "segments", height = height,
+    id = id, name = name, type = "segments", height = height, is_fixed = is_fixed,
     attr = list(hide_y_ticks = TRUE),
-    params = params, plot_f = plot_f,
+    params = NULL, plot_f = plot_f,
     segments_f = segments_f,
     color = color,
     auto_register = auto_register

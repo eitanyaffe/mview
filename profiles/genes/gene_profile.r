@@ -6,11 +6,6 @@ default_gene_params <- list(
     choices = c("tax", "mge"),
     default = "tax"
   ),
-  height = list(
-    group_id = "gene",
-    type = "integer",
-    default = 50
-  ),
   show_hover = list(
     group_id = "gene",
     type = "boolean",
@@ -23,7 +18,7 @@ default_gene_params <- list(
   )
 )
 
-gene_profile <- function(id, name, height = 100,
+gene_profile <- function(id, name, height = 30, is_fixed = TRUE,
                          gene_f = NULL,
                          color_field = "tax_color",
                          threshold = 200000,
@@ -58,7 +53,8 @@ gene_profile <- function(id, name, height = 100,
 
   # Create profile
   profile_create(
-    id = id, name = name, type = "gene", height = height,
+    id = id, name = name, type = "gene", 
+    height = height, is_fixed = is_fixed,
     attr = list(hide_y_ticks = TRUE),
     params = params, plot_f = plot_f,
     threshold = threshold,

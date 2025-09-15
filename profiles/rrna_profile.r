@@ -1,12 +1,3 @@
-# default parameters for rRNA profile
-default_rrna_params <- list(
-  height = list(
-    group_id = "gene",
-    type = "integer",
-    default = 50
-  )
-)
-
 # default rRNA colors
 default_rrna_colors <- c("16S" = "#7BB3D3", "23S" = "#C97BA8", "5S" = "#F8B563")
 
@@ -33,8 +24,7 @@ read_gff_f <- function(path) {
 }
 
 rrna_profile <- function(id, name, get_gff_f, colors = default_rrna_colors,
-                         height = default_rrna_params$height$default,
-                         params = default_rrna_params,
+                         height = 30, is_fixed = TRUE,
                          auto_register = TRUE) {
   
   # create data function that handles caching and color/label assignment
@@ -72,11 +62,11 @@ rrna_profile <- function(id, name, get_gff_f, colors = default_rrna_colors,
   gene_profile(
     id = id,
     name = name,
-    height = height,
+    height = height, is_fixed = is_fixed,
     gene_f = rrna_f,
     color_field = "rrna",
     label_field = "label",
-    params = params,
+    params = NULL,
     auto_register = auto_register
   )
 }

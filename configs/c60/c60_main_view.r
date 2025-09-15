@@ -128,7 +128,6 @@ synteny_profile(
 gene_profile(
   id = "genes",
   name = "Genes",
-  height = default_gene_params$height$default,
   gene_f = get_genes_f,
   color_field = "tax",
   label_field = "label",
@@ -154,7 +153,6 @@ rrna_profile(
 segments_profile(
   id = "assembly_segments",
   name = "Assembly Segments",
-  height = 40,
   segments_f = function(assembly) {
     data <- get_data("CAV_REFINE_SEGMENT_TABLE", 
                      tag = assembly,

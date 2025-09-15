@@ -158,11 +158,11 @@ default_alignment_params <- list(
   show_hover = list(
     group_id = "align_general",
     type = "boolean",
-    default = TRUE
+    default = FALSE
   )
 )
 
-align_profile <- function(id, name,
+align_profile <- function(id, name, is_fixed = FALSE,
                           aln_f = NULL,
                           bin_type = "auto",
                           plot_style = "auto",
@@ -257,7 +257,8 @@ align_profile <- function(id, name,
 
   # Create profile
   profile_create(
-    id = id, name = name, type = "align", height = params$height$default,
+    id = id, name = name, type = "align", 
+    height = params$height$default, is_fixed = is_fixed,
     params = params, plot_f = plot_f,
     auto_register = auto_register,
     aln_f = aln_f,

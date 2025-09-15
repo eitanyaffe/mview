@@ -263,7 +263,7 @@ default_synteny_params <- list(
   )
 )
 
-synteny_profile <- function(id, name,
+synteny_profile <- function(id, name, is_fixed = FALSE,
                            synteny_f = NULL,
                            consensus_f = NULL,
                            style = "summary",
@@ -271,7 +271,6 @@ synteny_profile <- function(id, name,
                            target_bins = 200,
                            min_xcov = 1.0,
                            color_style = "none",
-                           height = 400,
                            show_hover = TRUE,
                            hide_self = TRUE,
                            lib_grepl = "",
@@ -318,7 +317,8 @@ synteny_profile <- function(id, name,
 
   # create profile
   profile_create(
-    id = id, name = name, type = "synteny", height = height,
+    id = id, name = name, type = "synteny", 
+    height = params$height$default, is_fixed = is_fixed,
     params = params, plot_f = plot_f,
     auto_register = auto_register,
     synteny_f = synteny_f,

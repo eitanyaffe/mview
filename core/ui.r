@@ -6,8 +6,8 @@ library(plotly)
 library(shinyjs)
 
 ui <- fluidPage(
-  titlePanel("mview"),
   useShinyjs(), # Enable shinyjs functionality
+  div(style = "height: 10px;"), # Small gap at top
   tags$head(
     keyboard_initialize(), # Add the keyboard event listener
     tags$script(HTML("
@@ -82,14 +82,102 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler('triggerStateSave', function(stateNumber) {
         document.getElementById('save_state_' + stateNumber).click();
       });
+    ")),
+    
+    # ResizeObserver for dynamic container height
+    tags$script(HTML("
+      (function() {
+        function debounce(fn, ms){
+          let t; 
+          return function(arg){
+            clearTimeout(t);
+            t = setTimeout(function(){ fn(arg); }, ms);
+          };
+        }
+        function sendHeight(h){
+          if (window.Shiny && Shiny.setInputValue) {
+            Shiny.setInputValue('container_height', Math.round(h), {priority:'event'});
+          }
+        }
+        const sendHeightDebounced = debounce(sendHeight, 200); // debounced updates
+        
+        function initResizeObserver(){
+          const el = document.getElementById('resizable_profile_container');
+          if(!el) { 
+            setTimeout(initResizeObserver, 50); 
+            return; 
+          }
+          
+          // Send initial height after layout
+          requestAnimationFrame(function(){
+            sendHeight(el.getBoundingClientRect().height);
+          });
+          
+          const ro = new ResizeObserver(entries => {
+            for (const entry of entries) {
+              const h = (entry.contentBoxSize && entry.contentBoxSize[0])
+                        ? entry.contentBoxSize[0].blockSize
+                        : entry.contentRect.height;
+              // Only fire when user stops dragging (debounced)
+              sendHeightDebounced(h);
+            }
+          });
+          ro.observe(el);
+          // Keep a reference in case hot-reload occurs
+          window.__profile_container_ro__ = ro;
+        }
+        
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initResizeObserver);
+        } else {
+          initResizeObserver();
+        }
+      })();
     "))
   ),
   tags$style(HTML("
     .ui-resizable-s {
-      height: 8px;
-      background: #cccccc;
+      height: 10px !important;
+      background: #e9ecef;
+      border-top: 1px solid #d0d7de;
       cursor: ns-resize;
     }
+    /* Make the resizable container fill properly */
+    #resizable_profile_container {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      display: flex;
+      width: 100%;
+    }
+    /* Make the inner two-pane fill the resizable container */
+    #profile_two_pane {
+      height: 100%;
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+    /* Left plot column flexes; right sidebar fixed width */
+    #profile-plots-column {
+      flex: 1 1 auto;
+      min-width: 400px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    #parameter-panel-column {
+      flex: 0 0 280px;
+      max-width: 360px;
+      min-width: 220px;
+      height: 100%;
+      overflow-y: auto;
+      border-left: 1px solid #eee;
+      padding-left: 12px;
+    }
+    /* Make plotly output stretch vertically */
+    #plot_wrap { height: 100%; padding: 0; }
+    #combined_plot { height: 100% !important; }
+    /* Minimum height for resizable profile container */
+    #resizable_profile_container { min-height: 600px !important; }
     .state-info-box {
       border: 1px solid #ddd;
       padding: 8px;
@@ -156,16 +244,12 @@ ui <- fluidPage(
       padding: 0 !important;
     }
     #parameter-panel-column.collapsed {
-      width: 50px !important;
-      max-width: 50px;
       flex: 0 0 50px !important;
+      max-width: 50px;
+      min-width: 50px;
     }
     #profile-plots-column.expanded {
-      width: calc(100% - 60px) !important;
       flex: 1 1 auto !important;
-    }
-    .expanded #profilePlots {
-      width: 100% !important;
     }
     .navigation-panel {
       background-color: #f5f5f5;
@@ -197,6 +281,7 @@ ui <- fluidPage(
     column(
       width = 2,
       uiOutput("state_info"),
+      h4("mview 1.0", style = "margin-bottom: 5px; margin-top: 10px; color: #333;"),
       verbatimTextOutput("project_info"),
       shiny::selectInput("regions_module-assembly_select", "Assembly:",
         choices = get_assemblies(),
@@ -217,37 +302,9 @@ ui <- fluidPage(
     column(
       width = 10,
 
-      # Profile plots area with collapsible parameter panel
-      div(
-        style = "display: flex; width: 100%;",
-        div(
-          id = "profile-plots-column",
-          style = "flex: 1 1 auto; width: 79.17%;",
-          uiOutput("navigationPanelUI"),
-          uiOutput("profilePlots")
-        ),
-        div(
-          id = "parameter-panel-column",
-          style = "flex: 0 0 20.83%; width: 20.83%;",
-          div(
-            id = "parameter-panel",
-            class = "parameter-panel",
-            div(
-              class = "parameter-panel-header",
-              actionButton("toggleParameterPanel", "", 
-                icon = icon("chevron-left"),
-                class = "btn-sm parameter-toggle-btn",
-                style = "float: right; margin: 5px;"
-              ),
-              h5("Parameters", style = "margin: 5px 10px; display: inline-block;")
-            ),
-            div(
-              id = "parameter-panel-content",
-              uiOutput("parameter_tabs_ui")
-            )
-          )
-        )
-      ),
+
+      # Profile plots area with resizable container and parameter panel
+      uiOutput("resizableContainer"),
       hr(),
       uiOutput("mainTabsPanel")
     )

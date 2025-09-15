@@ -7,7 +7,7 @@ default_variants_params <- list(
   )
 )
 
-variants_profile <- function(id, name, height = 30,
+variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
                             params = default_variants_params,
                             auto_register = TRUE) {
 
@@ -164,7 +164,7 @@ variants_profile <- function(id, name, height = 30,
 
   # create profile
   profile_create(
-    id = id, name = name, type = "variants", height = height,
+    id = id, name = name, type = "variants", height = height, is_fixed = is_fixed,
     attr = list(hide_y_ticks = TRUE),
     params = params, plot_f = plot_f,
     auto_register = auto_register
