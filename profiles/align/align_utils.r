@@ -337,6 +337,7 @@ plot_mutations_unified <- function(gg, mutation_data, profile, cxt) {
   
   if (use_rectangles) {
     # plot mutation rectangles when zoomed in
+    mutation_border_size <- (profile$full_mutation_lwd %||% 0.5) * 0.8  # slightly thinner than mutation lines
     if (profile$show_hover) {
       gg <- gg + ggplot2::geom_rect(
         data = mutation_data,
@@ -346,7 +347,7 @@ plot_mutations_unified <- function(gg, mutation_data, profile, cxt) {
           fill = fill_color,
           text = hover_text
         ),
-        color = NA
+        color = mutation_data$fill_color, size = mutation_border_size
       ) +
         ggplot2::scale_fill_identity()
     } else {
@@ -357,7 +358,7 @@ plot_mutations_unified <- function(gg, mutation_data, profile, cxt) {
           ymin = ybottom, ymax = ytop,
           fill = fill_color
         ),
-        color = NA
+        color = mutation_data$fill_color, size = mutation_border_size
       ) +
         ggplot2::scale_fill_identity()
     }

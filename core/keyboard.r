@@ -352,11 +352,11 @@ keyboard_shortcuts <- list(
     }
   ),
   "Alt+S" = list(
-    description = "Add current region",
+    description = "Save current region",
     type = "region",
     action = function(regions_module_output) {
-      # trigger the add region input focus
-      regions_module_output$focus_add_input()
+      # trigger the save region input focus
+      regions_module_output$focus_save_input()
     }
   ),
   "Alt+ArrowDown" = list(

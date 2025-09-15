@@ -25,7 +25,7 @@ observeEvent(input$addContigsBtn, {
   }
 })
 
-observeEvent(input$setContigsBtn, {
+observeEvent(input$gotoContigsBtn, {
   rows <- input$contigTable_rows_selected
   if (length(rows) > 0) {
     contigs_data <- get_contigs(state$assembly)
@@ -58,7 +58,7 @@ observeEvent(input$addGenomesBtn, {
   }
 })
 
-observeEvent(input$setGenomesBtn, {
+observeEvent(input$gotoGenomesBtn, {
   rows <- input$genomeTable_rows_selected
   if (length(rows) > 0) {
     genomes_data <- get_genomes(state$assembly)

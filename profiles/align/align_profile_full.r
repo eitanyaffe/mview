@@ -145,7 +145,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
         text = hover_text,
         key = read_id
       ),
-      color = "black", size = 0.5
+      color = "gray50", size = 0.3
     )
   }
 

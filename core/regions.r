@@ -22,7 +22,7 @@ regions_ui <- function(id = "regions_module") {
         shiny::actionButton(ns("delete_region_table"), "Delete Table"),
         shiny::hr(),
         shiny::actionButton(ns("goto_region_btn"), "Goto"),
-        shiny::actionButton(ns("add_region"), "Add"),
+        shiny::actionButton(ns("save_region"), "Save"),
         shiny::actionButton(ns("edit_region"), "Edit"),
         shiny::actionButton(ns("delete_region"), "Delete")
       )
@@ -432,8 +432,8 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         shiny::removeModal()
       })
 
-      # add current region
-      observeEvent(input$add_region, {
+      # save current region
+      observeEvent(input$save_region, {
         if (current_regions_file() == "") {
           shiny::showNotification("no regions table selected", type = "error")
           return()
@@ -464,27 +464,27 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         next_id <- as.character(nrow(region_table()) + 1)
         
         shiny::showModal(shiny::modalDialog(
-          title = "Add Current Region",
-          shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
+          title = "Save Current Region",
+          shiny::selectInput(ns("save_region_file"), "Save to Region File:", 
                            choices = available_files, 
                            selected = default_selection),
-          shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
-          shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
-          shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
+          shiny::textInput(ns("save_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
+          shiny::numericInput(ns("save_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
+          shiny::textInput(ns("save_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
-            shiny::actionButton(ns("confirm_add_region"), "Add")
+            shiny::actionButton(ns("confirm_save_region"), "Save")
           ),
           easyClose = TRUE
         ))
       })
 
       # update region ID when file selection changes in add dialog
-      observeEvent(input$add_region_file, {
-        req(input$add_region_file)
+      observeEvent(input$save_region_file, {
+        req(input$save_region_file)
         
         # get next ID for the selected file
-        selected_file <- input$add_region_file
+        selected_file <- input$save_region_file
         
         target_table <- if (selected_file == current_regions_file()) {
           region_table()
@@ -506,18 +506,18 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         next_id <- as.character(nrow(target_table) + 1)
         
         # update the ID input
-        shiny::updateTextInput(session, "add_region_id", value = next_id)
+        shiny::updateTextInput(session, "save_region_id", value = next_id)
       })
 
-      observeEvent(input$confirm_add_region, {
-        req(input$add_region_description)
-        req(input$add_region_id)
-        req(input$add_region_level)
-        req(input$add_region_file)
-        description <- trimws(input$add_region_description)
-        custom_id <- trimws(input$add_region_id)
-        level <- as.integer(input$add_region_level)
-        selected_file <- input$add_region_file
+      observeEvent(input$confirm_save_region, {
+        req(input$save_region_description)
+        req(input$save_region_id)
+        req(input$save_region_level)
+        req(input$save_region_file)
+        description <- trimws(input$save_region_description)
+        custom_id <- trimws(input$save_region_id)
+        level <- as.integer(input$save_region_level)
+        selected_file <- input$save_region_file
         
         if (description == "") {
           shiny::showNotification("description cannot be empty", type = "error")
@@ -895,8 +895,8 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
       })
 
-      # trigger add region dialog (for keyboard shortcut)
-      focus_add_input <- function() {
+      # trigger save region dialog (for keyboard shortcut)
+      focus_save_input <- function() {
         if (current_regions_file() == "") {
           shiny::showNotification("no regions table selected", type = "error")
           return()
@@ -927,16 +927,16 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         next_id <- as.character(nrow(region_table()) + 1)
         
         shiny::showModal(shiny::modalDialog(
-          title = "Add Current Region",
-          shiny::selectInput(ns("add_region_file"), "Save to Region File:", 
+          title = "Save Current Region",
+          shiny::selectInput(ns("save_region_file"), "Save to Region File:", 
                            choices = available_files, 
                            selected = default_selection),
-          shiny::textInput(ns("add_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
-          shiny::numericInput(ns("add_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
-          shiny::textInput(ns("add_region_description"), "Description:", placeholder = "Enter region description"),
+          shiny::textInput(ns("save_region_id"), "Region ID:", value = next_id, placeholder = "Enter region ID"),
+          shiny::numericInput(ns("save_region_level"), "Level:", value = 1, min = 1, max = 10, step = 1),
+          shiny::textInput(ns("save_region_description"), "Description:", placeholder = "Enter region description"),
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
-            shiny::actionButton(ns("confirm_add_region"), "Add")
+            shiny::actionButton(ns("confirm_save_region"), "Save")
           ),
           easyClose = TRUE
         ))
@@ -952,7 +952,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         undo_last_action = undo_last_action,
         push_undo_state = push_undo_state,
         goto_region = goto_region,
-        focus_add_input = focus_add_input,
+        focus_save_input = focus_save_input,
         get_region_table = get_region_table
       ))
     }
