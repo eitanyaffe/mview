@@ -48,8 +48,6 @@ set_tab_panel_f(function() {
           br(),
           checkboxInput("autoUpdateProfilesChk", "Auto-update profiles", 
                        value = cache_get_if_exists("auto_update_profiles", FALSE), width = "100%"),
-          br(),
-          actionButton("gotoVariantsBtn", "Goto", class = "btn-secondary", width = "100%"),
           br(), br(),
           h5("Filtering"),
           numericInput("variantSpanFilter", "Min Span:", 
@@ -64,6 +62,13 @@ set_tab_panel_f(function() {
     fluidRow(
       column(12,
         h4("Variants"),
+        fluidRow(
+          column(12,
+            actionButton("gotoVariantsBtn", "Goto", class = "btn-secondary"),
+            actionButton("clearVariantsBtn", "Clear Selection", class = "btn-secondary"),
+            br(), br()
+          )
+        ),
         DTOutput("variantsTable")
       )
     )
@@ -269,6 +274,18 @@ observeEvent(input$gotoVariantsBtn, {
   showNotification(sprintf("Navigated to %d selected variants", length(valid_rows)), type = "message")
 })
 
+# clear selection button handler  
+observeEvent(input$clearVariantsBtn, {
+  # clear table selection by using DT proxy
+  proxy <- DT::dataTableProxy("variantsTable")
+  DT::selectRows(proxy, NULL)
+  
+  # also clear the reactive selection
+  selected_variants(NULL)
+  cache_set("variants.selected", NULL)
+  
+  showNotification("Cleared variant selection", type = "message")
+})
 
 # update button handler
 observeEvent(input$updateVariantsBtn, {
@@ -545,7 +562,12 @@ output$variantsTable <- renderDT({
 
 # helper function to get selected variants for highlighting
 get_selected_variants <- function() {
-  return(selected_variants())
+  selected <- selected_variants()
+  if (!is.null(selected) && nrow(selected) > 0) {
+    # ensure the selected items have an 'id' field that matches items_df$id
+    selected$id <- selected$variant_id
+  }
+  return(selected)
 }
 
 output$variantFrequencyPlot <- plotly::renderPlotly({

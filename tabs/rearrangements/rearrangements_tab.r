@@ -85,12 +85,7 @@ set_tab_panel_f(function() {
             br(), br()
           )
         ),
-        tabsetPanel(
-          id = "rearrangementDataTabs",
-          tabPanel("Events", 
-                   DTOutput("eventsTable"),
-                   value = "events_tab")
-        )
+        DTOutput("eventsTable")
       )
     )
   )
@@ -290,11 +285,33 @@ selected_rearrangements <- reactiveVal(NULL)
 
 # observer for table row selection
 observeEvent(input$eventsTable_rows_selected, {
-  selected_events <- get_selected_rearrangements()
+  rearrange_data <- state$filtered_rearrange_data
+  selected_rows <- input$eventsTable_rows_selected
   
-  # update reactive value and cache
-  selected_rearrangements(selected_events)
-  cache_set("rearrangements.selected", selected_events)
+  # always check if we have any selected rows
+  if (is.null(selected_rows) || length(selected_rows) == 0) {
+    # explicitly clear selection when no rows are selected
+    selected_rearrangements(NULL)
+    cache_set("rearrangements.selected", NULL)
+    return()
+  }
+  
+  if (!is.null(rearrange_data) && !is.null(rearrange_data$events)) {
+    # filter valid row indices
+    valid_rows <- selected_rows[selected_rows <= nrow(rearrange_data$events)]
+    
+    if (length(valid_rows) > 0) {
+      # get the selected rearrangements info
+      selected_events <- rearrange_data$events[valid_rows, ]
+      selected_rearrangements(selected_events)
+      # store in cache for profile access
+      cache_set("rearrangements.selected", selected_events)
+    } else {
+      # clear selection when no valid rows are selected
+      selected_rearrangements(NULL)
+      cache_set("rearrangements.selected", NULL)
+    }
+  }
   
   # refresh plots to show/remove highlighting
   if (input$autoUpdateProfilesRearrangeChk %||% FALSE) {
@@ -379,11 +396,15 @@ observeEvent(input$gotoRearrangementsBtn, {
 
 # clear selection button handler
 observeEvent(input$clearRearrangementsBtn, {
-  # clear the table selection
-  DT::dataTableProxy("eventsTable") %>% 
-    DT::selectRows(NULL)
+  # clear table selection by using DT proxy
+  proxy <- DT::dataTableProxy("eventsTable")
+  DT::selectRows(proxy, NULL)
   
-  showNotification("Selection cleared", type = "message")
+  # also clear the reactive selection
+  selected_rearrangements(NULL)
+  cache_set("rearrangements.selected", NULL)
+  
+  showNotification("Cleared rearrangement selection", type = "message")
 })
 
 # update button handler
@@ -508,6 +529,16 @@ output$eventsTable <- renderDT({
 
 
 # ---- Plot Renderer ----
+
+# helper function to get selected rearrangements for highlighting
+get_selected_rearrangements <- function() {
+  selected <- selected_rearrangements()
+  if (!is.null(selected) && nrow(selected) > 0) {
+    # ensure the selected items have an 'id' field that matches items_df$id
+    selected$id <- selected$event_id
+  }
+  return(selected)
+}
 
 # frequency plot output renderer
 output$rearrangementFrequencyPlot <- plotly::renderPlotly({
