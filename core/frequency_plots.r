@@ -306,7 +306,7 @@ create_scatter_plot <- function(data_matrix, items_df, library_ids, x_lib, y_lib
   non_selected_data <- plot_data[!plot_data$is_selected, ]
   selected_data <- plot_data[plot_data$is_selected, ]
   
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x_value, y = y_value, color = color, text = hover_text))
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x_value, y = y_value, color = color, text = hover_text, key = item_id))
   
   # draw non-selected items first
   if (nrow(non_selected_data) > 0) {
@@ -336,7 +336,7 @@ create_scatter_plot <- function(data_matrix, items_df, library_ids, x_lib, y_lib
              ggplot2::scale_y_continuous(labels = y_format)
   }
   
-  plotly::ggplotly(p, tooltip = "text") %>%
+  plotly::ggplotly(p, tooltip = "text", source = "scatter_plot") %>%
     plotly::layout(hovermode = "closest", showlegend = FALSE)
 }
 
@@ -420,7 +420,7 @@ create_temporal_plot <- function(data_matrix, items_df, library_ids,
   selected_data <- plot_data[plot_data$is_selected, ]
   
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = library, y = value, color = color, 
-                                               group = item_id, text = hover_text))
+                                               group = item_id, text = hover_text, key = item_id))
   
   # draw non-selected items first with lower alpha
   if (nrow(non_selected_data) > 0) {
@@ -455,7 +455,7 @@ create_temporal_plot <- function(data_matrix, items_df, library_ids,
     p <- p + ggplot2::scale_y_continuous(labels = y_format)
   }
   
-  plotly::ggplotly(p, tooltip = "text") %>%
+  plotly::ggplotly(p, tooltip = "text", source = "temporal_plot") %>%
     plotly::layout(hovermode = "closest", showlegend = FALSE)
 }
 

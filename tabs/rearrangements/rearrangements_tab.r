@@ -595,6 +595,35 @@ observeEvent(input$rearrangementJitter, {
   cache_set("rearrangement_frequency_plot_jitter", input$rearrangementJitter)
 })
 
+# click observers for frequency plot interaction
+observeEvent(plotly::event_data("plotly_click", source = "scatter_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "scatter_plot")
+  if (!is.null(event_data) && !is.null(event_data$key)) {
+    rearrange_data <- state$filtered_rearrange_data
+    if (!is.null(rearrange_data) && !is.null(rearrange_data$events)) {
+      matching_rows <- which(rearrange_data$events$event_id == event_data$key)
+      if (length(matching_rows) > 0) {
+        proxy <- DT::dataTableProxy("eventsTable")
+        DT::selectRows(proxy, matching_rows[1])
+      }
+    }
+  }
+})
+
+observeEvent(plotly::event_data("plotly_click", source = "temporal_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "temporal_plot")
+  if (!is.null(event_data) && !is.null(event_data$key)) {
+    rearrange_data <- state$filtered_rearrange_data
+    if (!is.null(rearrange_data) && !is.null(rearrange_data$events)) {
+      matching_rows <- which(rearrange_data$events$event_id == event_data$key)
+      if (length(matching_rows) > 0) {
+        proxy <- DT::dataTableProxy("eventsTable")
+        DT::selectRows(proxy, matching_rows[1])
+      }
+    }
+  }
+})
+
 # export function for PDF generation
 rearrangements_export_pdf <- function(region_info) {
   # query rearrangements for the specified region using tab config (like variants)

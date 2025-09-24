@@ -14,3 +14,5 @@ profiles/axis_profile_old.r
 /plots
 /core copy
 core/export_dialogs_bu.r
+tabs/variants/variants_tab_old.r
+tabs/rearrangements/rearrangements_tab_old.r

@@ -624,6 +624,35 @@ observeEvent(input$variantJitter, {
   cache_set("variant_frequency_plot_jitter", input$variantJitter)
 })
 
+# click observers for frequency plot interaction
+observeEvent(plotly::event_data("plotly_click", source = "scatter_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "scatter_plot")
+  if (!is.null(event_data) && !is.null(event_data$key)) {
+    variant_data <- state$filtered_variant_data
+    if (!is.null(variant_data) && !is.null(variant_data$variants)) {
+      matching_rows <- which(variant_data$variants$variant_id == event_data$key)
+      if (length(matching_rows) > 0) {
+        proxy <- DT::dataTableProxy("variantsTable")
+        DT::selectRows(proxy, matching_rows[1])
+      }
+    }
+  }
+})
+
+observeEvent(plotly::event_data("plotly_click", source = "temporal_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "temporal_plot")
+  if (!is.null(event_data) && !is.null(event_data$key)) {
+    variant_data <- state$filtered_variant_data
+    if (!is.null(variant_data) && !is.null(variant_data$variants)) {
+      matching_rows <- which(variant_data$variants$variant_id == event_data$key)
+      if (length(matching_rows) > 0) {
+        proxy <- DT::dataTableProxy("variantsTable")
+        DT::selectRows(proxy, matching_rows[1])
+      }
+    }
+  }
+})
+
 # export function for PDF generation
 variants_export_pdf <- function(region_info) {
   # query variants for the specified region using current UI settings
