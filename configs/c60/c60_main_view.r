@@ -7,6 +7,9 @@ source("profiles/segments_profile.r")
 # Load variants profile
 source("profiles/variants_profile.r")
 
+# Load rearrangements profile
+source("profiles/rearrangements_profile.r")
+
 # Load rRNA profile
 source("profiles/rrna_profile.r")
 
@@ -180,6 +183,15 @@ segments_profile(
 variants_profile(
   id = "variants",
   name = "Variants"
+)
+
+########################################################
+# rearrangements profile
+########################################################
+
+rearrangements_profile(
+  id = "rearrangements",
+  name = "Rearrangements"
 )
 
 ########################################################

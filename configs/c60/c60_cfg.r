@@ -241,5 +241,24 @@ register_tab(
   get_gene_table_f = get_variants_gene_table_f,
   codon_table_path = "codon_tables/table11",
   get_fasta_f = get_fasta_f,
-  use_genes = TRUE
+  use_genes = TRUE,
+  supports_export = TRUE
+)
+
+########################################################
+# register rearrangements tab
+########################################################
+
+register_tab(
+  tab_id = "rearrangements",
+  tab_label = "Rearrangements",
+  tab_code = "tabs/rearrangements/rearrangements_tab.r",
+  get_aln_f = get_aln_f,
+  library_ids = c("early", "pre", "post", "late"),
+  max_gap = 10,
+  min_element_length = 50,
+  min_anchor_length = 200,
+  max_anchor_mutations_percent = 0.01,
+  max_element_mutation_percent = 0.1,
+  supports_export = TRUE
 )

@@ -1,6 +1,6 @@
 # load variant utilities (only loaded when variants tab is registered)
 source("tabs/variants/variants_utils.r", local = TRUE)
-source("tabs/variants/variants_plots.r", local = TRUE)
+source("core/frequency_plots.r")
 
 # validate and extract tab parameters
 tab <- get_tab_by_id("variants")
@@ -53,18 +53,11 @@ set_tab_panel_f(function() {
           br(), br(),
           h5("Filtering"),
           numericInput("variantSpanFilter", "Min Span:", 
-                      value = 0.5, min = 0, max = 1, step = 0.1, width = "100%"),
-          br(),
-          selectInput("variantPlotMode", "Plot Mode:", 
-                     choices = c("Frequency" = "frequency", 
-                                "Variant Support" = "variant_support", 
-                                "Variant Coverage" = "variant_coverage"),
-                     selected = "frequency", width = "100%")
+                      value = 0.5, min = 0, max = 1, step = 0.1, width = "100%")
         )
       ),
       column(9,
-        h4("Variant Plot"),
-        plotly::plotlyOutput("variantFrequencyPlot", height = "400px")
+        create_frequency_plot_ui("variant", library_ids)
       )
     ),
     # bottom row: variants table (full width)
@@ -550,175 +543,120 @@ output$variantsTable <- renderDT({
 
 # ---- Plot Renderer ----
 
+# helper function to get selected variants for highlighting
+get_selected_variants <- function() {
+  return(selected_variants())
+}
+
 output$variantFrequencyPlot <- plotly::renderPlotly({
-  variant_data <- state$filtered_variant_data
   
-  if (is.null(variant_data) || is.null(variant_data$variants) || nrow(variant_data$variants) == 0) {
-    # empty plot with message
-    p <- ggplot2::ggplot() +
-      ggplot2::annotate("text", x = 0.5, y = 0.5, label = "Click 'Update' to load variants", size = 5) +
-      ggplot2::xlim(0, 1) + ggplot2::ylim(0, 1) +
-      ggplot2::theme_void()
-    return(plotly::ggplotly(p))
+  # get current data
+  raw_data <- state$filtered_variant_data
+  
+  # get current settings with defaults
+  plot_type <- input$variantPlotType %||% "temporal"
+  plot_value <- input$variantPlotValue %||% "frequency"
+  x_lib <- input$variantXLib %||% library_ids[1]
+  y_lib <- input$variantYLib %||% (if(length(library_ids) > 1) library_ids[2] else library_ids[1])
+  jitter_enabled <- input$variantJitter %||% FALSE
+  
+  # get selected items
+  selected_items <- get_selected_variants()
+  
+  # check if we have data
+  has_data <- !is.null(raw_data) && !is.null(raw_data$variants)
+  
+  # prepare items dataframe if we have data
+  items_df <- NULL
+  if (has_data) {
+    items_df <- add_variant_colors(raw_data$variants)
+    items_df$id <- items_df$variant_id
+    items_df$label <- paste(items_df$type, items_df$contig, items_df$coord, sep = " ")
   }
   
-  # prepare data for plotting
-  support_matrix <- variant_data$support
-  coverage_matrix <- variant_data$coverage
-  variants_df <- variant_data$variants
-  
-  # always add color information to variants dataframe
-  variants_df <- add_variant_colors(variants_df)
-  
-  # no sampling - use all variants for better plot interaction
-    
-  # reorder matrices to match configured library order
-  lib_indices <- match(library_ids, colnames(support_matrix))
-  support_matrix <- support_matrix[, lib_indices, drop = FALSE]
-  coverage_matrix <- coverage_matrix[, lib_indices, drop = FALSE]
-    
-  # get plot mode
-  plot_mode <- input$variantPlotMode %||% "frequency"
-  
-  # calculate data matrix based on plot mode
-  if (plot_mode == "variant_support") {
-    data_matrix <- support_matrix
-    y_label <- "Variant Support"
-    y_limits <- NULL
-    y_format <- scales::number_format()
-  } else if (plot_mode == "variant_coverage") {
-    data_matrix <- coverage_matrix
-    y_label <- "Variant Coverage"
-    y_limits <- NULL
-    y_format <- scales::number_format()
-  } else { # frequency mode
-    data_matrix <- ifelse(coverage_matrix > 0, support_matrix / coverage_matrix, 0)
-    y_label <- "Frequency"
-    y_limits <- c(0, 1)
-    y_format <- scales::percent_format()
-  }
-  
-  # convert to long format for plotting
-  plot_data <- data.frame()
-  for (i in seq_len(nrow(data_matrix))) {
-    for (j in seq_len(ncol(data_matrix))) {
-      plot_data <- rbind(plot_data, data.frame(
-        variant_id = variants_df$variant_id[i],
-        variant_type = variants_df$type[i],
-        contig = variants_df$contig[i],
-        coord = variants_df$coord[i],
-        library = library_ids[j],
-        value = data_matrix[i, j],
-        stringsAsFactors = FALSE
-      ))
-    }
-  }
-  
-  # remove invalid values
-  plot_data <- plot_data[is.finite(plot_data$value) & !is.na(plot_data$value), ]
-  
-  if (nrow(plot_data) == 0) {
-    p <- ggplot2::ggplot() +
-      ggplot2::annotate("text", x = 0.5, y = 0.5, label = "No valid data", size = 5) +
-      ggplot2::xlim(0, 1) + ggplot2::ylim(0, 1) +
-      ggplot2::theme_void()
-    return(plotly::ggplotly(p))
-  }
-  
-  # use colors from variants dataframe for plot
-  plot_data$variant_color <- variants_df$color[match(plot_data$variant_id, variants_df$variant_id)]
-  
-  # check if we have selected variants for highlighting
-  # always check current table selection state directly
-  current_table_selection <- input$variantsTable_rows_selected
-  plot_data$is_selected <- FALSE
-  
-  if (!is.null(current_table_selection) && length(current_table_selection) > 0 && 
-      !is.null(variant_data$variants) && nrow(variant_data$variants) > 0) {
-    # filter valid row indices
-    valid_selection <- current_table_selection[current_table_selection <= nrow(variant_data$variants)]
-    if (length(valid_selection) > 0) {
-      selected_variant_ids <- variant_data$variants$variant_id[valid_selection]
-      plot_data$is_selected <- plot_data$variant_id %in% selected_variant_ids
-    }
-  }
-  
-  # set library order as factor using our configured library_ids order
-  plot_data$library <- factor(plot_data$library, levels = library_ids)
-  
-  # create position label and hover text
-  plot_data$position_label <- paste0(plot_data$contig, ":", plot_data$coord)
-  
-  # format value for hover based on plot mode
-  if (plot_mode == "frequency") {
-    value_text <- paste0(round(plot_data$value * 100, 1), "%")
-  } else {
-    value_text <- as.character(plot_data$value)
-  }
-  
-  # get descriptions for hover text (truncate if too long)
-  plot_data$description_display <- sapply(variants_df$desc[match(plot_data$variant_id, variants_df$variant_id)], function(desc) {
-    if (is.na(desc) || nchar(desc) <= 15) {
-      return(desc)
-    } else {
-      # truncate middle for hover (keep first and last 5 characters)
-      first_5 <- substr(desc, 1, 5)
-      last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
-      return(paste0(first_5, "...", last_5))
-    }
-  })
-  
-  # add mutation description to hover if available
-  plot_data$mutation_desc <- variants_df$mutation_desc[match(plot_data$variant_id, variants_df$variant_id)]
-  
-  plot_data$hover_text <- paste0(
-    "Variant: ", plot_data$variant_id, "<br>",
-    "Position: ", plot_data$position_label, "<br>",
-    "Description: ", plot_data$description_display, "<br>",
-    ifelse(!is.na(plot_data$mutation_desc) & plot_data$mutation_desc != "", 
-           paste0("AA Change: ", plot_data$mutation_desc, "<br>"), ""),
-    "Library: ", plot_data$library, "<br>",
-    y_label, ": ", value_text, "<br>"
-  )
-  
-  # create plot with conditional styling for selected variant
-  non_selected_data <- plot_data[!plot_data$is_selected, ]
-  selected_data <- plot_data[plot_data$is_selected, ]
-  
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = library, y = value, color = variant_color, group = variant_id, text = hover_text))
-  
-  # draw non-selected variants first with lower alpha
-  if (nrow(non_selected_data) > 0) {
-    p <- p + 
-      ggplot2::geom_line(data = non_selected_data, alpha = 0.3, size = 0.5) +
-      ggplot2::geom_point(data = non_selected_data, size = 2, alpha = 0.8)
-  }
-  
-  # draw selected variant on top with higher visibility
-  if (nrow(selected_data) > 0) {
-    p <- p + 
-      ggplot2::geom_line(data = selected_data, alpha = 0.9, size = 2) +
-      ggplot2::geom_point(data = selected_data, size = 4, alpha = 1, stroke = 1.5, shape = 21, fill = "white")
-  }
-  
-  p <- p + ggplot2::scale_color_identity() +
-    ggplot2::labs(
-      x = "Library",
-      y = y_label
-    ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-      legend.position = "none"
-    )
-  
-  # add y-axis formatting based on plot mode
-  if (!is.null(y_limits)) {
-    p <- p + ggplot2::scale_y_continuous(limits = y_limits, labels = y_format)
-  } else {
-    p <- p + ggplot2::scale_y_continuous(labels = y_format)
-  }
-  
-  plotly::ggplotly(p, tooltip = "text") %>%
-    plotly::layout(hovermode = "closest", showlegend = FALSE)
+  # render the plot using the cleaned internal function
+  render_frequency_plot_internal(has_data, items_df, raw_data$support, raw_data$coverage,
+                                plot_type, plot_value, x_lib, y_lib, 
+                                jitter_enabled, selected_items, library_ids, 
+                                "Click 'Update' to load variants")
 })
+
+# frequency plot observers for caching
+observeEvent(input$variantPlotType, {
+  cache_set("variant_frequency_plot_type", input$variantPlotType)
+})
+
+observeEvent(input$variantPlotValue, {
+  cache_set("variant_frequency_plot_value", input$variantPlotValue)
+})
+
+observeEvent(input$variantXLib, {
+  cache_set("variant_frequency_plot_x_lib", input$variantXLib)
+})
+
+observeEvent(input$variantYLib, {
+  cache_set("variant_frequency_plot_y_lib", input$variantYLib)
+})
+
+observeEvent(input$variantJitter, {
+  cache_set("variant_frequency_plot_jitter", input$variantJitter)
+})
+
+# export function for PDF generation
+variants_export_pdf <- function(region_info) {
+  # query variants for the specified region using current UI settings
+  raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("variants"))
+  
+  # apply current filters
+  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)
+  
+  # filter the data
+  filtered_data <- filter_variants_by_span(raw_data, span_filter)
+  
+  # get current plot settings
+  plot_type <- input$variantPlotType %||% "temporal"
+  plot_value <- input$variantPlotValue %||% "frequency"
+  x_lib <- input$variantXLib %||% library_ids[1]
+  y_lib <- input$variantYLib %||% (if(length(library_ids) > 1) library_ids[2] else library_ids[1])
+  jitter_enabled <- input$variantJitter %||% FALSE
+  
+  # check if we have data
+  has_data <- !is.null(filtered_data) && !is.null(filtered_data$variants)
+  
+  # prepare items dataframe if we have data
+  items_df <- NULL
+  if (has_data) {
+    items_df <- add_variant_colors(filtered_data$variants)
+    items_df$id <- items_df$variant_id
+    items_df$label <- paste(items_df$type, items_df$contig, items_df$coord, sep = " ")
+  }
+  
+  # create the plot using the unified export function
+  return(create_frequency_plot_for_export(has_data, items_df, filtered_data$support, filtered_data$coverage,
+                                         plot_type, plot_value, x_lib, y_lib, 
+                                         jitter_enabled, library_ids, 
+                                         title = "Variants"))
+}
+
+# export function for table generation
+variants_export_table <- function(region_info) {
+  # query variants for the specified region using current UI settings
+  raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("variants"))
+  
+  # apply current filters
+  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)
+  
+  # filter the data
+  filtered_data <- filter_variants_by_span(raw_data, span_filter)
+  
+  # return the filtered variants dataframe (or NULL if no data)
+  if (!is.null(filtered_data) && !is.null(filtered_data$variants)) {
+    return(filtered_data$variants)
+  }
+  
+  return(NULL)
+}
+
+# register the export functions for this tab
+register_tab_export_function("variants", "pdf", variants_export_pdf)
+register_tab_export_function("variants", "table", variants_export_table)

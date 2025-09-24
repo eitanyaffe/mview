@@ -98,26 +98,18 @@ calculate_context_zoom <- function(current_zoom, context_option, contigs_table) 
 }
 
 
-# check if variants tab is registered and available
-is_variants_tab_available <- function() {
-  variants_tab <- get_tab_by_id("variants")
-  return(!is.null(variants_tab))
-}
-
-# load variant utilities if needed (only when variants are being exported)
-load_variant_utilities <- function() {
-  # check if functions are already loaded
-  if (!exists("query_variants_for_context")) {
-    source("tabs/variants/variants_utils.r", local = parent.frame())
-  }
-  if (!exists("create_variant_frequency_plot")) {
-    source("tabs/variants/variants_plots.r", local = parent.frame())
+# load required utilities for export
+load_export_utilities <- function() {
+  # load frequency plots (for PDF export)
+  if (!exists("create_frequency_plot_for_export")) {
+    source("core/frequency_plots.r", local = parent.frame())
   }
 }
 
 # create export directories for all contexts
-create_export_dirs <- function(output_dir, context_options) {
+create_export_dirs <- function(output_dir, context_options, single_region_mode = FALSE) {
   context_dirs <- list()
+  exportable_tabs <- get_exportable_tabs()
   
   for (context_option in context_options) {
     context_folder <- context_to_folder_name(context_option)
@@ -126,31 +118,61 @@ create_export_dirs <- function(output_dir, context_options) {
       dir.create(context_dir, recursive = TRUE)
     }
     
-    # create subfolders for this context
-    regions_dir <- file.path(context_dir, "regions")
-    profiles_dir <- file.path(context_dir, "profiles") 
-    variants_dir <- file.path(context_dir, "variants")
-    tables_dir <- file.path(context_dir, "tables")
-    
-    for (subfolder in c(regions_dir, profiles_dir, variants_dir, tables_dir)) {
-      if (!dir.exists(subfolder)) {
-        dir.create(subfolder, recursive = TRUE)
+    if (single_region_mode) {
+      # for single region export, use flat structure - all files go directly in context_dir
+      dir_list <- list(
+        context_dir = context_dir,
+        regions_dir = context_dir,  # same as context_dir for flat structure
+        profiles_dir = context_dir
+      )
+      
+      # add tab directories (all point to context_dir for flat structure)
+      for (tab_id in names(exportable_tabs)) {
+        dir_list[[paste0(tab_id, "_dir")]] <- context_dir
+      }
+    } else {
+      # for multi-region export, use organized folder structure
+      # create standard subfolders
+      regions_dir <- file.path(context_dir, "regions")
+      profiles_dir <- file.path(context_dir, "profiles")
+      
+      subfolders <- c(regions_dir, profiles_dir)
+      
+      # create dynamic subfolders for each exportable tab
+      tab_dirs <- list()
+      for (tab_id in names(exportable_tabs)) {
+        tab_dir <- file.path(context_dir, tab_id)
+        tab_dirs[[tab_id]] <- tab_dir
+        subfolders <- c(subfolders, tab_dir)
+      }
+      
+      # create all directories
+      for (subfolder in subfolders) {
+        if (!dir.exists(subfolder)) {
+          dir.create(subfolder, recursive = TRUE)
+        }
+      }
+      
+      # build directory list (include tab dirs dynamically)
+      dir_list <- list(
+        context_dir = context_dir,
+        regions_dir = regions_dir,
+        profiles_dir = profiles_dir
+      )
+      
+      # add tab directories dynamically
+      for (tab_id in names(tab_dirs)) {
+        dir_list[[paste0(tab_id, "_dir")]] <- tab_dirs[[tab_id]]
       }
     }
     
-    context_dirs[[context_option]] <- list(
-      context_dir = context_dir,
-      regions_dir = regions_dir,
-      profiles_dir = profiles_dir,
-      variants_dir = variants_dir,
-      tables_dir = tables_dir
-    )
+    context_dirs[[context_option]] <- dir_list
   }
   
   return(context_dirs)
 }
 
-# export a single region in a specific context
+# export a single region in a specific context using new tab-based system
 export_region <- function(region_data, context_option, dirs, export_params, use_simple_names = FALSE) {
   # set state for this region
   if (!is.null(region_data$contigs) && region_data$contigs != "") {
@@ -187,39 +209,32 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   # early return if no context
   if (is.null(cxt)) return(FALSE)
   
-  # generate region name and filenames
+  # generate region name
   region_name <- if (!is.null(region_data$id)) region_data$id else "region"
   region_name <- sanitize_filename(region_name)
   
-  filenames <- if (use_simple_names) {
-    generate_single_region_filenames(export_params$include_variants)
-  } else {
-    generate_multi_region_filenames(region_name, export_params$include_variants)
-  }
+  # create region_info for tabs
+  region_info <- list(
+    assembly = state$assembly,
+    contigs = state$contigs,
+    zoom = state$zoom,
+    context_zoom = context_zoom,
+    region_name = region_name
+  )
   
-  # query and cache variants FIRST (if requested)
-  variant_data <- NULL
-  if (export_params$include_variants && !is.null(export_params$variants_tab)) {
-    load_variant_utilities()
-    variant_data <- query_variants_for_context(
-      assembly = state$assembly,
-      contigs = state$contigs,
-      zoom = context_zoom,
-      tab_config = export_params$variants_tab
-    )
-    
-    # cache variants for variant profile to access
-    colored_variants <- if (!is.null(variant_data)) add_variant_colors(variant_data$variants) else NULL
-    cache_set("variants.current", colored_variants)
-  } else {
-    cache_set("variants.current", NULL)
-  }
-  
-  # export profiles
+  # export profiles (always done)
   plot_result <- plot_profiles_ggplot(cxt)
   if (is.null(plot_result) || is.null(plot_result$plot)) return(FALSE)
   
-  profiles_file <- file.path(dirs$regions_dir, filenames$profiles)
+  # export profiles first
+  if (use_simple_names) {
+    # for single region export, use simple filename directly
+    profiles_file <- file.path(dirs$profiles_dir, "profiles.pdf")
+  } else {
+    # for multi-region export, use region prefix
+    profiles_file <- file.path(dirs$regions_dir, paste0(region_name, "_profiles.pdf"))
+  }
+  
   ggplot2::ggsave(
     filename = profiles_file,
     plot = plot_result$plot,
@@ -230,71 +245,97 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     device = "pdf"
   )
   
-  # copy to profiles folder with simple name
+  # copy to profiles folder with simple name (only for multi-region)
   if (!use_simple_names) {
     profiles_simple_file <- file.path(dirs$profiles_dir, paste0(region_name, ".pdf"))
     file.copy(profiles_file, profiles_simple_file)
   }
   
-  # export variants files if requested
-  if (!export_params$include_variants || is.null(export_params$variants_tab)) return(TRUE)
-  
-  if (!is.null(variant_data)) {
-    # save variants table
-    colored_variants <- add_variant_colors(variant_data$variants)
-    table_file <- save_variants_table(colored_variants, dirs$regions_dir, region_name, use_simple_names)
-    
-    if (!use_simple_names) {
-      table_simple_file <- file.path(dirs$tables_dir, paste0(region_name, ".txt"))
-      file.copy(table_file, table_simple_file)
+  # export tab plots and tables dynamically
+  exportable_tabs <- get_exportable_tabs()
+  for (tab_id in names(exportable_tabs)) {
+    # check if this tab was requested for export
+    include_param <- paste0("include_", tab_id)
+    if (!isTRUE(export_params[[include_param]])) {
+      next  # skip this tab
     }
     
-    # create and save variant plot
-    plot_result <- create_variant_frequency_plot(
-      variant_data = variant_data,
-      library_ids = export_params$variants_tab$library_ids,
-      plot_mode = export_params$plot_mode,
-      variant_span_filter = export_params$variant_min_span
-    )
-    
-    variants_file <- file.path(dirs$regions_dir, filenames$variants)
-    ggplot2::ggsave(
-      filename = variants_file,
-      plot = plot_result$plot,
-      width = plot_result$width_inches,
-      height = plot_result$height_inches,
-      units = "in",
-      dpi = 300,
-      device = "pdf"
-    )
-    
-    if (!use_simple_names) {
-      variants_simple_file <- file.path(dirs$variants_dir, paste0(region_name, ".pdf"))
-      file.copy(variants_file, variants_simple_file)
-    }
-  } else {
-    # create empty variants files
-    empty_plot <- create_variant_frequency_plot(NULL, export_params$variants_tab$library_ids)
-    
-    variants_file <- file.path(dirs$regions_dir, filenames$variants)
-    ggplot2::ggsave(
-      filename = variants_file,
-      plot = empty_plot$plot,
-      width = empty_plot$width_inches,
-      height = empty_plot$height_inches,
-      units = "in",
-      dpi = 300,
-      device = "pdf"
-    )
-    
-    table_file <- save_variants_table(NULL, dirs$regions_dir, region_name, use_simple_names)
-    
-    if (!use_simple_names) {
-      variants_simple_file <- file.path(dirs$variants_dir, paste0(region_name, ".pdf"))
-      file.copy(variants_file, variants_simple_file)
+    # export PDF if available
+    pdf_export_function <- get_tab_export_function(tab_id, "pdf")
+    if (!is.null(pdf_export_function)) {
+      # call the tab's PDF export function
+      plot_result <- pdf_export_function(region_info)
       
-      table_simple_file <- file.path(dirs$tables_dir, paste0(region_name, ".txt"))
-      file.copy(table_file, table_simple_file)
+      if (!is.null(plot_result) && !is.null(plot_result$plot)) {
+        # save the plot
+        if (use_simple_names) {
+          # for single region export, use simple filename directly in tab folder
+          tab_dir_key <- paste0(tab_id, "_dir")
+          tab_file <- file.path(dirs[[tab_dir_key]], paste0(tab_id, ".pdf"))
+        } else {
+          # for multi-region export, use region prefix in regions directory
+          tab_file <- file.path(dirs$regions_dir, paste0(region_name, "_", tab_id, ".pdf"))
+        }
+        
+        ggplot2::ggsave(
+          filename = tab_file,
+          plot = plot_result$plot,
+          width = plot_result$width_inches,
+          height = plot_result$height_inches,
+          units = "in",
+          dpi = 300,
+          device = "pdf"
+        )
+        
+        # copy to tab-specific folder with simple name (only for multi-region)
+        if (!use_simple_names) {
+          tab_dir_key <- paste0(tab_id, "_dir")
+          if (!is.null(dirs[[tab_dir_key]])) {
+            tab_simple_file <- file.path(dirs[[tab_dir_key]], paste0(region_name, ".pdf"))
+            file.copy(tab_file, tab_simple_file)
+          }
+        }
+      } else {
+        cat(sprintf("warning: PDF export function for tab '%s' returned no plot, skipping PDF\n", tab_id))
+      }
+    }
+    
+    # export table if available
+    table_export_function <- get_tab_export_function(tab_id, "table")
+    if (!is.null(table_export_function)) {
+      # call the tab's table export function
+      table_data <- table_export_function(region_info)
+      
+      if (!is.null(table_data)) {
+        # save the table
+        if (use_simple_names) {
+          # for single region export, use simple filename directly in tab folder
+          tab_dir_key <- paste0(tab_id, "_dir")
+          table_file <- file.path(dirs[[tab_dir_key]], paste0(tab_id, "_table.txt"))
+        } else {
+          # for multi-region export, use region prefix in regions directory
+          table_file <- file.path(dirs$regions_dir, paste0(region_name, "_", tab_id, "_table.txt"))
+        }
+        
+        write.table(table_data, table_file, sep = "\t", row.names = FALSE, quote = FALSE)
+        cat(sprintf("saved %s table (%d rows) to: %s\n", tab_id, nrow(table_data), table_file))
+        
+        # copy to tab-specific folder with simple name (only for multi-region)
+        if (!use_simple_names) {
+          tab_dir_key <- paste0(tab_id, "_dir")
+          if (!is.null(dirs[[tab_dir_key]])) {
+            tab_simple_table_file <- file.path(dirs[[tab_dir_key]], paste0(region_name, "_table.txt"))
+            file.copy(table_file, tab_simple_table_file)
+          }
+        }
+      } else {
+        cat(sprintf("warning: table export function for tab '%s' returned no data, skipping table\n", tab_id))
+      }
+    }
+    
+    # warn if no export functions are available
+    if (is.null(pdf_export_function) && is.null(table_export_function)) {
+      cat(sprintf("warning: no export functions registered for tab '%s', skipping\n", tab_id))
     }
   }
   
@@ -303,7 +344,21 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
 
 # show enhanced export current view dialog
 observeEvent(input$plotViewBtn, {
-  variants_available <- is_variants_tab_available()
+  exportable_tabs <- get_exportable_tabs()
+  
+  # create tab checkboxes dynamically
+  tab_checkboxes <- if (length(exportable_tabs) > 0) {
+    tab_inputs <- lapply(names(exportable_tabs), function(tab_id) {
+      tab <- exportable_tabs[[tab_id]]
+      checkboxInput(paste0("pdf_include_", tab_id), 
+                   paste("Include", tolower(tab$tab_label), "plots"),
+                   value = cache_get_if_exists(paste0("export_include_", tab_id), FALSE), 
+                   width = "100%")
+    })
+    do.call(tagList, tab_inputs)
+  } else {
+    p("No exportable tabs available", style = "color: #888;")
+  }
   
   showModal(modalDialog(
     title = "Export Current View to PDF",
@@ -337,21 +392,11 @@ observeEvent(input$plotViewBtn, {
         p(id = "pdf_full_path", paste("Full path:", file.path(getwd(), "plots", cache_get_if_exists("export_output_dir", "current_view"))), 
           style = "color: #666; font-size: 0.9em; word-break: break-all;"),
         br(),
-        p("Creates folders for each context: precise/, 10kb_margin/, etc.", style = "color: #666; font-size: 0.9em;")
+        p("Creates folders for each context and tab type.", style = "color: #666; font-size: 0.9em;")
       ),
       column(4,
-        h5("Options"),
-        if (variants_available) {
-          tagList(
-            checkboxInput("pdf_include_variants", "Include variant plots", 
-                         value = cache_get_if_exists("export_include_variants", FALSE), width = "100%"),
-            br(),
-            numericInput("pdf_variant_min_span", "Min variant span:", 
-                        value = cache_get_if_exists("export_variant_min_span", 0.5), min = 0, max = 1, step = 0.1, width = "100%")
-          )
-        } else {
-          p("Variant plots not available", style = "color: #888;")
-        }
+        h5("Tabs to Export"),
+        tab_checkboxes
       )
     ),
     footer = tagList(
@@ -363,7 +408,21 @@ observeEvent(input$plotViewBtn, {
 
 # show enhanced export all regions dialog  
 observeEvent(input$plotRegionsBtn, {
-  variants_available <- is_variants_tab_available()
+  exportable_tabs <- get_exportable_tabs()
+  
+  # create tab checkboxes dynamically
+  tab_checkboxes <- if (length(exportable_tabs) > 0) {
+    tab_inputs <- lapply(names(exportable_tabs), function(tab_id) {
+      tab <- exportable_tabs[[tab_id]]
+      checkboxInput(paste0("pdf_regions_include_", tab_id), 
+                   paste("Include", tolower(tab$tab_label), "plots"),
+                   value = cache_get_if_exists(paste0("export_include_", tab_id), FALSE), 
+                   width = "100%")
+    })
+    do.call(tagList, tab_inputs)
+  } else {
+    p("No exportable tabs available", style = "color: #888;")
+  }
   
   showModal(modalDialog(
     title = "Export All Regions to PDF",
@@ -397,21 +456,11 @@ observeEvent(input$plotRegionsBtn, {
         p(id = "pdf_regions_full_path", paste("Full path:", file.path(getwd(), "plots", cache_get_if_exists("export_regions_output_dir", "all_regions"))), 
           style = "color: #666; font-size: 0.9em; word-break: break-all;"),
         br(),
-        p("Creates context folders, each with subfolders: regions/, profiles/, variants/, tables/", style = "color: #666; font-size: 0.9em;")
+        p("Creates context folders, each with subfolders for profiles and tab types.", style = "color: #666; font-size: 0.9em;")
       ),
       column(4,
-        h5("Options"),
-        if (variants_available) {
-          tagList(
-            checkboxInput("pdf_regions_include_variants", "Include variant plots", 
-                         value = cache_get_if_exists("export_include_variants", FALSE), width = "100%"),
-            br(),
-            numericInput("pdf_regions_variant_min_span", "Min variant span:", 
-                        value = cache_get_if_exists("export_variant_min_span", 0.5), min = 0, max = 1, step = 0.1, width = "100%")
-          )
-        } else {
-          p("Variant plots not available", style = "color: #888;")
-        }
+        h5("Tabs to Export"),
+        tab_checkboxes
       )
     ),
     p("This will export all regions from the current regions table."),
@@ -500,16 +549,23 @@ observeEvent(input$confirm_export_view, {
     # get export parameters
     context_options <- input$pdf_contexts %||% c("10kb margin")
     output_dir_name <- input$pdf_output_dir %||% "current_view"
-    include_variants <- input$pdf_include_variants %||% FALSE
-    variant_min_span <- input$pdf_variant_min_span %||% 0.5
     width <- input$pdf_width %||% 10
     height <- input$pdf_height %||% 6
     
-    # cache user choices for next time
+    # get tab inclusion settings dynamically
+    exportable_tabs <- get_exportable_tabs()
+    tab_inclusions <- list()
+    for (tab_id in names(exportable_tabs)) {
+      include_param <- paste0("include_", tab_id)
+      input_param <- paste0("pdf_include_", tab_id)
+      tab_inclusions[[include_param]] <- input[[input_param]] %||% FALSE
+      # cache the setting
+      cache_set(paste0("export_include_", tab_id), tab_inclusions[[include_param]])
+    }
+    
+    # cache other settings
     cache_set("export_contexts", context_options)
     cache_set("export_output_dir", output_dir_name)
-    cache_set("export_include_variants", include_variants)
-    cache_set("export_variant_min_span", variant_min_span)
     cache_set("export_width", width)
     cache_set("export_height", height)
     
@@ -539,31 +595,16 @@ observeEvent(input$confirm_export_view, {
     original_zoom <- state$zoom
     original_assembly <- state$assembly
     
-    # create context directories
-    context_dirs <- create_export_dirs(output_dir, context_options)
+    # create context directories (use flat structure for single region)
+    context_dirs <- create_export_dirs(output_dir, context_options, single_region_mode = TRUE)
     
-    # get variants tab if needed
-    variants_tab <- if (include_variants && is_variants_tab_available()) {
-      get_tab_by_id("variants")
-    } else {
-      NULL
-    }
-    
-    # get current variant settings
-    current_plot_mode <- if (exists("input") && !is.null(input$variantPlotMode)) {
-      input$variantPlotMode
-    } else {
-      "frequency"  # default
-    }
-    
-    # create export parameters
-    export_params <- list(
-      include_variants = include_variants,
-      variants_tab = variants_tab,
-      variant_min_span = variant_min_span,
-      width = width,
-      height = height,
-      plot_mode = current_plot_mode
+    # create export parameters (include tab inclusions and basic settings)
+    export_params <- c(
+      list(
+        width = width,
+        height = height
+      ),
+      tab_inclusions
     )
     
     # create region data from current state
@@ -593,6 +634,7 @@ observeEvent(input$confirm_export_view, {
     showNotification(paste("Exported", success_count, "of", length(context_options), "contexts to:", output_dir), type = "message", duration = 5)
     
   }, error = function(e) {
+    browser()
     showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
   })
 })
@@ -605,16 +647,23 @@ observeEvent(input$confirm_export_regions, {
     # get export parameters
     context_options <- input$pdf_regions_contexts %||% c("10kb margin")
     output_dir_name <- input$pdf_regions_output_dir %||% "all_regions"
-    include_variants <- input$pdf_regions_include_variants %||% FALSE
-    variant_min_span <- input$pdf_regions_variant_min_span %||% 0.5
     width <- input$pdf_regions_width %||% 10
     height <- input$pdf_regions_height %||% 6
     
-    # cache user choices for next time
+    # get tab inclusion settings dynamically
+    exportable_tabs <- get_exportable_tabs()
+    tab_inclusions <- list()
+    for (tab_id in names(exportable_tabs)) {
+      include_param <- paste0("include_", tab_id)
+      input_param <- paste0("pdf_regions_include_", tab_id)
+      tab_inclusions[[include_param]] <- input[[input_param]] %||% FALSE
+      # cache the setting
+      cache_set(paste0("export_include_", tab_id), tab_inclusions[[include_param]])
+    }
+    
+    # cache other settings
     cache_set("export_contexts", context_options)
     cache_set("export_regions_output_dir", output_dir_name)
-    cache_set("export_include_variants", include_variants)
-    cache_set("export_variant_min_span", variant_min_span)
     cache_set("export_width", width)
     cache_set("export_height", height)
     
@@ -649,33 +698,16 @@ observeEvent(input$confirm_export_regions, {
     
     success_count <- 0
     
-    # get variants tab if needed
-    variants_tab <- if (include_variants && is_variants_tab_available()) {
-      # load variant utilities only when needed
-      load_variant_utilities()
-      get_tab_by_id("variants")
-    } else {
-      NULL
-    }
-    
-    # get current variant settings
-    current_plot_mode <- if (exists("input") && !is.null(input$variantPlotMode)) {
-      input$variantPlotMode
-    } else {
-      "frequency"  # default
-    }
-    
     # create context directories
     context_dirs <- create_export_dirs(output_dir, context_options)
     
-    # create export parameters
-    export_params <- list(
-      include_variants = include_variants,
-      variants_tab = variants_tab,
-      variant_min_span = variant_min_span,
-      width = width,
-      height = height,
-      plot_mode = current_plot_mode
+    # create export parameters (include tab inclusions and basic settings)
+    export_params <- c(
+      list(
+        width = width,
+        height = height
+      ),
+      tab_inclusions
     )
     
     # iterate through regions, then contexts (main loop is regions)
@@ -701,6 +733,7 @@ observeEvent(input$confirm_export_regions, {
                      type = "message", duration = 8)
     
   }, error = function(e) {
+    browser()
     showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
   })
 })

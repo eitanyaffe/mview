@@ -5,6 +5,7 @@
 .tabs_env <- new.env(parent = emptyenv())
 .tabs_env$registered_tabs <- list()
 .tabs_env$current_loading_tab <- NULL
+.tabs_env$export_functions <- list()
 
 # Register a new tab with its configuration
 register_tab <- function(tab_id, tab_label, tab_code, ...) {
@@ -104,4 +105,76 @@ get_tab_panels <- function() {
   }
   
   panels
-} 
+}
+
+# Register export function for a tab
+register_tab_export_function <- function(tab_id, export_type, export_function) {
+  stopifnot(is.character(tab_id) && length(tab_id) == 1 && nzchar(tab_id))
+  stopifnot(is.character(export_type) && length(export_type) == 1 && nzchar(export_type))
+  stopifnot(is.function(export_function))
+  stopifnot(export_type %in% c("pdf", "table"))
+  
+  # Check that the tab exists and supports export
+  tab <- get_tab_by_id(tab_id)
+  if (is.null(tab)) {
+    stop(sprintf("register_tab_export_function: tab '%s' not found", tab_id))
+  }
+  
+  if (!isTRUE(tab$supports_export)) {
+    warning(sprintf("register_tab_export_function: tab '%s' does not have supports_export = TRUE", tab_id))
+  }
+  
+  # Initialize tab entry if it doesn't exist
+  if (is.null(.tabs_env$export_functions[[tab_id]])) {
+    .tabs_env$export_functions[[tab_id]] <- list()
+  }
+  
+  .tabs_env$export_functions[[tab_id]][[export_type]] <- export_function
+  cat(sprintf("registered %s export function for tab: %s\n", export_type, tab_id))
+  invisible(NULL)
+}
+
+# Get export function for a tab
+get_tab_export_function <- function(tab_id, export_type) {
+  stopifnot(is.character(tab_id) && length(tab_id) == 1 && nzchar(tab_id))
+  stopifnot(is.character(export_type) && length(export_type) == 1 && nzchar(export_type))
+  stopifnot(export_type %in% c("pdf", "table"))
+  
+  export_functions <- .tabs_env$export_functions
+  if (tab_id %in% names(export_functions) && 
+      export_type %in% names(export_functions[[tab_id]])) {
+    return(export_functions[[tab_id]][[export_type]])
+  }
+  
+  NULL
+}
+
+# Get all tabs that have export functions registered
+get_exportable_tabs <- function() {
+  export_functions <- .tabs_env$export_functions
+  registered_tabs <- .tabs_env$registered_tabs
+  
+  exportable_tabs <- list()
+  for (tab_id in names(export_functions)) {
+    if (tab_id %in% names(registered_tabs)) {
+      tab <- registered_tabs[[tab_id]]
+      if (isTRUE(tab$supports_export)) {
+        exportable_tabs[[tab_id]] <- tab
+      }
+    }
+  }
+  
+  exportable_tabs
+}
+
+# Get available export types for a tab
+get_tab_export_types <- function(tab_id) {
+  stopifnot(is.character(tab_id) && length(tab_id) == 1 && nzchar(tab_id))
+  
+  export_functions <- .tabs_env$export_functions
+  if (tab_id %in% names(export_functions)) {
+    return(names(export_functions[[tab_id]]))
+  }
+  
+  character(0)
+}

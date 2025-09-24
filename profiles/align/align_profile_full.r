@@ -267,8 +267,6 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     gg <- gg + ggplot2::coord_cartesian(ylim = c(NA, profile$force_max_y))
   }
   
-  # !!!
-  # cache_set("alns", df$reads)
   # build legends based on mutation_color_mode
   legends <- list()
   mutation_color_mode <- if (!is.null(profile$mutation_color_mode)) profile$mutation_color_mode else "detailed"
