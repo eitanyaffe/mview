@@ -255,27 +255,15 @@ create_scatter_plot <- function(data_matrix, items_df, library_ids, x_lib, y_lib
     return(plotly::ggplotly(p))
   }
   
-  # add jitter if enabled (5% of plot range)
-  if (jitter_enabled) {
-    x_range <- max(plot_data$x_value) - min(plot_data$x_value)
-    y_range <- max(plot_data$y_value) - min(plot_data$y_value)
-    x_jitter <- x_range * 0.05
-    y_jitter <- y_range * 0.05
-    
-    # apply jitter
-    plot_data$x_value <- plot_data$x_value + runif(nrow(plot_data), -x_jitter, x_jitter)
-    plot_data$y_value <- plot_data$y_value + runif(nrow(plot_data), -y_jitter, y_jitter)
-    
-    # apply bounds based on plot value type
-    if (plot_value == "frequency") {
-      # frequency values must stay within [0, 1]
-      plot_data$x_value <- pmax(0, pmin(1, plot_data$x_value))
-      plot_data$y_value <- pmax(0, pmin(1, plot_data$y_value))
-    } else {
-      # count values (support/coverage) must not go negative
-      plot_data$x_value <- pmax(0, plot_data$x_value)
-      plot_data$y_value <- pmax(0, plot_data$y_value)
-    }
+  # apply bounds based on plot value type (always for frequency)
+  if (plot_value == "frequency") {
+    # frequency values must stay within [0, 1]
+    plot_data$x_value <- pmax(0, pmin(1, plot_data$x_value))
+    plot_data$y_value <- pmax(0, pmin(1, plot_data$y_value))
+  } else {
+    # count values (support/coverage) must not go negative
+    plot_data$x_value <- pmax(0, plot_data$x_value)
+    plot_data$y_value <- pmax(0, plot_data$y_value)
   }
   
   # check for selected items
@@ -301,6 +289,27 @@ create_scatter_plot <- function(data_matrix, items_df, library_ids, x_lib, y_lib
     x_lib, " ", value_label, ": ", x_text, "<br>",
     y_lib, " ", value_label, ": ", y_text, "<br>"
   )
+  
+  # add jitter if enabled (5% of plot range) - after hover text
+  if (jitter_enabled) {
+    x_range <- max(plot_data$x_value) - min(plot_data$x_value)
+    y_range <- max(plot_data$y_value) - min(plot_data$y_value)
+    x_jitter <- x_range * 0.05
+    y_jitter <- y_range * 0.05
+    
+    # apply jitter
+    plot_data$x_value <- plot_data$x_value + runif(nrow(plot_data), -x_jitter, x_jitter)
+    plot_data$y_value <- plot_data$y_value + runif(nrow(plot_data), -y_jitter, y_jitter)
+    
+    # reapply bounds after jitter
+    if (plot_value == "frequency") {
+      plot_data$x_value <- pmax(0, pmin(1, plot_data$x_value))
+      plot_data$y_value <- pmax(0, pmin(1, plot_data$y_value))
+    } else {
+      plot_data$x_value <- pmax(0, plot_data$x_value)
+      plot_data$y_value <- pmax(0, plot_data$y_value)
+    }
+  }
   
   # create plot
   non_selected_data <- plot_data[!plot_data$is_selected, ]
@@ -372,22 +381,13 @@ create_temporal_plot <- function(data_matrix, items_df, library_ids,
     return(plotly::ggplotly(p))
   }
   
-  # add jitter if enabled (5% of y-axis range)
-  if (jitter_enabled) {
-    y_range <- max(plot_data$value) - min(plot_data$value)
-    y_jitter <- y_range * 0.05
-    
-    # apply jitter
-    plot_data$value <- plot_data$value + runif(nrow(plot_data), -y_jitter, y_jitter)
-    
-    # apply bounds based on plot value type
-    if (plot_value == "frequency") {
-      # frequency values must stay within [0, 1]
-      plot_data$value <- pmax(0, pmin(1, plot_data$value))
-    } else {
-      # count values (support/coverage) must not go negative
-      plot_data$value <- pmax(0, plot_data$value)
-    }
+  # apply bounds based on plot value type (always for frequency)
+  if (plot_value == "frequency") {
+    # frequency values must stay within [0, 1]
+    plot_data$value <- pmax(0, pmin(1, plot_data$value))
+  } else {
+    # count values (support/coverage) must not go negative
+    plot_data$value <- pmax(0, plot_data$value)
   }
   
   # check for selected items
@@ -414,6 +414,22 @@ create_temporal_plot <- function(data_matrix, items_df, library_ids,
     "Library: ", plot_data$library, "<br>",
     value_label, ": ", value_text, "<br>"
   )
+  
+  # add jitter if enabled (5% of y-axis range) - after hover text
+  if (jitter_enabled) {
+    y_range <- max(plot_data$value) - min(plot_data$value)
+    y_jitter <- y_range * 0.05
+    
+    # apply jitter
+    plot_data$value <- plot_data$value + runif(nrow(plot_data), -y_jitter, y_jitter)
+    
+    # reapply bounds after jitter
+    if (plot_value == "frequency") {
+      plot_data$value <- pmax(0, pmin(1, plot_data$value))
+    } else {
+      plot_data$value <- pmax(0, plot_data$value)
+    }
+  }
   
   # create plot with conditional styling for selected items
   non_selected_data <- plot_data[!plot_data$is_selected, ]

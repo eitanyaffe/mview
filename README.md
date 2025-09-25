@@ -172,7 +172,7 @@ The collapsible right panel contains profile-specific settings that are applied 
 
 mview includes several built-in profiles for genomic visualization:
 
-- **alignment**: Display read alignments with advanced mutation analysis, multiple visualization modes, and comprehensive filtering options including alignment length, mutation rates, and clipping patterns
+- **alignment**: Display read alignments with advanced mutation analysis, multiple visualization modes and comprehensive filtering options including alignment length, mutation rates, and clipping patterns
 - **gene**: Display gene segments with strand orientation and customizable coloring
 - **segments**: Display genomic segments as colored rectangles (used for regions, annotations)
 - **axis**: Show contig coordinates with tick marks for orientation
@@ -257,3 +257,9 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 - Legends tab added
 - Short indel filtering: Added `min_indel_length` parameter to alignment profiles to filter out short indels from mutation density calculations, reducing noise from sequencing artifacts while preserving longer, more meaningful indels.
+- Chunk-based height calculation: Enhanced alignment visualization with flexible chunk definition strategies. Instead of calculating heights per read, alignments are now grouped into chunks based on configurable criteria:
+  - **break_on_overlap**: Default mode that creates new chunks when alignments overlap (considering max_gap tolerance)
+  - **break_on_gap**: Creates new chunks when gaps between alignments exceed max_gap threshold  
+  - **read**: Groups entire read into single chunk (equivalent to previous read-based heights)
+  - **alignment**: Each alignment forms its own chunk for maximum granularity
+  - This provides better visual separation of alignment clusters while maintaining read-level context for clicking and navigation.

@@ -61,6 +61,17 @@ default_alignment_params <- list(
     type = "integer",
     default = 3
   ),
+  max_gap = list(
+    group_id = "align_full",
+    type = "integer",
+    default = 10
+  ),
+  chunk_type = list(
+    group_id = "align_full",
+    type = "select",
+    choices = c("read", "alignment", "break_on_overlap", "break_on_gap"),
+    default = "break_on_overlap"
+  ),
   height = list(
     group_id = "align_general",
     type = "integer",
@@ -182,6 +193,8 @@ align_profile <- function(id, name, is_fixed = FALSE,
                           min_alignment_length = 0,
                           max_alignment_length = 0,
                           min_indel_length = 3,
+                          max_gap = 10,
+                          chunk_type = "break_on_overlap",
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           show_hover = TRUE,
@@ -280,6 +293,8 @@ align_profile <- function(id, name, is_fixed = FALSE,
     min_alignment_length = min_alignment_length,
     max_alignment_length = max_alignment_length,
     min_indel_length = min_indel_length,
+    max_gap = max_gap,
+    chunk_type = chunk_type,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
     show_hover = show_hover,

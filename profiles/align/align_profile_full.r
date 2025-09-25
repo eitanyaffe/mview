@@ -1,16 +1,16 @@
 # Full mode for alignment profile
 
 # Get colors for alignments based on color mode
-get_alignment_colors <- function(alignments, reads, style) {
+get_alignment_colors <- function(alignments, chunks, style) {
   if (style == "none") {
     return(rep("lightgray", nrow(alignments)))
   } else if (style == "by_strand") {
-    # get corresponding read info
-    read_lookup <- setNames(reads$is_reverse, reads$read_id)
-    read_is_reverse <- read_lookup[alignments$read_id]
+    # get corresponding chunk info
+    chunk_lookup <- setNames(chunks$read_reversed, chunks$chunk_id)
+    chunk_is_reverse <- chunk_lookup[alignments$chunk_id]
     
-    # xor of read and alignment strand
-    alignments$along_contig = !xor(alignments$is_reverse, read_is_reverse)
+    # xor of chunk and alignment strand
+    alignments$along_contig = !xor(alignments$is_reverse, chunk_is_reverse)
     colors <- ifelse(alignments$along_contig, "#dcfbdc", "#efcb39")
     return(colors)
   } else if (style == "by_mutations") {
@@ -35,6 +35,8 @@ min_mutations_percent = 0.0,
 max_mutations_percent = 10.0,
 min_alignment_length = 0,
 max_alignment_length = 0,
+max_gap = 10,
+chunk_type = "break_on_overlap",
 min_indel_length = 3) {
   
   # Create cache key based on all relevant parameters
@@ -57,12 +59,14 @@ min_indel_length = 3) {
                        max_mutations_percent = max_mutations_percent,
                        min_alignment_length = min_alignment_length,
                        max_alignment_length = max_alignment_length,
+                       max_gap = max_gap,
+                       chunk_type = chunk_type,
                        min_indel_length = min_indel_length
                      ), algo = "md5"))
 
   # Use cache for the full query
   df <- cache(cache_key, {
-    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(min_indel_length))
+    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_gap), chunk_type, as.integer(min_indel_length))
   })
   cat(sprintf("done with aln_query_full\n"))
   
@@ -98,7 +102,18 @@ min_indel_length = 3) {
     reads <- filter_segments(reads, cxt, cxt$mapper$xlim)
   }
 
-  return(list(alignments = alignments, mutations = mutations, reads = reads))
+  # Process chunks
+  chunks <- NULL
+  if (!is.null(df$chunks) && nrow(df$chunks) > 0) {
+    chunks <- df$chunks
+    chunks$contig <- chunks$contig_id
+    # alntools full mode outputs 1-based coordinates
+    chunks$start <- chunks$span_start
+    chunks$end <- chunks$span_end
+    chunks <- filter_segments(chunks, cxt, cxt$mapper$xlim)
+  }
+
+  return(list(alignments = alignments, mutations = mutations, reads = reads, chunks = chunks))
 }
 
 align_profile_full <- function(profile, cxt, aln, gg) {
@@ -118,27 +133,30 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     max_mutations_percent = as.numeric(profile$max_mutations_percent),
     min_alignment_length = as.integer(profile$min_alignment_length),
     max_alignment_length = as.integer(profile$max_alignment_length),
+    max_gap = as.integer(profile$max_gap),
+    chunk_type = profile$chunk_type,
     min_indel_length = as.integer(profile$min_indel_length))
   
-  # Plot reads first (under alignments)
-  if (!is.null(df$reads) && nrow(df$reads) > 0) {
+  # Plot chunks first (under alignments)
+  if (!is.null(df$chunks) && nrow(df$chunks) > 0) {
 
-    cat(sprintf("plotting %d reads\n", nrow(df$reads)))
-    reads <- df$reads
+    cat(sprintf("plotting %d chunks\n", nrow(df$chunks)))
+    chunks <- df$chunks
 
     # create hover text only if enabled
     if (profile$show_hover) {
-      reads$hover_text <- paste0(
-        "Read: ", reads$read_id, "\n",
-        reads$start, "-", reads$end
+      chunks$hover_text <- paste0(
+        "Chunk: ", chunks$chunk_id, "\n",
+        "Read: ", chunks$read_id, "\n",
+        chunks$start, "-", chunks$end
       )
     } else {
-      reads$hover_text <- ""
+      chunks$hover_text <- ""
     }
 
-    # draw read lines at middle height
+    # draw chunk lines at middle height
     gg <- gg + ggplot2::geom_segment(
-      data = reads,
+      data = chunks,
       ggplot2::aes(
         x = gstart, xend = gend,
         y = height + 0.5, yend = height + 0.5,
@@ -154,7 +172,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     cat(sprintf("plotting %d alignments\n", nrow(df$alignments)))
 
     alignments <- df$alignments
-    alignments = alignments[is.element(alignments$read_id, reads$read_id), ]
+    alignments = alignments[is.element(alignments$chunk_id, chunks$chunk_id), ]
     alignments$rect_ymin <- alignments$height
     alignments$rect_ymax <- alignments$height + 1
 
@@ -170,7 +188,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     
 
     # set colors based on color mode
-    alignments$color <- get_alignment_colors(alignments, reads, profile$full_style)
+    alignments$color <- get_alignment_colors(alignments, chunks, profile$full_style)
 
     alignments$align_length <- alignments$end - alignments$start + 1
     alignments$mut_density_pct <- (alignments$mutation_count / alignments$align_length) * 100
@@ -241,7 +259,9 @@ align_profile_full <- function(profile, cxt, aln, gg) {
   # Plot mutations using unified function
   if (!is.null(df$mutations) && nrow(df$mutations) > 0 && profile$full_style == "show_mutations") {
     mutations <- df$mutations
-    mutations = mutations[is.element(mutations$read_id, df$reads$read_id), ]
+    # filter mutations to those belonging to alignments in visible chunks
+    visible_chunk_alignments <- alignments$alignment_index
+    mutations = mutations[is.element(mutations$alignment_index, visible_chunk_alignments), ]
 
     # build hover text for align-specific format
     if (profile$show_hover) {

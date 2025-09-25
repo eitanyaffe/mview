@@ -166,6 +166,10 @@ Categories are stacked from highest distance (bottom) to lowest distance (top) i
   - `max_mutations_percent`: Maximum mutations percentage threshold with preset options (0%, 0.01%, 0.1%, 1%, 10%). Default 10%. Special case: 0% = only alignments with zero mutations. Otherwise filters out alignments with mutation rate above this threshold.
   - `min_indel_length`: Minimum indel length to include in mutation density calculations (default 3). Indels shorter than this threshold are filtered out from mutation counts and density calculations to reduce noise from sequencing artifacts. Set to 0 to include all indels.
 
+#### Chunk-based height calculation
+
+In full mode, alignments are grouped into "chunks" (stretches of related alignments) for height calculation, providing better visual separation while maintaining biological context. Heights are calculated for chunks, then inherited by individual alignments within each chunk. Clicking on any alignment still navigates to the full read context.
+
 #### Full mode parameters
   - `full_style`:
     - `none`: alignments gray; no mutation overlay.
@@ -176,6 +180,12 @@ Categories are stacked from highest distance (bottom) to lowest distance (top) i
     - `by_coord_left`: minimize overlap by start coordinate.
     - `by_coord_right`: minimize overlap by end coordinate.
     - `by_mutations`: order by mutation density while preventing overlaps.
+  - `chunk_type`: defines how alignments are grouped into chunks for height calculation:
+    - `break_on_overlap`: start new chunk when alignments overlap in read coordinates (default).
+    - `break_on_gap`: start new chunk when gap between alignments in read coordinates exceeds max_gap.
+    - `read`: entire read forms one chunk (equivalent to read-based heights).
+    - `alignment`: each alignment forms its own chunk (maximum granularity).
+  - `max_gap`: maximum gap tolerance for chunk detection in read coordinates (default: 10).
   - `max_reads`: cap alignments fetched per interval in full mode.
   - `max_mutations`: cap mutations drawn when `full_style=show_mutations`.
 
