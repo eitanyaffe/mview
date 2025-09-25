@@ -258,8 +258,8 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 - Legends tab added
 - Short indel filtering: Added `min_indel_length` parameter to alignment profiles to filter out short indels from mutation density calculations, reducing noise from sequencing artifacts while preserving longer, more meaningful indels.
 - Chunk-based height calculation: Enhanced alignment visualization with flexible chunk definition strategies. Instead of calculating heights per read, alignments are now grouped into chunks based on configurable criteria:
-  - **break_on_overlap**: Default mode that creates new chunks when alignments overlap (considering max_gap tolerance)
-  - **break_on_gap**: Creates new chunks when gaps between alignments exceed max_gap threshold  
+  - **break_on_overlap**: Default mode that creates new chunks when alignments overlap (considering max_margin tolerance)
+  - **break_on_gap**: Creates new chunks when gaps between alignments exceed max_margin threshold  
   - **read**: Groups entire read into single chunk (equivalent to previous read-based heights)
   - **alignment**: Each alignment forms its own chunk for maximum granularity
   - This provides better visual separation of alignment clusters while maintaining read-level context for clicking and navigation.

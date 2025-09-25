@@ -11,7 +11,7 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
   # extract required parameters from tab config
   get_aln_f <- tab_config$get_aln_f
   library_ids <- tab_config$library_ids
-  max_gap <- tab_config$max_gap %||% 10
+  max_margin <- tab_config$max_margin %||% 10
   min_element_length <- tab_config$min_element_length %||% 50
   min_anchor_length <- tab_config$min_anchor_length %||% 200
   max_anchor_mutations_percent <- tab_config$max_anchor_mutations_percent %||% 0.001
@@ -53,7 +53,7 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
   rearrange_results <- aln_rearrange(
     store_list = stores,
     intervals_df = cxt$intervals,
-    max_gap = as.integer(max_gap),
+    max_margin = as.integer(max_margin),
     min_element_length = as.integer(min_element_length),
     min_anchor_length = as.integer(min_anchor_length),
     max_anchor_mutations_percent = as.numeric(max_anchor_mutations_percent),

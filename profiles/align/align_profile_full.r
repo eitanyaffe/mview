@@ -35,7 +35,7 @@ min_mutations_percent = 0.0,
 max_mutations_percent = 10.0,
 min_alignment_length = 0,
 max_alignment_length = 0,
-max_gap = 10,
+max_margin = 10,
 chunk_type = "break_on_overlap",
 min_indel_length = 3) {
   
@@ -59,14 +59,14 @@ min_indel_length = 3) {
                        max_mutations_percent = max_mutations_percent,
                        min_alignment_length = min_alignment_length,
                        max_alignment_length = max_alignment_length,
-                       max_gap = max_gap,
+                       max_margin = max_margin,
                        chunk_type = chunk_type,
                        min_indel_length = min_indel_length
                      ), algo = "md5"))
 
   # Use cache for the full query
   df <- cache(cache_key, {
-    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_gap), chunk_type, as.integer(min_indel_length))
+    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_margin), chunk_type, as.integer(min_indel_length))
   })
   cat(sprintf("done with aln_query_full\n"))
   
@@ -133,7 +133,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     max_mutations_percent = as.numeric(profile$max_mutations_percent),
     min_alignment_length = as.integer(profile$min_alignment_length),
     max_alignment_length = as.integer(profile$max_alignment_length),
-    max_gap = as.integer(profile$max_gap),
+    max_margin = as.integer(profile$max_margin),
     chunk_type = profile$chunk_type,
     min_indel_length = as.integer(profile$min_indel_length))
   

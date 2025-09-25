@@ -182,10 +182,10 @@ In full mode, alignments are grouped into "chunks" (stretches of related alignme
     - `by_mutations`: order by mutation density while preventing overlaps.
   - `chunk_type`: defines how alignments are grouped into chunks for height calculation:
     - `break_on_overlap`: start new chunk when alignments overlap in read coordinates (default).
-    - `break_on_gap`: start new chunk when gap between alignments in read coordinates exceeds max_gap.
+    - `break_on_gap`: start new chunk when gap between alignments in read coordinates exceeds max_margin.
     - `read`: entire read forms one chunk (equivalent to read-based heights).
     - `alignment`: each alignment forms its own chunk (maximum granularity).
-  - `max_gap`: maximum gap tolerance for chunk detection in read coordinates (default: 10).
+  - `max_margin`: maximum margin tolerance for chunk detection in read coordinates (default: 10).
   - `max_reads`: cap alignments fetched per interval in full mode.
   - `max_mutations`: cap mutations drawn when `full_style=show_mutations`.
 

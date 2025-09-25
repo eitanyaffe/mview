@@ -18,7 +18,7 @@ if (length(missing_params) > 0) {
 
 get_aln_f <- tab$get_aln_f
 library_ids <- tab$library_ids
-max_gap <- tab$max_gap %||% 10
+max_margin <- tab$max_margin %||% 10
 min_element_length <- tab$min_element_length %||% 50
 min_anchor_length <- tab$min_anchor_length %||% 200
 max_anchor_mutations_percent <- tab$max_anchor_mutations_percent %||% 0.01
@@ -41,7 +41,7 @@ set_tab_panel_f(function() {
         wellPanel(
           h5("Rearrangement Parameters"),
           numericInput("maxGapInput", "Max Gap:", 
-                      value = cache_get_if_exists("rearrange.max_gap", 10), 
+                      value = cache_get_if_exists("rearrange.max_margin", 10), 
                       min = 0, step = 1, width = "100%"),
           numericInput("minElementLengthInput", "Min Element Length:", 
                       value = cache_get_if_exists("rearrange.min_element_length", 50), 
@@ -99,7 +99,7 @@ query_rearrangements <- function(assembly, contigs, zoom) {
   tab_config <- list(
     get_aln_f = get_aln_f,
     library_ids = library_ids,
-    max_gap = max_gap,
+    max_margin = max_margin,
     min_element_length = min_element_length,
     min_anchor_length = min_anchor_length,
     max_anchor_mutations_percent = max_anchor_mutations_percent,

@@ -255,7 +255,7 @@ register_tab(
   tab_code = "tabs/rearrangements/rearrangements_tab.r",
   get_aln_f = get_aln_f,
   library_ids = c("early", "pre", "post", "late"),
-  max_gap = 10,
+  max_margin = 10,
   min_element_length = 50,
   min_anchor_length = 200,
   max_anchor_mutations_percent = 0.01,
