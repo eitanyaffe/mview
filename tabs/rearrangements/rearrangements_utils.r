@@ -49,6 +49,12 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
     return(NULL)
   }
   
+  # get reference contigs for seam resolution
+  reference_contigs <- get_fasta(assembly)
+  if (is.null(reference_contigs)) {
+    reference_contigs <- list()
+  }
+  
   # call aln_rearrange
   rearrange_results <- aln_rearrange(
     store_list = stores,
@@ -59,8 +65,8 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
     max_anchor_mutations_percent = as.numeric(max_anchor_mutations_percent),
     max_element_mutation_percent = as.numeric(max_element_mutation_percent),
     should_verify = FALSE,
-    reference_contigs = list(),
-    reference_reads = list()
+    reference_contigs = reference_contigs,
+    resolve_seams = "reference_only"
   )
 
   # add frequency column to events dataframe

@@ -166,17 +166,17 @@ filter_rearrangements_by_support <- function(rearrange_data, min_support) {
   return(filtered_data)
 }
 
-# helper function to format shim columns for display
-format_shim_column <- function(shim_vector, max_display_length = 10) {
-  sapply(shim_vector, function(shim) {
-    if (is.na(shim) || nchar(shim) == 0) {
+# helper function to format seam columns for display
+format_seam_column <- function(seam_vector, max_display_length = 20) {
+  sapply(seam_vector, function(seam) {
+    if (is.na(seam) || nchar(seam) == 0) {
       return("")
     }
-    if (nchar(shim) <= max_display_length) {
-      return(shim)
+    if (nchar(seam) <= max_display_length) {
+      return(seam)
     }
-    # show first 5 + "..." + last 5
-    paste0(substr(shim, 1, 5), "...", substr(shim, nchar(shim) - 4, nchar(shim)))
+    # show first 10 + "..." + last 10
+    paste0(substr(seam, 1, 10), "...", substr(seam, nchar(seam) - 9, nchar(seam)))
   })
 }
 
@@ -470,11 +470,11 @@ output$eventsTable <- renderDT({
     display_df$frequency <- round(display_df$frequency, 3)
   }
   
-  # format shim columns if they exist
-  shim_cols <- c("left_shim", "right_shim", "middle_shim")
-  for (col in shim_cols) {
+  # format seam columns if they exist
+  seam_cols <- c("read_seams", "assembly_seams")
+  for (col in seam_cols) {
     if (col %in% names(display_df)) {
-      display_df[[paste0(col, "_display")]] <- format_shim_column(display_df[[col]])
+      display_df[[paste0(col, "_display")]] <- format_seam_column(display_df[[col]])
     }
   }
   
@@ -493,9 +493,8 @@ output$eventsTable <- renderDT({
     "Total Support" = "total_support",
     "Total Coverage" = "total_coverage",
     "Frequency" = "frequency",
-    "Left Shim" = "left_shim_display",
-    "Right Shim" = "right_shim_display",
-    "Middle Shim" = "middle_shim_display"
+    "Read Seams" = "read_seams_display",
+    "Assembly Seams" = "assembly_seams_display"
   )
   
   # filter to available columns
