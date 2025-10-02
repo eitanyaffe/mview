@@ -20,6 +20,7 @@ regions_ui <- function(id = "regions_module") {
         shiny::actionButton(ns("new_region_table"), "New Table"),
         shiny::actionButton(ns("open_region_table"), "Open Table"),
         shiny::actionButton(ns("delete_region_table"), "Delete Table"),
+        shiny::actionButton(ns("homologs_btn"), "Homologs", icon = shiny::icon("search")),
         shiny::hr(),
         shiny::actionButton(ns("goto_region_btn"), "Goto"),
         shiny::actionButton(ns("save_region"), "Save"),
@@ -430,6 +431,271 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         shiny::removeModal()
+      })
+
+      # homologs search button
+      observeEvent(input$homologs_btn, {
+        # get current view information from main state
+        current_app_state <- shiny::isolate(shiny::reactiveValuesToList(main_state_rv))
+        
+        # determine query contig and convert global coordinates to local coordinates
+        query_contig <- ""
+        query_start <- 1L
+        query_end <- 1000L
+        
+        if (!is.null(current_app_state$contigs) && length(current_app_state$contigs) > 0 &&
+            !is.null(current_app_state$zoom) && !is.null(current_app_state$assembly)) {
+          
+          # build context to get coordinate mapper
+          cxt <- tryCatch({
+            build_context(current_app_state$contigs, get_contigs(current_app_state$assembly), 
+                         current_app_state$zoom, current_app_state$assembly)
+          }, error = function(e) NULL)
+          
+          if (!is.null(cxt) && !is.null(cxt$mapper)) {
+            # check which contigs the current zoom spans
+            cdf <- cxt$mapper$cdf
+            zoom_contigs <- cdf[cdf$start < current_app_state$zoom[2] & cdf$end > current_app_state$zoom[1], ]
+            
+            if (nrow(zoom_contigs) >= 1) {
+              # use first contig that overlaps with zoom
+              query_contig <- zoom_contigs$contig[1]
+              contig_global_start <- zoom_contigs$start[1]
+              
+              # convert global coordinates to local coordinates
+              # local_coord = global_coord - contig_global_start + 1
+              query_start <- as.integer(max(1, round(current_app_state$zoom[1] - contig_global_start) + 1))
+              query_end <- as.integer(round(current_app_state$zoom[2] - contig_global_start))
+              
+              # ensure end is at least start
+              query_end <- max(query_end, query_start)
+            } else {
+              # fallback: use first contig
+              query_contig <- current_app_state$contigs[1]
+            }
+          } else {
+            # fallback: use first contig
+            query_contig <- current_app_state$contigs[1]
+          }
+        }
+        
+        shiny::showModal(shiny::modalDialog(
+          title = "Find Homologous Regions",
+          size = "m",
+          shiny::fluidRow(
+            shiny::column(6,
+              shiny::h5("Query Region"),
+              shiny::textInput(ns("homologs_contig"), "Contig:", value = query_contig),
+              shiny::numericInput(ns("homologs_start"), "Start Position:", value = query_start, min = 1),
+              shiny::numericInput(ns("homologs_end"), "End Position:", value = query_end, min = 1)
+            ),
+            shiny::column(6,
+              shiny::h5("Search Parameters"),
+              shiny::numericInput(ns("homologs_k"), "Kmer Size:", value = 21, min = 1, max = 50),
+              shiny::numericInput(ns("homologs_num_kmers"), "Number of Kmers:", value = 10, min = 1, max = 100),
+              shiny::numericInput(ns("homologs_threshold"), "Threshold (%):", value = 80, min = 1, max = 100),
+              shiny::numericInput(ns("homologs_margin"), "Margin (bp):", value = 5000, min = 0, step = 1000)
+            )
+          ),
+          shiny::fluidRow(
+            shiny::column(12,
+              shiny::h5("Output"),
+              shiny::textInput(ns("homologs_filename"), "Output Filename:", 
+                       value = paste0("homologs_", query_contig, "_", query_start, "_", query_end, ".txt"),
+                       placeholder = "homologs_results.txt")
+            )
+          ),
+          footer = shiny::tagList(
+            shiny::modalButton("Cancel"),
+            shiny::actionButton(ns("homologs_run"), "Search Homologs", class = "btn-primary")
+          ),
+          easyClose = TRUE
+        ))
+      })
+
+      # handle homologs search execution
+      observeEvent(input$homologs_run, {
+        tryCatch({
+          # validate inputs
+          if (is.null(input$homologs_contig) || input$homologs_contig == "") {
+            shiny::showNotification("Please specify a query contig", type = "error")
+            return()
+          }
+          
+          if (is.null(input$homologs_filename) || input$homologs_filename == "") {
+            shiny::showNotification("Please specify an output filename", type = "error")
+            return()
+          }
+          
+          # get assembly sequences
+          current_assembly <- shiny::isolate(main_state_rv$assembly)
+          assembly_sequences <- tryCatch({
+            get_fasta(current_assembly)
+          }, error = function(e) {
+            shiny::showNotification(paste("Failed to load assembly sequences:", e$message), type = "error")
+            return(NULL)
+          })
+          
+          if (is.null(assembly_sequences)) {
+            shiny::showNotification("No assembly sequences available", type = "error")
+            return()
+          }
+          
+          # validate query contig exists in assembly
+          if (!input$homologs_contig %in% names(assembly_sequences)) {
+            shiny::showNotification(paste("Contig", input$homologs_contig, "not found in assembly"), type = "error")
+            return()
+          }
+          
+          # validate query region
+          contig_length <- nchar(assembly_sequences[[input$homologs_contig]])
+          if (input$homologs_start > contig_length || input$homologs_end > contig_length) {
+            shiny::showNotification(paste("Query region exceeds contig length:", contig_length), type = "error")
+            return()
+          }
+          
+          if (input$homologs_start > input$homologs_end) {
+            shiny::showNotification("Start position must be <= end position", type = "error")
+            return()
+          }
+          
+          # show progress notification
+          shiny::showNotification("Running homologs search...", type = "message", duration = 3)
+          
+          # call alntools homologs_search function (available after init_alntools)
+          homologs_results <- tryCatch({
+            # check if homologs_search function is available
+            if (!exists("homologs_search", mode = "function")) {
+              stop("homologs_search function not available - alntools may not be initialized")
+            }
+            
+            # call homologs_search function directly (no package prefix needed)
+            homologs_search(
+              assembly_sequences = assembly_sequences,
+              query_contig = input$homologs_contig,
+              query_start = as.integer(input$homologs_start),
+              query_end = as.integer(input$homologs_end),
+              k = as.integer(input$homologs_k),
+              num_kmers = as.integer(input$homologs_num_kmers),
+              threshold = as.numeric(input$homologs_threshold),
+              num_threads = 0  # use auto-detection for optimal performance
+            )
+          }, error = function(e) {
+            # show error with helpful message
+            shiny::showNotification(paste("Homologs search failed:", e$message), 
+                                   type = "error", duration = 10)
+            return(NULL)
+          })
+          
+          if (is.null(homologs_results) || nrow(homologs_results) == 0) {
+            shiny::showNotification("No homologous regions found", type = "warning")
+            return()
+          }
+          
+          # save results to regions directory
+          regions_dir <- tryCatch(ensure_regions_dir(), error = function(e) {
+            shiny::showNotification("Regions directory not configured", type = "error")
+            return(NULL)
+          })
+          
+          if (is.null(regions_dir)) return()
+          
+          # ensure filename has .txt extension
+          filename <- input$homologs_filename
+          if (!grepl("\\.txt$", filename)) {
+            filename <- paste0(filename, ".txt")
+          }
+          
+          file_path <- file.path(regions_dir, filename)
+          
+          # apply margin to extend regions
+          margin <- as.integer(input$homologs_margin %||% 0)
+          margin_suffix <- if (margin > 0) paste0("_margin_", format_bp(margin)) else ""
+          
+          # create better descriptions with length, kmer count, and margin info
+          better_descriptions <- paste0("length_", homologs_results$length, 
+                                       "_kmers_", homologs_results$kmer_count,
+                                       "_coverage_", round(homologs_results$coverage_percent), "pct",
+                                       margin_suffix)
+          extended_starts <- pmax(1, homologs_results$start - margin)
+          extended_ends <- homologs_results$end + margin
+          
+          # validate margin doesn't extend beyond contig boundaries
+          for (i in seq_len(nrow(homologs_results))) {
+            contig_name <- homologs_results$contig[i]
+            if (contig_name %in% names(assembly_sequences)) {
+              contig_length <- nchar(assembly_sequences[[contig_name]])
+              extended_ends[i] <- min(extended_ends[i], contig_length)
+            }
+          }
+          
+          # convert homologs results to proper region table format
+          region_format_results <- data.frame(
+            id = homologs_results$id,
+            level = rep(1L, nrow(homologs_results)),  # default level
+            description = better_descriptions,
+            assembly = rep(current_assembly, nrow(homologs_results)),  # use actual assembly name
+            contigs = homologs_results$contig,  # single contig per region
+            zoom_start = as.numeric(extended_starts),  # use extended coordinates
+            zoom_end = as.numeric(extended_ends),      # use extended coordinates
+            segment_contig = homologs_results$contig,
+            segment_start = as.integer(extended_starts),
+            segment_end = as.integer(extended_ends),
+            single_contig = rep(TRUE, nrow(homologs_results)),
+            stringsAsFactors = FALSE
+          )
+          
+          # compute global zoom coordinates from segment coordinates
+          for (i in seq_len(nrow(region_format_results))) {
+            # try to get contig mapping to compute global coordinates
+            tryCatch({
+              contig_name <- region_format_results$contigs[i]
+              contig_vector <- c(contig_name)  # build_context expects a vector
+              cxt <- build_context(contig_vector, get_contigs(region_format_results$assembly[i]), 
+                                 NULL, region_format_results$assembly[i])
+              
+              if (!is.null(cxt) && !is.null(cxt$mapper)) {
+                cdf <- cxt$mapper$cdf
+                contig_row <- cdf[cdf$contig == region_format_results$segment_contig[i], ]
+                
+                if (nrow(contig_row) == 1) {
+                  # convert local coordinates to global coordinates
+                  # global_coord = local_coord + contig_global_start - 1
+                  region_format_results$zoom_start[i] <- region_format_results$segment_start[i] + contig_row$start[1] - 1
+                  region_format_results$zoom_end[i] <- region_format_results$segment_end[i] + contig_row$start[1] - 1
+                }
+              }
+            }, error = function(e) {
+              # if global coordinate computation fails, use local coordinates as fallback
+              shiny::showNotification(paste("Warning: Could not compute global coordinates for", 
+                                           region_format_results$segment_contig[i], "- using local coordinates"), 
+                                     type = "warning", duration = 3)
+              region_format_results$zoom_start[i] <<- region_format_results$segment_start[i]
+              region_format_results$zoom_end[i] <<- region_format_results$segment_end[i]
+            })
+          }
+          
+          # write results to file
+          tryCatch({
+            write.table(region_format_results, 
+                       file = file_path, 
+                       sep = "\t", 
+                       row.names = FALSE, 
+                       col.names = TRUE, 
+                       quote = FALSE)
+            
+            shiny::showNotification(paste("Found", nrow(homologs_results), "homologous regions. Results saved to:", filename), 
+                                   type = "message", duration = 8)
+          }, error = function(e) {
+            shiny::showNotification(paste("Failed to save results:", e$message), type = "error")
+          })
+          
+          # close dialog
+          shiny::removeModal()
+          
+        }, error = function(e) {
+          shiny::showNotification(paste("Homologs search failed:", e$message), type = "error", duration = 10)
+        })
       })
 
       # save current region
@@ -852,11 +1118,15 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           stringsAsFactors = FALSE
         )
         
-        # add goto button column
-        display_table$Actions <- paste0(
-          '<button type="button" class="btn btn-primary btn-sm" onclick="Shiny.setInputValue(\'',
-          ns('goto_region'), '\', ', rt$id, ', {priority: \'event\'});">Goto</button>'
-        )
+        # add goto button column with proper actionButton approach
+        display_table$Actions <- sapply(seq_len(nrow(display_table)), function(i) {
+          as.character(shiny::actionButton(
+            paste0("goto_region_btn_", i), 
+            "Goto",
+            class = "btn btn-primary btn-sm",
+            onclick = sprintf("Shiny.setInputValue('%s', %d, {priority: 'event'})", ns('goto_region_trigger'), i)
+          ))
+        })
         
         DT::datatable(
           display_table,
@@ -887,11 +1157,15 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       })
 
       # handle goto button clicks (table buttons)
-      observeEvent(input$goto_region, {
-        region_id <- input$goto_region
-        region_row <- region_table()[region_table()$id == region_id, ]
-        if (nrow(region_row) > 0) {
-          goto_region(region_row[1, ])
+      observeEvent(input$goto_region_trigger, {
+        req(input$goto_region_trigger)
+        row_idx <- as.integer(input$goto_region_trigger)
+        rt <- region_table()
+        
+        # ensure row index is valid
+        if (row_idx > 0 && row_idx <= nrow(rt)) {
+          region_row <- rt[row_idx, ]
+          goto_region(region_row)
         }
       })
 
