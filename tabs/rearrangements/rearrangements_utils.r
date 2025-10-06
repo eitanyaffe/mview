@@ -187,3 +187,170 @@ save_rearrangements_table <- function(events_df, output_dir, region_name, use_si
   cat(sprintf("saved rearrangements table (%d events) to: %s\n", nrow(events_df), filename))
   return(filename)
 }
+
+# load rearrangements from files for static mode
+load_rearrangements_from_files <- function(assembly, contigs, zoom, tab_config) {
+  # early return if no assembly
+  if (is.null(assembly)) {
+    return(NULL)
+  }
+  
+  # extract required parameters from tab config
+  library_ids <- tab_config$library_ids
+  get_rearrange_events_f <- tab_config$get_rearrange_events_f
+  get_rearrange_support_f <- tab_config$get_rearrange_support_f
+  get_rearrange_coverage_f <- tab_config$get_rearrange_coverage_f
+  
+  tryCatch({
+    # load events table
+    events_table <- get_rearrange_events_f(assembly)
+    if (is.null(events_table) || nrow(events_table) == 0) {
+      return(NULL)
+    }
+    
+    # validate events table columns
+    expected_events_cols <- c("event_id", "type", "contig_id", "out_clip", "in_clip")
+    missing_events_cols <- expected_events_cols[!expected_events_cols %in% colnames(events_table)]
+    if (length(missing_events_cols) > 0) {
+      warning(sprintf("rearrangements events table missing expected columns: %s", 
+                     paste(missing_events_cols, collapse = ", ")))
+    }
+    
+    # check for summary statistics columns (may need to be calculated)
+    summary_cols <- c("total_support", "total_coverage", "library_count", "frequency")
+    missing_summary_cols <- summary_cols[!summary_cols %in% colnames(events_table)]
+    if (length(missing_summary_cols) > 0) {
+      warning(sprintf("rearrangements events table missing summary columns (will be calculated): %s", 
+                     paste(missing_summary_cols, collapse = ", ")))
+    }
+    
+    # load support and coverage matrices
+    support_matrix <- get_rearrange_support_f(assembly)
+    coverage_matrix <- get_rearrange_coverage_f(assembly)
+    
+    if (is.null(support_matrix) || is.null(coverage_matrix)) {
+      return(NULL)
+    }
+    
+    # validate matrix structures
+    if (!"event_id" %in% colnames(support_matrix)) {
+      warning("rearrangements support matrix missing 'event_id' column")
+      return(NULL)
+    }
+    if (!"event_id" %in% colnames(coverage_matrix)) {
+      warning("rearrangements coverage matrix missing 'event_id' column")
+      return(NULL)
+    }
+    
+    # check matrix dimensions match
+    if (nrow(support_matrix) != nrow(coverage_matrix)) {
+      warning(sprintf("rearrangements matrix dimension mismatch: support has %d rows, coverage has %d rows",
+                     nrow(support_matrix), nrow(coverage_matrix)))
+    }
+    if (ncol(support_matrix) != ncol(coverage_matrix)) {
+      warning(sprintf("rearrangements matrix dimension mismatch: support has %d columns, coverage has %d columns",
+                     ncol(support_matrix), ncol(coverage_matrix)))
+    }
+    
+    # filter events by selected contigs only (ignore zoom)
+    # require contigs to be selected - if no contigs, show no events
+    if (is.null(contigs) || length(contigs) == 0) {
+      return(NULL)
+    }
+    
+    # filter by selected contigs (assuming events have contig_id column)
+    events_table <- events_table[events_table$contig_id %in% contigs, ]
+    
+    if (nrow(events_table) == 0) {
+      return(NULL)
+    }
+    
+    # filter support and coverage matrices to match filtered events
+    event_ids <- events_table$event_id
+    support_filtered <- support_matrix[support_matrix$event_id %in% event_ids, ]
+    coverage_filtered <- coverage_matrix[coverage_matrix$event_id %in% event_ids, ]
+    
+    # warn if some events are missing from matrices
+    missing_in_support <- event_ids[!event_ids %in% support_matrix$event_id]
+    missing_in_coverage <- event_ids[!event_ids %in% coverage_matrix$event_id]
+    
+    if (length(missing_in_support) > 0) {
+      warning(sprintf("rearrangements: %d event(s) from events table not found in support matrix", 
+                     length(missing_in_support)))
+    }
+    if (length(missing_in_coverage) > 0) {
+      warning(sprintf("rearrangements: %d event(s) from events table not found in coverage matrix", 
+                     length(missing_in_coverage)))
+    }
+    
+    # convert matrices to proper format (event_id as rownames, library columns only)
+    rownames(support_filtered) <- support_filtered$event_id
+    rownames(coverage_filtered) <- coverage_filtered$event_id
+    
+    # rename support/coverage matrix columns to match configured library_ids
+    # skip first column (event_id) and map remaining columns to library_ids
+    support_cols <- colnames(support_filtered)
+    actual_lib_cols <- support_cols[support_cols != "event_id"]
+    
+    if (length(actual_lib_cols) == 0) {
+      warning("no library columns found in support matrix (only event_id column)")
+      return(NULL)
+    }
+    
+    # map actual columns to configured library_ids (in order)
+    num_libs <- min(length(actual_lib_cols), length(library_ids))
+    if (num_libs < length(library_ids)) {
+      warning(sprintf("fewer library columns (%d) than configured library_ids (%d)", 
+                     length(actual_lib_cols), length(library_ids)))
+    }
+    
+    # rename columns in both matrices
+    old_names <- actual_lib_cols[1:num_libs]
+    new_names <- library_ids[1:num_libs]
+    
+    for (i in 1:num_libs) {
+      colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
+      colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
+    }
+    
+    available_libs <- new_names
+    
+    support_matrix_final <- as.matrix(support_filtered[, available_libs, drop = FALSE])
+    coverage_matrix_final <- as.matrix(coverage_filtered[, available_libs, drop = FALSE])
+    
+    # reorder events table to match matrix row order
+    events_table <- events_table[match(rownames(support_matrix_final), events_table$event_id), ]
+    
+    # calculate missing summary statistics from matrices
+    if (!"total_support" %in% colnames(events_table)) {
+      events_table$total_support <- rowSums(support_matrix_final, na.rm = TRUE)
+    }
+    if (!"total_coverage" %in% colnames(events_table)) {
+      events_table$total_coverage <- rowSums(coverage_matrix_final, na.rm = TRUE)
+    }
+    if (!"library_count" %in% colnames(events_table)) {
+      events_table$library_count <- rowSums(support_matrix_final > 0, na.rm = TRUE)
+    }
+    if (!"frequency" %in% colnames(events_table)) {
+      events_table$frequency <- ifelse(events_table$total_coverage > 0, 
+                                      events_table$total_support / events_table$total_coverage, 0)
+    }
+    
+    # ensure column names match what profile expects
+    if ("contig_id" %in% colnames(events_table) && !"contig" %in% colnames(events_table)) {
+      events_table$contig <- events_table$contig_id
+    }
+    
+    # return data in same format as query_rearrangements_for_context
+    return(list(
+      events = events_table,
+      support = support_matrix_final,
+      coverage = coverage_matrix_final,
+      library_ids = available_libs
+    ))
+    
+  }, error = function(e) {
+    warning(sprintf("error loading rearrangements from files: %s", e$message))
+    return(NULL)
+  })
+}

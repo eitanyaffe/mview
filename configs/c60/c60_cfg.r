@@ -228,37 +228,67 @@ get_variants_gene_table_f <- function(assembly) {
   return(gene_table)
 }
 
+# variants tab - static mode (using pre-computed files)
 register_tab(
   tab_id = "variants",
   tab_label = "Variants",
   tab_code = "tabs/variants/variants_tab.r",
-  min_reads = 2,
-  min_coverage = 10,
-  min_libraries = 0,
-  get_aln_f = get_aln_f,
+  is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
-  max_variants = 1000,
-  get_gene_table_f = get_variants_gene_table_f,
-  codon_table_path = "codon_tables/table11",
-  get_fasta_f = get_fasta_f,
-  use_genes = TRUE,
+  get_variants_table_f = function(assembly) get_data("MINIMAP_VARS_TABLE", tag = assembly),
+  get_variants_support_f = function(assembly) get_data("MINIMAP_VARS_SUPPORT", tag = assembly),
+  get_variants_coverage_f = function(assembly) get_data("MINIMAP_VARS_COVERAGE", tag = assembly),
   supports_export = TRUE
 )
+
+# example dynamic mode configuration (commented out)
+# register_tab(
+#   tab_id = "variants",
+#   tab_label = "Variants",
+#   tab_code = "tabs/variants/variants_tab.r",
+#   is.dynamic = TRUE,  # use alignment queries
+#   min_reads = 2,
+#   min_coverage = 10,
+#   min_libraries = 0,
+#   get_aln_f = get_aln_f,
+#   library_ids = c("early", "pre", "post", "late"),
+#   max_variants = 1000,
+#   get_gene_table_f = get_variants_gene_table_f,
+#   codon_table_path = "codon_tables/table11",
+#   get_fasta_f = get_fasta_f,
+#   use_genes = TRUE,
+#   supports_export = TRUE
+# )
 
 ########################################################
 # register rearrangements tab
 ########################################################
 
+# rearrangements tab - static mode (using pre-computed files)
 register_tab(
   tab_id = "rearrangements",
   tab_label = "Rearrangements",
   tab_code = "tabs/rearrangements/rearrangements_tab.r",
-  get_aln_f = get_aln_f,
-  library_ids = c("early", "pre", "post", "late"),
-  max_margin = 10,
-  min_element_length = 50,
-  min_anchor_length = 200,
-  max_anchor_mutations_percent = 0.01,
-  max_element_mutation_percent = 0.1,
+  is.dynamic = FALSE,  # use pre-computed files
+  library_ids = c("early", "pre", "post", "late"),  # will be mapped to actual column names
+  get_rearrange_events_f = function(assembly) get_data("MINIMAP_REARRANGE_EVENTS", tag = assembly),
+  get_rearrange_support_f = function(assembly) get_data("MINIMAP_REARRANGE_SUPPORT", tag = assembly),
+  get_rearrange_coverage_f = function(assembly) get_data("MINIMAP_REARRANGE_COVERAGE", tag = assembly),
   supports_export = TRUE
 )
+
+# example dynamic mode configuration (commented out)
+# register_tab(
+#   tab_id = "rearrangements",
+#   tab_label = "Rearrangements",
+#   tab_code = "tabs/rearrangements/rearrangements_tab.r",
+#   is.dynamic = TRUE,  # use alignment queries
+#   get_aln_f = get_aln_f,
+#   library_ids = c("early", "pre", "post", "late"),
+#   max_margin = 10,
+#   min_element_length = 50,
+#   min_anchor_length = 200,
+#   max_anchor_mutations_percent = 0.01,
+#   max_element_mutation_percent = 0.1,
+#   supports_export = TRUE
+# )

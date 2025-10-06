@@ -8,10 +8,29 @@ if (is.null(tab)) {
   stop("variants tab not found during loading")
 }
 
-required_params <- c("min_reads", "min_coverage", "min_libraries", "get_aln_f", "library_ids")
-missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
-if (length(missing_params) > 0) {
-  stop(sprintf("variants tab missing required parameters: %s", paste(missing_params, collapse = ", ")))
+# check if dynamic or static mode
+is_dynamic <- tab$is.dynamic %||% TRUE  # default to dynamic for backward compatibility
+
+if (is_dynamic) {
+  # dynamic mode: requires alignment functions
+  required_params <- c("min_reads", "min_coverage", "min_libraries", "get_aln_f", "library_ids")
+  missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
+  if (length(missing_params) > 0) {
+    stop(sprintf("variants tab (dynamic mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
+  }
+} else {
+  # static mode: requires file getter functions
+  required_params <- c("library_ids", "get_variants_table_f", "get_variants_support_f", "get_variants_coverage_f")
+  missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
+  if (length(missing_params) > 0) {
+    stop(sprintf("variants tab (static mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
+  }
+}
+
+# extract common parameters
+library_ids <- tab$library_ids
+if (!is.character(library_ids) || length(library_ids) == 0) {
+  stop("library_ids must be a non-empty character vector")
 }
 
 # optional gene parameters
@@ -20,17 +39,31 @@ codon_table_path <- tab$codon_table_path
 get_fasta_f <- tab$get_fasta_f
 use_genes <- tab$use_genes
 
-min_reads <- tab$min_reads
-min_coverage <- tab$min_coverage
-min_libraries <- tab$min_libraries
-get_aln_f <- tab$get_aln_f
-library_ids <- tab$library_ids
-
-if (!is.function(get_aln_f)) {
-  stop(sprintf("get_aln_f must be a function, got: %s", class(get_aln_f)))
-}
-if (!is.character(library_ids) || length(library_ids) == 0) {
-  stop("library_ids must be a non-empty character vector")
+# extract mode-specific parameters
+if (is_dynamic) {
+  min_reads <- tab$min_reads
+  min_coverage <- tab$min_coverage
+  min_libraries <- tab$min_libraries
+  get_aln_f <- tab$get_aln_f
+  
+  if (!is.function(get_aln_f)) {
+    stop(sprintf("get_aln_f must be a function, got: %s", class(get_aln_f)))
+  }
+} else {
+  # static mode parameters
+  get_variants_table_f <- tab$get_variants_table_f
+  get_variants_support_f <- tab$get_variants_support_f
+  get_variants_coverage_f <- tab$get_variants_coverage_f
+  
+  if (!is.function(get_variants_table_f)) {
+    stop(sprintf("get_variants_table_f must be a function, got: %s", class(get_variants_table_f)))
+  }
+  if (!is.function(get_variants_support_f)) {
+    stop(sprintf("get_variants_support_f must be a function, got: %s", class(get_variants_support_f)))
+  }
+  if (!is.function(get_variants_coverage_f)) {
+    stop(sprintf("get_variants_coverage_f must be a function, got: %s", class(get_variants_coverage_f)))
+  }
 }
 
 # set the tab panel UI
@@ -42,8 +75,12 @@ set_tab_panel_f(function() {
       column(3,
         wellPanel(
           h5("Variant Controls"),
-          actionButton("updateVariantsBtn", "Update Variants", class = "btn-primary", width = "100%"),
-          br(), br(),
+          if (is_dynamic) {
+            list(
+              actionButton("updateVariantsBtn", "Update Variants", class = "btn-primary", width = "100%"),
+              br(), br()
+            )
+          },
           verbatimTextOutput("variantCountText", placeholder = TRUE),
           br(),
           checkboxInput("autoUpdateProfilesChk", "Auto-update profiles", 
@@ -78,22 +115,34 @@ set_tab_panel_f(function() {
 # ---- Variant Data Management ----
 # (utility functions moved to variants_utils.r)
 
-# simplified query function that uses the utility function
+# query function that uses appropriate loading method based on mode
 query_variants <- function(assembly, contigs, zoom) {
-  # create tab config object for the utility function
-  tab_config <- list(
-    min_reads = min_reads,
-    min_coverage = min_coverage,
-    min_libraries = min_libraries,
-    get_aln_f = get_aln_f,
-    library_ids = library_ids,
-    use_genes = use_genes,
-    get_gene_table_f = get_gene_table_f,
-    get_fasta_f = get_fasta_f,
-    codon_table_path = codon_table_path
-  )
-  
-  return(query_variants_for_context(assembly, contigs, zoom, tab_config))
+  if (is_dynamic) {
+    # dynamic mode: use alignment query
+    tab_config <- list(
+      min_reads = min_reads,
+      min_coverage = min_coverage,
+      min_libraries = min_libraries,
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      use_genes = use_genes,
+      get_gene_table_f = get_gene_table_f,
+      get_fasta_f = get_fasta_f,
+      codon_table_path = codon_table_path
+    )
+    
+    return(query_variants_for_context(assembly, contigs, zoom, tab_config))
+  } else {
+    # static mode: load from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_variants_table_f = get_variants_table_f,
+      get_variants_support_f = get_variants_support_f,
+      get_variants_coverage_f = get_variants_coverage_f
+    )
+    
+    return(load_variants_from_files(assembly, contigs, zoom, tab_config))
+  }
 }
 
 # ---- Event Handlers ----
@@ -287,9 +336,8 @@ observeEvent(input$clearVariantsBtn, {
   showNotification("Cleared variant selection", type = "message")
 })
 
-# update button handler
-observeEvent(input$updateVariantsBtn, {
-  
+# common function to update variants data
+update_variants_data <- function() {
   # query variants
   variant_data <- query_variants(state$assembly, state$contigs, state$zoom)
   
@@ -331,14 +379,23 @@ observeEvent(input$updateVariantsBtn, {
     state$filtered_variant_data <- NULL
     state$variants <- NULL
     cache_set("variants.current", NULL)
-    # still mark as needing refresh even if no data
-    if (!(input$autoUpdateProfilesChk %||% FALSE)) {
-      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
-        invalidate_plot()
-      }
-    }
   }
-})
+}
+
+# update button handler (only for dynamic mode)
+if (is_dynamic) {
+  observeEvent(input$updateVariantsBtn, {
+    update_variants_data()
+  })
+} else {
+  # static mode: auto-load when assembly or contigs change
+  observeEvent(list(state$assembly, state$contigs), {
+    # load if we have a valid assembly
+    if (!is.null(state$assembly)) {
+      update_variants_data()
+    }
+  }, ignoreNULL = FALSE, ignoreInit = FALSE)
+}
 
 # span filter change handler
 observeEvent(input$variantSpanFilter, {
@@ -406,8 +463,13 @@ output$variantsTable <- renderDT({
   variant_data <- state$filtered_variant_data
   
   if (is.null(variant_data) || is.null(variant_data$variants) || nrow(variant_data$variants) == 0) {
+    message <- if (is_dynamic) {
+      "Click 'Update' to load variants for the current view"
+    } else {
+      "Select contigs to load variants"
+    }
     return(datatable(
-      data.frame(Message = "Click 'Update' to load variants for the current view"),
+      data.frame(Message = message),
       options = list(dom = "t"),
       rownames = FALSE,
       selection = "none"
@@ -416,7 +478,7 @@ output$variantsTable <- renderDT({
   
   # format the variants table for display
   display_df <- variant_data$variants
-  
+
   # truncate long sequences for display
   if ("sequence" %in% names(display_df)) {
     display_df$sequence <- sapply(display_df$sequence, function(seq) {
@@ -597,10 +659,16 @@ output$variantFrequencyPlot <- plotly::renderPlotly({
   }
   
   # render the plot using the cleaned internal function
+  no_data_message <- if (is_dynamic) {
+    "Click 'Update' to load variants"
+  } else {
+    "Select contigs to load variants"
+  }
+  
   render_frequency_plot_internal(has_data, items_df, raw_data$support, raw_data$coverage,
                                 plot_type, plot_value, x_lib, y_lib, 
                                 jitter_enabled, selected_items, library_ids, 
-                                "Click 'Update' to load variants")
+                                no_data_message)
 })
 
 # frequency plot observers for caching

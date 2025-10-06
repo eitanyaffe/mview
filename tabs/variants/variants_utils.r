@@ -232,3 +232,101 @@ add_variant_colors <- function(variants_df) {
   return(variants_df)
 }
 
+# load variants from files for static mode
+load_variants_from_files <- function(assembly, contigs, zoom, tab_config) {
+  # early return if no assembly
+  if (is.null(assembly)) {
+    return(NULL)
+  }
+  
+  # extract required parameters from tab config
+  library_ids <- tab_config$library_ids
+  get_variants_table_f <- tab_config$get_variants_table_f
+  get_variants_support_f <- tab_config$get_variants_support_f
+  get_variants_coverage_f <- tab_config$get_variants_coverage_f
+  
+  tryCatch({
+    # load variants table
+    variants_table <- get_variants_table_f(assembly)
+    if (is.null(variants_table) || nrow(variants_table) == 0) {
+      return(NULL)
+    }
+    
+    # load support and coverage matrices
+    support_matrix <- get_variants_support_f(assembly)
+    coverage_matrix <- get_variants_coverage_f(assembly)
+    
+    if (is.null(support_matrix) || is.null(coverage_matrix)) {
+      return(NULL)
+    }
+    
+    # filter variants by selected contigs only (ignore zoom)
+    # require contigs to be selected - if no contigs, show no variants
+    if (is.null(contigs) || length(contigs) == 0) {
+      return(NULL)
+    }
+    
+    # filter by selected contigs
+    variants_table <- variants_table[variants_table$contig %in% contigs, ]
+    
+    if (nrow(variants_table) == 0) {
+      return(NULL)
+    }
+    
+    # filter support and coverage matrices to match filtered variants
+    variant_ids <- variants_table$variant_id
+    support_filtered <- support_matrix[support_matrix$variant_id %in% variant_ids, ]
+    coverage_filtered <- coverage_matrix[coverage_matrix$variant_id %in% variant_ids, ]
+    
+    # convert matrices to proper format (variant_id as rownames, library columns only)
+    rownames(support_filtered) <- support_filtered$variant_id
+    rownames(coverage_filtered) <- coverage_filtered$variant_id
+    
+    # rename support/coverage matrix columns to match configured library_ids
+    # skip first column (variant_id) and map remaining columns to library_ids
+    support_cols <- colnames(support_filtered)
+    actual_lib_cols <- support_cols[support_cols != "variant_id"]
+    
+    if (length(actual_lib_cols) == 0) {
+      warning("no library columns found in support matrix (only variant_id column)")
+      return(NULL)
+    }
+    
+    # map actual columns to configured library_ids (in order)
+    num_libs <- min(length(actual_lib_cols), length(library_ids))
+    if (num_libs < length(library_ids)) {
+      warning(sprintf("fewer library columns (%d) than configured library_ids (%d)", 
+                     length(actual_lib_cols), length(library_ids)))
+    }
+    
+    # rename columns in both matrices
+    old_names <- actual_lib_cols[1:num_libs]
+    new_names <- library_ids[1:num_libs]
+    
+    for (i in 1:num_libs) {
+      colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
+      colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
+    }
+    
+    available_libs <- new_names
+    
+    support_matrix_final <- as.matrix(support_filtered[, available_libs, drop = FALSE])
+    coverage_matrix_final <- as.matrix(coverage_filtered[, available_libs, drop = FALSE])
+    
+    # reorder variants table to match matrix row order
+    variants_table <- variants_table[match(rownames(support_matrix_final), variants_table$variant_id), ]
+    
+    # return data in same format as query_variants_for_context
+    return(list(
+      variants = variants_table,
+      support = support_matrix_final,
+      coverage = coverage_matrix_final,
+      library_ids = available_libs
+    ))
+    
+  }, error = function(e) {
+    warning(sprintf("error loading variants from files: %s", e$message))
+    return(NULL)
+  })
+}
+

@@ -10,25 +10,58 @@ if (is.null(tab)) {
   stop("rearrangements tab not found during loading")
 }
 
-required_params <- c("get_aln_f", "library_ids")
-missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
-if (length(missing_params) > 0) {
-  stop(sprintf("rearrangements tab missing required parameters: %s", paste(missing_params, collapse = ", ")))
+# check if dynamic or static mode
+is_dynamic <- tab$is.dynamic %||% TRUE  # default to dynamic for backward compatibility
+
+if (is_dynamic) {
+  # dynamic mode: requires alignment functions
+  required_params <- c("get_aln_f", "library_ids")
+  missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
+  if (length(missing_params) > 0) {
+    stop(sprintf("rearrangements tab (dynamic mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
+  }
+} else {
+  # static mode: requires file getter functions
+  required_params <- c("library_ids", "get_rearrange_events_f", "get_rearrange_support_f", "get_rearrange_coverage_f")
+  missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
+  if (length(missing_params) > 0) {
+    stop(sprintf("rearrangements tab (static mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
+  }
 }
 
-get_aln_f <- tab$get_aln_f
+# extract common parameters
 library_ids <- tab$library_ids
-max_margin <- tab$max_margin %||% 10
-min_element_length <- tab$min_element_length %||% 50
-min_anchor_length <- tab$min_anchor_length %||% 200
-max_anchor_mutations_percent <- tab$max_anchor_mutations_percent %||% 0.01
-max_element_mutation_percent <- tab$max_element_mutation_percent %||% 0.1
-
-if (!is.function(get_aln_f)) {
-  stop(sprintf("get_aln_f must be a function, got: %s", class(get_aln_f)))
-}
 if (!is.character(library_ids) || length(library_ids) == 0) {
   stop("library_ids must be a non-empty character vector")
+}
+
+# extract mode-specific parameters
+if (is_dynamic) {
+  get_aln_f <- tab$get_aln_f
+  max_margin <- tab$max_margin %||% 10
+  min_element_length <- tab$min_element_length %||% 50
+  min_anchor_length <- tab$min_anchor_length %||% 200
+  max_anchor_mutations_percent <- tab$max_anchor_mutations_percent %||% 0.01
+  max_element_mutation_percent <- tab$max_element_mutation_percent %||% 0.1
+  
+  if (!is.function(get_aln_f)) {
+    stop(sprintf("get_aln_f must be a function, got: %s", class(get_aln_f)))
+  }
+} else {
+  # static mode parameters
+  get_rearrange_events_f <- tab$get_rearrange_events_f
+  get_rearrange_support_f <- tab$get_rearrange_support_f
+  get_rearrange_coverage_f <- tab$get_rearrange_coverage_f
+  
+  if (!is.function(get_rearrange_events_f)) {
+    stop(sprintf("get_rearrange_events_f must be a function, got: %s", class(get_rearrange_events_f)))
+  }
+  if (!is.function(get_rearrange_support_f)) {
+    stop(sprintf("get_rearrange_support_f must be a function, got: %s", class(get_rearrange_support_f)))
+  }
+  if (!is.function(get_rearrange_coverage_f)) {
+    stop(sprintf("get_rearrange_coverage_f must be a function, got: %s", class(get_rearrange_coverage_f)))
+  }
 }
 
 # set the tab panel UI
@@ -56,8 +89,12 @@ set_tab_panel_f(function() {
                       value = cache_get_if_exists("rearrange.max_element_mutation_percent", 1), 
                       min = 0, max = 1, step = 0.001, width = "100%"),
           br(),
-          actionButton("updateRearrangementsBtn", "Update Rearrangements", class = "btn-primary", width = "100%"),
-          br(), br(),
+          if (is_dynamic) {
+            list(
+              actionButton("updateRearrangementsBtn", "Update Rearrangements", class = "btn-primary", width = "100%"),
+              br(), br()
+            )
+          },
           verbatimTextOutput("rearrangementCountText", placeholder = TRUE),
           br(),
           checkboxInput("autoUpdateProfilesRearrangeChk", "Auto-update profiles", 
@@ -93,20 +130,32 @@ set_tab_panel_f(function() {
 
 # ---- Rearrangement Data Management ----
 
-# simplified query function that uses the utility function (like variants)
+# query function that uses appropriate loading method based on mode
 query_rearrangements <- function(assembly, contigs, zoom) {
-  # create tab config object for the utility function
-  tab_config <- list(
-    get_aln_f = get_aln_f,
-    library_ids = library_ids,
-    max_margin = max_margin,
-    min_element_length = min_element_length,
-    min_anchor_length = min_anchor_length,
-    max_anchor_mutations_percent = max_anchor_mutations_percent,
-    max_element_mutation_percent = max_element_mutation_percent
-  )
-  
-  return(query_rearrangements_for_context(assembly, contigs, zoom, tab_config))
+  if (is_dynamic) {
+    # dynamic mode: use alignment query
+    tab_config <- list(
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      max_margin = max_margin,
+      min_element_length = min_element_length,
+      min_anchor_length = min_anchor_length,
+      max_anchor_mutations_percent = max_anchor_mutations_percent,
+      max_element_mutation_percent = max_element_mutation_percent
+    )
+    
+    return(query_rearrangements_for_context(assembly, contigs, zoom, tab_config))
+  } else {
+    # static mode: load from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_rearrange_events_f = get_rearrange_events_f,
+      get_rearrange_support_f = get_rearrange_support_f,
+      get_rearrange_coverage_f = get_rearrange_coverage_f
+    )
+    
+    return(load_rearrangements_from_files(assembly, contigs, zoom, tab_config))
+  }
 }
 
 # filter rearrangements by span (frequency range)
@@ -235,6 +284,10 @@ process_filtered_rearrangements <- function(raw_data, span_filter, support_filte
     colored_events <- add_rearrangement_colors(filtered_data$events)
     state$rearrangements <- colored_events
     cache_set("rearrangements.current", colored_events)
+    
+    # debug: print column names and row count for troubleshooting
+    cat(sprintf("cached rearrangements: %d events with columns: %s\n", 
+                nrow(colored_events), paste(colnames(colored_events), collapse = ", ")))
   } else {
     state$rearrangements <- NULL
     cache_set("rearrangements.current", NULL)
@@ -407,8 +460,8 @@ observeEvent(input$clearRearrangementsBtn, {
   showNotification("Cleared rearrangement selection", type = "message")
 })
 
-# update button handler
-observeEvent(input$updateRearrangementsBtn, {
+# common function to update rearrangements data
+update_rearrangements_data <- function() {
   # query rearrangements
   rearrange_data <- query_rearrangements(state$assembly, state$contigs, state$zoom)
   
@@ -416,15 +469,32 @@ observeEvent(input$updateRearrangementsBtn, {
   state$raw_rearrange_data <- rearrange_data
   
   process_filtered_rearrangements(rearrange_data, input$rearrangementSpanFilter %||% 0.5, input$rearrangementSupportFilter %||% 1, clear_selection = TRUE)
-})
+}
+
+# update button handler (only for dynamic mode)
+if (is_dynamic) {
+  observeEvent(input$updateRearrangementsBtn, {
+    update_rearrangements_data()
+  })
+} else {
+  # static mode: auto-load when assembly or contigs change
+  observeEvent(list(state$assembly, state$contigs), {
+    # load if we have a valid assembly
+    if (!is.null(state$assembly)) {
+      update_rearrangements_data()
+    }
+  }, ignoreNULL = FALSE, ignoreInit = FALSE)
+}
 
 # span filter change handler
 observeEvent(input$rearrangementSpanFilter, {
+  cache_set("rearrange.span_filter", input$rearrangementSpanFilter)
   process_filtered_rearrangements(state$raw_rearrange_data, input$rearrangementSpanFilter, input$rearrangementSupportFilter %||% 1, clear_selection = TRUE)
 })
 
 # support filter change handler
 observeEvent(input$rearrangementSupportFilter, {
+  cache_set("rearrange.support_filter", input$rearrangementSupportFilter)
   process_filtered_rearrangements(state$raw_rearrange_data, input$rearrangementSpanFilter %||% 0.5, input$rearrangementSupportFilter, clear_selection = TRUE)
 })
 
@@ -454,8 +524,13 @@ output$eventsTable <- renderDT({
   rearrange_data <- state$filtered_rearrange_data
   
   if (is.null(rearrange_data) || is.null(rearrange_data$events) || nrow(rearrange_data$events) == 0) {
+    message <- if (is_dynamic) {
+      "Click 'Update' to load rearrangements for the current view"
+    } else {
+      "Select contigs to load rearrangements"
+    }
     return(datatable(
-      data.frame(Message = "Click 'Update' to load rearrangements for the current view"),
+      data.frame(Message = message),
       options = list(dom = "t"),
       rownames = FALSE,
       selection = "none"
@@ -567,10 +642,16 @@ output$rearrangementFrequencyPlot <- plotly::renderPlotly({
   }
   
   # render the plot using the cleaned internal function
+  no_data_message <- if (is_dynamic) {
+    "Click 'Update' to load rearrangements"
+  } else {
+    "Select contigs to load rearrangements"
+  }
+  
   render_frequency_plot_internal(has_data, items_df, raw_data$support, raw_data$coverage,
                                 plot_type, plot_value, x_lib, y_lib, 
                                 jitter_enabled, selected_items, library_ids, 
-                                "Click 'Update' to load rearrangements")
+                                no_data_message)
 })
 
 # frequency plot observers for caching
@@ -592,6 +673,27 @@ observeEvent(input$rearrangementYLib, {
 
 observeEvent(input$rearrangementJitter, {
   cache_set("rearrangement_frequency_plot_jitter", input$rearrangementJitter)
+})
+
+# parameter observers for caching
+observeEvent(input$maxGapInput, {
+  cache_set("rearrange.max_margin", input$maxGapInput)
+})
+
+observeEvent(input$minElementLengthInput, {
+  cache_set("rearrange.min_element_length", input$minElementLengthInput)
+})
+
+observeEvent(input$minAnchorLengthInput, {
+  cache_set("rearrange.min_anchor_length", input$minAnchorLengthInput)
+})
+
+observeEvent(input$maxAnchorMutationsPercentInput, {
+  cache_set("rearrange.max_anchor_mutations_percent", input$maxAnchorMutationsPercentInput)
+})
+
+observeEvent(input$maxElementMutationPercentInput, {
+  cache_set("rearrange.max_element_mutation_percent", input$maxElementMutationPercentInput)
 })
 
 # click observers for frequency plot interaction
