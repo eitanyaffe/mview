@@ -228,6 +228,27 @@ get_variants_gene_table_f <- function(assembly) {
   return(gene_table)
 }
 
+# load variants table with gene fields
+get_variants_table_f <- function(assembly) {
+  vars_table <- get_data("MINIMAP_VARS_TABLE", tag = assembly)
+  vars_genic <- get_data("MINIMAP_VARS_GENIC", tag = assembly)
+  
+  if (is.null(vars_table)) {
+    return(NULL)
+  }
+  
+  if (is.null(vars_genic)) {
+    return(vars_table)
+  }
+  
+  # left join to add gene fields
+  merged <- merge(vars_table, vars_genic, 
+                  by.x = "variant_id", by.y = "row_id", 
+                  all.x = TRUE, sort = FALSE)
+  
+  return(merged)
+}
+
 # variants tab - static mode (using pre-computed files)
 register_tab(
   tab_id = "variants",
@@ -235,7 +256,7 @@ register_tab(
   tab_code = "tabs/variants/variants_tab.r",
   is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
-  get_variants_table_f = function(assembly) get_data("MINIMAP_VARS_TABLE", tag = assembly),
+  get_variants_table_f = get_variants_table_f,
   get_variants_support_f = function(assembly) get_data("MINIMAP_VARS_SUPPORT", tag = assembly),
   get_variants_coverage_f = function(assembly) get_data("MINIMAP_VARS_COVERAGE", tag = assembly),
   supports_export = TRUE
