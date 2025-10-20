@@ -185,11 +185,11 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     region_zoom <- c(region_data$zoom_start, region_data$zoom_end)
   }
   state$zoom <- region_zoom
-  
+
   if (!is.null(region_data$assembly) && region_data$assembly != "") {
     state$assembly <- region_data$assembly
   }
-  
+
   # calculate context zoom for this region and context
   context_zoom <- calculate_context_zoom(region_zoom, context_option, get_contigs(state$assembly))
   
@@ -212,7 +212,7 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   # generate region name
   region_name <- if (!is.null(region_data$id)) region_data$id else "region"
   region_name <- sanitize_filename(region_name)
-  
+
   # create region_info for tabs
   region_info <- list(
     assembly = state$assembly,
@@ -221,37 +221,8 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     context_zoom = context_zoom,
     region_name = region_name
   )
-  
-  # export profiles (always done)
-  plot_result <- plot_profiles_ggplot(cxt)
-  if (is.null(plot_result) || is.null(plot_result$plot)) return(FALSE)
-  
-  # export profiles first
-  if (use_simple_names) {
-    # for single region export, use simple filename directly
-    profiles_file <- file.path(dirs$profiles_dir, "profiles.pdf")
-  } else {
-    # for multi-region export, use region prefix
-    profiles_file <- file.path(dirs$regions_dir, paste0(region_name, "_profiles.pdf"))
-  }
-  
-  ggplot2::ggsave(
-    filename = profiles_file,
-    plot = plot_result$plot,
-    width = export_params$width,
-    height = export_params$height,
-    units = "in",
-    dpi = 300,
-    device = "pdf"
-  )
-  
-  # copy to profiles folder with simple name (only for multi-region)
-  if (!use_simple_names) {
-    profiles_simple_file <- file.path(dirs$profiles_dir, paste0(region_name, ".pdf"))
-    file.copy(profiles_file, profiles_simple_file)
-  }
-  
-  # export tab plots and tables dynamically
+
+  # export tab plots and tables FIRST (to populate cache for profile rendering)
   exportable_tabs <- get_exportable_tabs()
   for (tab_id in names(exportable_tabs)) {
     # check if this tab was requested for export
@@ -265,7 +236,6 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     if (!is.null(pdf_export_function)) {
       # call the tab's PDF export function
       plot_result <- pdf_export_function(region_info)
-      
       if (!is.null(plot_result) && !is.null(plot_result$plot)) {
         # save the plot
         if (use_simple_names) {
@@ -276,7 +246,6 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
           # for multi-region export, use region prefix in regions directory
           tab_file <- file.path(dirs$regions_dir, paste0(region_name, "_", tab_id, ".pdf"))
         }
-        
         ggplot2::ggsave(
           filename = tab_file,
           plot = plot_result$plot,
@@ -337,6 +306,35 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     if (is.null(pdf_export_function) && is.null(table_export_function)) {
       cat(sprintf("warning: no export functions registered for tab '%s', skipping\n", tab_id))
     }
+  }
+  
+  # NOW plot profiles (after cache has been populated by tab export functions)
+  plot_result <- plot_profiles_ggplot(cxt)
+  if (is.null(plot_result) || is.null(plot_result$plot)) return(FALSE)
+
+  # save profiles
+  if (use_simple_names) {
+    # for single region export, use simple filename directly
+    profiles_file <- file.path(dirs$profiles_dir, "profiles.pdf")
+  } else {
+    # for multi-region export, use region prefix
+    profiles_file <- file.path(dirs$regions_dir, paste0(region_name, "_profiles.pdf"))
+  }
+
+  ggplot2::ggsave(
+    filename = profiles_file,
+    plot = plot_result$plot,
+    width = export_params$width,
+    height = export_params$height,
+    units = "in",
+    dpi = 300,
+    device = "pdf"
+  )
+  
+  # copy to profiles folder with simple name (only for multi-region)
+  if (!use_simple_names) {
+    profiles_simple_file <- file.path(dirs$profiles_dir, paste0(region_name, ".pdf"))
+    file.copy(profiles_file, profiles_simple_file)
   }
   
   return(TRUE)  # success
@@ -634,7 +632,6 @@ observeEvent(input$confirm_export_view, {
     showNotification(paste("Exported", success_count, "of", length(context_options), "contexts to:", output_dir), type = "message", duration = 5)
     
   }, error = function(e) {
-    browser()
     showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
   })
 })
@@ -714,6 +711,9 @@ observeEvent(input$confirm_export_regions, {
     for (i in seq_len(nrow(regions_data))) {
       region <- regions_data[i, ]
       
+      cat(sprintf("---------------------------------------- Region %d/%d: %s ----------------------------------------\n", 
+                  i, nrow(regions_data), region$id))
+      
       # iterate through contexts for this region
       for (context_option in context_options) {
         dirs <- context_dirs[[context_option]]
@@ -733,7 +733,6 @@ observeEvent(input$confirm_export_regions, {
                      type = "message", duration = 8)
     
   }, error = function(e) {
-    browser()
     showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
   })
 })

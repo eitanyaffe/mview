@@ -259,6 +259,7 @@ register_tab(
   get_variants_table_f = get_variants_table_f,
   get_variants_support_f = function(assembly) get_data("MINIMAP_VARS_SUPPORT", tag = assembly),
   get_variants_coverage_f = function(assembly) get_data("MINIMAP_VARS_COVERAGE", tag = assembly),
+  use_genes = TRUE,
   supports_export = TRUE
 )
 
@@ -291,10 +292,11 @@ register_tab(
   tab_label = "Rearrangements",
   tab_code = "tabs/rearrangements/rearrangements_tab.r",
   is.dynamic = FALSE,  # use pre-computed files
-  library_ids = c("early", "pre", "post", "late"),  # will be mapped to actual column names
+  library_ids = c("early", "pre", "post", "late"),
   get_rearrange_events_f = function(assembly) get_data("MINIMAP_REARRANGE_EVENTS", tag = assembly),
   get_rearrange_support_f = function(assembly) get_data("MINIMAP_REARRANGE_SUPPORT", tag = assembly),
   get_rearrange_coverage_f = function(assembly) get_data("MINIMAP_REARRANGE_COVERAGE", tag = assembly),
+  use_genes = TRUE,
   supports_export = TRUE
 )
 

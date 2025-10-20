@@ -147,6 +147,93 @@ add_rearrangement_colors <- function(events_df) {
   return(events_df)
 }
 
+# filter rearrangements by region (contigs and zoom coordinates)
+filter_rearrangements_by_region <- function(rearrange_data, contigs, zoom, assembly) {
+  # early return if no data
+  if (is.null(rearrange_data) || is.null(rearrange_data$events)) {
+    return(NULL)
+  }
+  
+  # early return if no filtering criteria
+  if ((is.null(contigs) || length(contigs) == 0) && is.null(zoom)) {
+    return(rearrange_data)
+  }
+  
+  events_df <- rearrange_data$events
+  
+  # filter by contigs if specified
+  if (!is.null(contigs) && length(contigs) > 0) {
+    # check which column name is used for contig
+    contig_col <- if ("contig" %in% colnames(events_df)) "contig" else "contig_id"
+    
+    keep_contigs <- events_df[[contig_col]] %in% contigs
+    events_df <- events_df[keep_contigs, ]
+    
+    if (nrow(events_df) == 0) {
+      return(NULL)
+    }
+    
+    # filter support and coverage matrices
+    if (!is.null(rearrange_data$support)) {
+      rearrange_data$support <- rearrange_data$support[keep_contigs, , drop = FALSE]
+    }
+    if (!is.null(rearrange_data$coverage)) {
+      rearrange_data$coverage <- rearrange_data$coverage[keep_contigs, , drop = FALSE]
+    }
+    
+    # filter read_events if present
+    if (!is.null(rearrange_data$read_events)) {
+      kept_event_ids <- events_df$event_id
+      rearrange_data$read_events <- rearrange_data$read_events[rearrange_data$read_events$event_id %in% kept_event_ids, ]
+    }
+  }
+  
+  # filter by zoom coordinates if specified
+  if (!is.null(zoom) && length(zoom) == 2) {
+    # need to convert local coordinates to global coordinates
+    contigs_table <- get_contigs(assembly)
+    if (!is.null(contigs_table)) {
+      contig_col <- if ("contig" %in% colnames(events_df)) "contig" else "contig_id"
+      
+      cxt <- build_context(unique(events_df[[contig_col]]), contigs_table, NULL, assembly)
+      if (!is.null(cxt) && !is.null(cxt$mapper)) {
+        # convert event coordinates to global (use out_clip coordinate)
+        events_df$gcoord <- cxt$mapper$l2g(events_df[[contig_col]], events_df$out_clip)
+        
+        # filter by zoom range
+        keep_zoom <- events_df$gcoord >= zoom[1] & events_df$gcoord <= zoom[2]
+        events_df <- events_df[keep_zoom, ]
+        
+        # remove temporary gcoord column
+        events_df$gcoord <- NULL
+        
+        if (nrow(events_df) == 0) {
+          return(NULL)
+        }
+        
+        # filter support and coverage matrices
+        if (!is.null(rearrange_data$support)) {
+          rearrange_data$support <- rearrange_data$support[keep_zoom, , drop = FALSE]
+        }
+        if (!is.null(rearrange_data$coverage)) {
+          rearrange_data$coverage <- rearrange_data$coverage[keep_zoom, , drop = FALSE]
+        }
+        
+        # filter read_events if present
+        if (!is.null(rearrange_data$read_events)) {
+          kept_event_ids <- events_df$event_id
+          rearrange_data$read_events <- rearrange_data$read_events[rearrange_data$read_events$event_id %in% kept_event_ids, ]
+        }
+      }
+    }
+  }
+  
+  # update events in the data structure
+  rearrange_data$events <- events_df
+  
+  return(rearrange_data)
+}
+
 # save rearrangements table to tab-delimited file
 save_rearrangements_table <- function(events_df, output_dir, region_name, use_simple_name = FALSE) {
   # create filename based on export type

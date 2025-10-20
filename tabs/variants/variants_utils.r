@@ -7,7 +7,7 @@ query_variants_for_context <- function(assembly, contigs, zoom, tab_config) {
   if (is.null(assembly) || length(contigs) == 0) {
     return(NULL)
   }
-  
+
   # extract required parameters from tab config
   min_reads <- tab_config$min_reads
   min_coverage <- tab_config$min_coverage
@@ -230,6 +230,76 @@ add_variant_colors <- function(variants_df) {
   }
   
   return(variants_df)
+}
+
+# filter variants by region (contigs and zoom coordinates)
+filter_variants_by_region <- function(variant_data, contigs, zoom, assembly) {
+  # early return if no data
+  if (is.null(variant_data) || is.null(variant_data$variants)) {
+    return(NULL)
+  }
+  
+  # early return if no filtering criteria
+  if ((is.null(contigs) || length(contigs) == 0) && is.null(zoom)) {
+    return(variant_data)
+  }
+  
+  variants_df <- variant_data$variants
+  
+  # filter by contigs if specified
+  if (!is.null(contigs) && length(contigs) > 0) {
+    keep_contigs <- variants_df$contig %in% contigs
+    variants_df <- variants_df[keep_contigs, ]
+    
+    if (nrow(variants_df) == 0) {
+      return(NULL)
+    }
+    
+    # filter support and coverage matrices
+    if (!is.null(variant_data$support)) {
+      variant_data$support <- variant_data$support[keep_contigs, , drop = FALSE]
+    }
+    if (!is.null(variant_data$coverage)) {
+      variant_data$coverage <- variant_data$coverage[keep_contigs, , drop = FALSE]
+    }
+  }
+  
+  # filter by zoom coordinates if specified
+  if (!is.null(zoom) && length(zoom) == 2) {
+    # need to convert local coordinates to global coordinates
+    contigs_table <- get_contigs(assembly)
+    if (!is.null(contigs_table)) {
+      cxt <- build_context(unique(variants_df$contig), contigs_table, NULL, assembly)
+      if (!is.null(cxt) && !is.null(cxt$mapper)) {
+        # convert variant coordinates to global
+        variants_df$gcoord <- cxt$mapper$l2g(variants_df$contig, variants_df$coord)
+        
+        # filter by zoom range
+        keep_zoom <- variants_df$gcoord >= zoom[1] & variants_df$gcoord <= zoom[2]
+        variants_df <- variants_df[keep_zoom, ]
+        
+        # remove temporary gcoord column
+        variants_df$gcoord <- NULL
+        
+        if (nrow(variants_df) == 0) {
+          return(NULL)
+        }
+        
+        # filter support and coverage matrices
+        if (!is.null(variant_data$support)) {
+          variant_data$support <- variant_data$support[keep_zoom, , drop = FALSE]
+        }
+        if (!is.null(variant_data$coverage)) {
+          variant_data$coverage <- variant_data$coverage[keep_zoom, , drop = FALSE]
+        }
+      }
+    }
+  }
+  
+  # update variants in the data structure
+  variant_data$variants <- variants_df
+  
+  return(variant_data)
 }
 
 # load variants from files for static mode

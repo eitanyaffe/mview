@@ -723,14 +723,47 @@ observeEvent(plotly::event_data("plotly_click", source = "temporal_plot"), {
 
 # export function for PDF generation
 variants_export_pdf <- function(region_info) {
-  # query variants for the specified region using current UI settings
-  raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("variants"))
+  # load data fresh for export region (bypass state to avoid stale data)
+  if (is_dynamic) {
+    # dynamic mode: query fresh data from alntools
+    tab_config <- list(
+      min_reads = min_reads,
+      min_coverage = min_coverage,
+      min_libraries = min_libraries,
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      use_genes = use_genes,
+      get_gene_table_f = get_gene_table_f,
+      get_fasta_f = get_fasta_f,
+      codon_table_path = codon_table_path
+    )
+    raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
+  } else {
+    # static mode: load fresh data from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_variants_table_f = get_variants_table_f,
+      get_variants_support_f = get_variants_support_f,
+      get_variants_coverage_f = get_variants_coverage_f
+    )
+    raw_data <- load_variants_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
+    # filter to zoom coordinates
+    raw_data <- filter_variants_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
+  }
   
   # apply current filters
   span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)
   
   # filter the data
   filtered_data <- filter_variants_by_span(raw_data, span_filter)
+  
+  # cache filtered variants for profile access during export
+  if (!is.null(filtered_data) && !is.null(filtered_data$variants)) {
+    colored_variants <- add_variant_colors(filtered_data$variants)
+    cache_set("variants.current", colored_variants)
+  } else {
+    cache_set("variants.current", NULL)
+  }
   
   # get current plot settings
   plot_type <- input$variantPlotType %||% "temporal"
@@ -759,8 +792,33 @@ variants_export_pdf <- function(region_info) {
 
 # export function for table generation
 variants_export_table <- function(region_info) {
-  # query variants for the specified region using current UI settings
-  raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("variants"))
+  # load data fresh for export region (bypass state to avoid stale data)
+  if (is_dynamic) {
+    # dynamic mode: query fresh data from alntools
+    tab_config <- list(
+      min_reads = min_reads,
+      min_coverage = min_coverage,
+      min_libraries = min_libraries,
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      use_genes = use_genes,
+      get_gene_table_f = get_gene_table_f,
+      get_fasta_f = get_fasta_f,
+      codon_table_path = codon_table_path
+    )
+    raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
+  } else {
+    # static mode: load fresh data from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_variants_table_f = get_variants_table_f,
+      get_variants_support_f = get_variants_support_f,
+      get_variants_coverage_f = get_variants_coverage_f
+    )
+    raw_data <- load_variants_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
+    # filter to zoom coordinates
+    raw_data <- filter_variants_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
+  }
   
   # apply current filters
   span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)

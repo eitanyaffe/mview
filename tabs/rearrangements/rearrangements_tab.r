@@ -72,25 +72,26 @@ set_tab_panel_f(function() {
     fluidRow(
       column(3,
         wellPanel(
-          h5("Rearrangement Parameters"),
-          numericInput("maxGapInput", "Max Gap:", 
-                      value = cache_get_if_exists("rearrange.max_margin", 10), 
-                      min = 0, step = 1, width = "100%"),
-          numericInput("minElementLengthInput", "Min Element Length:", 
-                      value = cache_get_if_exists("rearrange.min_element_length", 50), 
-                      min = 1, step = 1, width = "100%"),
-          numericInput("minAnchorLengthInput", "Min Anchor Length:", 
-                      value = cache_get_if_exists("rearrange.min_anchor_length", 200), 
-                      min = 1, step = 1, width = "100%"),
-          numericInput("maxAnchorMutationsPercentInput", "Max Anchor Mutations %:", 
-                      value = cache_get_if_exists("rearrange.max_anchor_mutations_percent", 0.1), 
-                      min = 0, max = 1, step = 0.001, width = "100%"),
-          numericInput("maxElementMutationPercentInput", "Max Element Mutations %:", 
-                      value = cache_get_if_exists("rearrange.max_element_mutation_percent", 1), 
-                      min = 0, max = 1, step = 0.001, width = "100%"),
-          br(),
+          h5("Rearrangement Controls"),
           if (is_dynamic) {
             list(
+              h5("Query Parameters"),
+              numericInput("maxGapInput", "Max Gap:", 
+                          value = cache_get_if_exists("rearrange.max_margin", 10), 
+                          min = 0, step = 1, width = "100%"),
+              numericInput("minElementLengthInput", "Min Element Length:", 
+                          value = cache_get_if_exists("rearrange.min_element_length", 50), 
+                          min = 1, step = 1, width = "100%"),
+              numericInput("minAnchorLengthInput", "Min Anchor Length:", 
+                          value = cache_get_if_exists("rearrange.min_anchor_length", 200), 
+                          min = 1, step = 1, width = "100%"),
+              numericInput("maxAnchorMutationsPercentInput", "Max Anchor Mutations %:", 
+                          value = cache_get_if_exists("rearrange.max_anchor_mutations_percent", 0.1), 
+                          min = 0, max = 1, step = 0.001, width = "100%"),
+              numericInput("maxElementMutationPercentInput", "Max Element Mutations %:", 
+                          value = cache_get_if_exists("rearrange.max_element_mutation_percent", 1), 
+                          min = 0, max = 1, step = 0.001, width = "100%"),
+              br(),
               actionButton("updateRearrangementsBtn", "Update Rearrangements", class = "btn-primary", width = "100%"),
               br(), br()
             )
@@ -676,25 +677,28 @@ observeEvent(input$rearrangementJitter, {
 })
 
 # parameter observers for caching
-observeEvent(input$maxGapInput, {
-  cache_set("rearrange.max_margin", input$maxGapInput)
-})
+# query parameter observers (only for dynamic mode)
+if (is_dynamic) {
+  observeEvent(input$maxGapInput, {
+    cache_set("rearrange.max_margin", input$maxGapInput)
+  })
 
-observeEvent(input$minElementLengthInput, {
-  cache_set("rearrange.min_element_length", input$minElementLengthInput)
-})
+  observeEvent(input$minElementLengthInput, {
+    cache_set("rearrange.min_element_length", input$minElementLengthInput)
+  })
 
-observeEvent(input$minAnchorLengthInput, {
-  cache_set("rearrange.min_anchor_length", input$minAnchorLengthInput)
-})
+  observeEvent(input$minAnchorLengthInput, {
+    cache_set("rearrange.min_anchor_length", input$minAnchorLengthInput)
+  })
 
-observeEvent(input$maxAnchorMutationsPercentInput, {
-  cache_set("rearrange.max_anchor_mutations_percent", input$maxAnchorMutationsPercentInput)
-})
+  observeEvent(input$maxAnchorMutationsPercentInput, {
+    cache_set("rearrange.max_anchor_mutations_percent", input$maxAnchorMutationsPercentInput)
+  })
 
-observeEvent(input$maxElementMutationPercentInput, {
-  cache_set("rearrange.max_element_mutation_percent", input$maxElementMutationPercentInput)
-})
+  observeEvent(input$maxElementMutationPercentInput, {
+    cache_set("rearrange.max_element_mutation_percent", input$maxElementMutationPercentInput)
+  })
+}
 
 # click observers for frequency plot interaction
 observeEvent(plotly::event_data("plotly_click", source = "scatter_plot"), {
@@ -727,8 +731,31 @@ observeEvent(plotly::event_data("plotly_click", source = "temporal_plot"), {
 
 # export function for PDF generation
 rearrangements_export_pdf <- function(region_info) {
-  # query rearrangements for the specified region using tab config (like variants)
-  raw_data <- query_rearrangements_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("rearrangements"))
+  # load data fresh for export region (bypass state to avoid stale data)
+  if (is_dynamic) {
+    # dynamic mode: query fresh data from alntools
+    tab_config <- list(
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      max_margin = max_margin,
+      min_element_length = min_element_length,
+      min_anchor_length = min_anchor_length,
+      max_anchor_mutations_percent = max_anchor_mutations_percent,
+      max_element_mutation_percent = max_element_mutation_percent
+    )
+    raw_data <- query_rearrangements_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
+  } else {
+    # static mode: load fresh data from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_rearrange_events_f = get_rearrange_events_f,
+      get_rearrange_support_f = get_rearrange_support_f,
+      get_rearrange_coverage_f = get_rearrange_coverage_f
+    )
+    raw_data <- load_rearrangements_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
+    # filter to zoom coordinates
+    raw_data <- filter_rearrangements_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
+  }
   
   # apply current filters
   span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0.5)
@@ -737,6 +764,14 @@ rearrangements_export_pdf <- function(region_info) {
   # filter the data
   filtered_data <- filter_rearrangements_by_span(raw_data, span_filter)
   filtered_data <- filter_rearrangements_by_support(filtered_data, support_filter)
+  
+  # cache filtered events for profile access during export
+  if (!is.null(filtered_data) && !is.null(filtered_data$events)) {
+    colored_events <- add_rearrangement_colors(filtered_data$events)
+    cache_set("rearrangements.current", colored_events)
+  } else {
+    cache_set("rearrangements.current", NULL)
+  }
   
   # get current plot settings
   plot_type <- input$rearrangementPlotType %||% "temporal"
@@ -765,8 +800,31 @@ rearrangements_export_pdf <- function(region_info) {
 
 # export function for table generation
 rearrangements_export_table <- function(region_info) {
-  # query rearrangements for the specified region using tab config (like variants)
-  raw_data <- query_rearrangements_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, get_tab_by_id("rearrangements"))
+  # load data fresh for export region (bypass state to avoid stale data)
+  if (is_dynamic) {
+    # dynamic mode: query fresh data from alntools
+    tab_config <- list(
+      get_aln_f = get_aln_f,
+      library_ids = library_ids,
+      max_margin = max_margin,
+      min_element_length = min_element_length,
+      min_anchor_length = min_anchor_length,
+      max_anchor_mutations_percent = max_anchor_mutations_percent,
+      max_element_mutation_percent = max_element_mutation_percent
+    )
+    raw_data <- query_rearrangements_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
+  } else {
+    # static mode: load fresh data from files
+    tab_config <- list(
+      library_ids = library_ids,
+      get_rearrange_events_f = get_rearrange_events_f,
+      get_rearrange_support_f = get_rearrange_support_f,
+      get_rearrange_coverage_f = get_rearrange_coverage_f
+    )
+    raw_data <- load_rearrangements_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
+    # filter to zoom coordinates
+    raw_data <- filter_rearrangements_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
+  }
   
   # apply current filters
   span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0.5)
