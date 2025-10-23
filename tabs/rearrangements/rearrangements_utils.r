@@ -14,8 +14,8 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
   max_margin <- tab_config$max_margin %||% 10
   min_element_length <- tab_config$min_element_length %||% 50
   min_anchor_length <- tab_config$min_anchor_length %||% 200
-  max_anchor_mutations_percent <- tab_config$max_anchor_mutations_percent %||% 0.001
-  max_element_mutation_percent <- tab_config$max_element_mutation_percent %||% 0.01
+  max_anchor_mutations_percent <- tab_config$max_anchor_mutations_percent %||% 1.0
+  max_element_mutation_percent <- tab_config$max_element_mutation_percent %||% 1.0
   
   # get alignment stores from all configured library_ids
   stores <- list()

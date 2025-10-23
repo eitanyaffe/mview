@@ -41,8 +41,8 @@ if (is_dynamic) {
   max_margin <- tab$max_margin %||% 10
   min_element_length <- tab$min_element_length %||% 50
   min_anchor_length <- tab$min_anchor_length %||% 200
-  max_anchor_mutations_percent <- tab$max_anchor_mutations_percent %||% 0.01
-  max_element_mutation_percent <- tab$max_element_mutation_percent %||% 0.1
+  max_anchor_mutations_percent <- tab$max_anchor_mutations_percent %||% 1.0
+  max_element_mutation_percent <- tab$max_element_mutation_percent %||% 1.0
   
   if (!is.function(get_aln_f)) {
     stop(sprintf("get_aln_f must be a function, got: %s", class(get_aln_f)))
@@ -86,11 +86,11 @@ set_tab_panel_f(function() {
                           value = cache_get_if_exists("rearrange.min_anchor_length", 200), 
                           min = 1, step = 1, width = "100%"),
               numericInput("maxAnchorMutationsPercentInput", "Max Anchor Mutations %:", 
-                          value = cache_get_if_exists("rearrange.max_anchor_mutations_percent", 0.1), 
-                          min = 0, max = 1, step = 0.001, width = "100%"),
+                          value = cache_get_if_exists("rearrange.max_anchor_mutations_percent", 1.0), 
+                          min = 0, max = 100, step = 0.1, width = "100%"),
               numericInput("maxElementMutationPercentInput", "Max Element Mutations %:", 
-                          value = cache_get_if_exists("rearrange.max_element_mutation_percent", 1), 
-                          min = 0, max = 1, step = 0.001, width = "100%"),
+                          value = cache_get_if_exists("rearrange.max_element_mutation_percent", 1.0), 
+                          min = 0, max = 100, step = 0.1, width = "100%"),
               br(),
               actionButton("updateRearrangementsBtn", "Update Rearrangements", class = "btn-primary", width = "100%"),
               br(), br()

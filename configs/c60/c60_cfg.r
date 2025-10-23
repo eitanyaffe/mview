@@ -311,7 +311,7 @@ register_tab(
 #   max_margin = 10,
 #   min_element_length = 50,
 #   min_anchor_length = 200,
-#   max_anchor_mutations_percent = 0.01,
-#   max_element_mutation_percent = 0.1,
+#   max_anchor_mutations_percent = 1.0,
+#   max_element_mutation_percent = 1.0,
 #   supports_export = TRUE
 # )
