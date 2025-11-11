@@ -153,18 +153,18 @@ rrna_profile(
 # assembly segments profile
 ########################################################
 
-segments_profile(
-  id = "assembly_segments",
-  name = "Assembly Segments",
-  segments_f = function(assembly) {
-    data <- get_data("CAV_REFINE_SEGMENT_TABLE", 
-                     tag = assembly,
-                     null.on.missing = TRUE)
-    data$desc <- data$segment        
-    data$id <- ""
-    data
-  }
-)
+## segments_profile(
+##   id = "assembly_segments",
+##   name = "Assembly Segments",
+##   segments_f = function(assembly) {
+##     data <- get_data("CAV_REFINE_SEGMENT_TABLE", 
+##                      tag = assembly,
+##                      null.on.missing = TRUE)
+##     data$desc <- data$segment        
+##     data$id <- ""
+##     data
+##   }
+## )
 
 ########################################################
 # regions segments profile

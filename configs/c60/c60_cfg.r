@@ -9,10 +9,11 @@ set_regions_dir("configs/c60/regions")
 ########################################################
 
 # project_name <- "pb4"
-project_name <- "pb-b20"
+# project_name <- "pb-b20"
 # project_name <- "pb-pilot2"
+project_name <- "h40"
 
-# search for lookup files under MAKESHIFT_ROOT/export/long/pb4/
+# search for lookup files
 dir <- paste(Sys.getenv("MAKESHIFT_ROOT"), "export", "long", project_name, "default", sep = "/")
 fns <- list.files(dir, full.names = TRUE, pattern = "*.txt")
 set_lookup(fns)
@@ -40,21 +41,27 @@ register_contigs_f(function(assembly = NULL) {
 
 # Register genomes function
 register_genomes_f(function(assembly = NULL) {
-  df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
-  if (is.null(df)) {
-    return(NULL)
-  }
-  df$gid <- df$contig
-  data.frame(gid = df$gid, length = df$length)
+    # df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
+    df <- get_data("BINNING_HOST_TABLE", tag = assembly)
+    
+    if (is.null(df)) {
+        return(NULL)
+    }
+    # df$gid <- df$contig
+    rr = data.frame(gid = df$bin, df[,-match(c("bin","domain"), names(df))])
+    rr = rr[order(-rr$length),]
 })
 
 # Register contig map function
 register_contig_map_f(function(assembly = NULL) {
-  df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
-  if (is.null(df)) {
-    return(NULL)
-  }
-  data.frame(contig = df$contig, gid = df$contig)
+    # df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
+    df <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly)
+    if (is.null(df)) {
+        return(NULL)
+    }
+    # data.frame(contig = df$contig, gid = df$contig)
+    rr = data.frame(contig = df$contig, gid = df$bin)
+    unique(rr)
 })
 
 read_fasta_f <- function(path) {
