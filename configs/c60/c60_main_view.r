@@ -93,14 +93,27 @@ for (assembly_other in subject_ids) {
 
 # synteny data function - simple user function
 get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
-  data <- get_data("MINIMAP_SYNTENY_ASSEMBLY_TABLE", 
-                   tag = paste0(assembly, "_", field, "_", binsize),
+  synteny_tag <- paste0(assembly, "_", field, "_", binsize)
+  data <- get_data("SYNTENY_ASSEMBLY_TABLE", 
+                   tag = synteny_tag,
                    null.on.missing = TRUE)
+  if (is.null(data)) {
+    return(NULL)
+  }
+
+  required_cols <- c("contig", "start", "end")
+  missing_cols <- required_cols[!required_cols %in% colnames(data)]
+  if (length(missing_cols) > 0) {
+    path <- get_path("SYNTENY_ASSEMBLY_TABLE", tag = synteny_tag)
+    stop(sprintf("synteny table missing required columns (%s) in %s",
+                 paste(missing_cols, collapse = ", "),
+                 path))
+  }
   
   # filter out self-assembly libraries if hide_self is TRUE and data exists
-  if (hide_self && !is.null(data)) {
+  if (hide_self) {
     keep_cols <- !grepl(paste0("^", assembly, "_"), colnames(data))
-    keep_cols[1:3] <- TRUE  # always keep contig, start, end
+    keep_cols[match(required_cols, colnames(data))] <- TRUE
     data <- data[, keep_cols, drop = FALSE]
   }
   
@@ -109,20 +122,20 @@ get_synteny_f <- function(assembly, field, binsize, hide_self = TRUE) {
 
 # consensus data function - loads the merged consensus RDS file
 get_consensus_f <- function(assembly) {
-  data <- get_data("MINIMAP_SYNTENY_CONSENSUS_MERGED", 
+  data <- get_data("SYNTENY_CONSENSUS_MERGED", 
                    tag = assembly,
                    read_f = readRDS)
   return(data)
 }
 
 # summary synteny profile
-synteny_profile(
-  id = "synteny",
-  name = "synteny",
-  synteny_f = get_synteny_f,
-  consensus_f = get_consensus_f,
-  params = default_synteny_params
-)
+## synteny_profile(
+##   id = "synteny",
+##   name = "synteny",
+##   synteny_f = get_synteny_f,
+##   consensus_f = get_consensus_f,
+##   params = default_synteny_params
+## )
 
 ########################################################
 # basic gene profile

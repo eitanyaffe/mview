@@ -129,6 +129,103 @@ change_contig_action <- function(regions_module_output, main_state_rv, input, di
               new_contig))
 }
 
+change_genome_action <- function(regions_module_output, main_state_rv, input, direction) {
+  if (is.null(input$genomeTable_rows_all)) {
+    cat(sprintf("alt+arrow%s: genome table not initialized\n", direction))
+    return()
+  }
+  
+  if (length(input$genomeTable_rows_all) == 0) {
+    cat(sprintf("alt+arrow%s: genome table empty\n", direction))
+    return()
+  }
+  
+  genomes_data <- get_genomes(main_state_rv$assembly)
+  if (is.null(genomes_data) || nrow(genomes_data) == 0) {
+    cat(sprintf("alt+arrow%s: no genomes available\n", direction))
+    return()
+  }
+  
+  contig_map_data <- get_contig_map(main_state_rv$assembly)
+  if (is.null(contig_map_data) || nrow(contig_map_data) == 0) {
+    cat(sprintf("alt+arrow%s: no contig map available\n", direction))
+    return()
+  }
+  
+  selected_rows <- input$genomeTable_rows_selected
+  genome_proxy <- DT::dataTableProxy("genomeTable")
+  
+  if (is.null(selected_rows) || length(selected_rows) == 0) {
+    new_row_index <- input$genomeTable_rows_all[1]
+    new_gid <- genomes_data$gid[new_row_index]
+    new_contigs <- unique(contig_map_data$contig[contig_map_data$gid == new_gid])
+    
+    if (length(new_contigs) == 0) {
+      cat(sprintf("alt+arrow%s: genome %s has no contigs\n", direction, new_gid))
+      return()
+    }
+    
+    regions_module_output$push_undo_state()
+    DT::selectRows(genome_proxy, 1)
+    main_state_rv$contigs <- new_contigs
+    main_state_rv$zoom <- NULL
+    cat("selected first genome in table\n")
+    return()
+  }
+  
+  if (length(selected_rows) != 1) {
+    cat(sprintf("alt+arrow%s: multiple genome rows selected, doing nothing\n", direction))
+    return()
+  }
+  
+  current_table_index <- which(input$genomeTable_rows_all == selected_rows[1])
+  
+  if (direction == "down") {
+    if (current_table_index >= length(input$genomeTable_rows_all)) {
+      new_table_index <- 1
+    } else {
+      new_table_index <- current_table_index + 1
+    }
+  } else {
+    if (current_table_index <= 1) {
+      new_table_index <- length(input$genomeTable_rows_all)
+    } else {
+      new_table_index <- current_table_index - 1
+    }
+  }
+  
+  new_row_index <- input$genomeTable_rows_all[new_table_index]
+  new_gid <- genomes_data$gid[new_row_index]
+  new_contigs <- unique(contig_map_data$contig[contig_map_data$gid == new_gid])
+  
+  if (length(new_contigs) == 0) {
+    cat(sprintf("alt+arrow%s: genome %s has no contigs\n", direction, new_gid))
+    return()
+  }
+  
+  regions_module_output$push_undo_state()
+  DT::selectRows(genome_proxy, new_row_index)
+  main_state_rv$contigs <- new_contigs
+  main_state_rv$zoom <- NULL
+  
+  cat(sprintf("navigated to %s genome: %s\n",
+              if (direction == "down") "next" else "previous",
+              new_gid))
+}
+
+change_navigation_action <- function(regions_module_output, main_state_rv, input, direction) {
+  nav_mode <- cache_get_if_exists("navigate_up_down_type", "genome")
+  if (!nav_mode %in% c("genome", "contig")) {
+    nav_mode <- "genome"
+  }
+  
+  if (nav_mode == "contig") {
+    change_contig_action(regions_module_output, main_state_rv, input, direction)
+  } else {
+    change_genome_action(regions_module_output, main_state_rv, input, direction)
+  }
+}
+
 # Helper function for region navigation
 change_region_action <- function(regions_module_output, main_state_rv, direction) {
   # get current regions table
@@ -360,17 +457,17 @@ keyboard_shortcuts <- list(
     }
   ),
   "Alt+ArrowDown" = list(
-    description = "Navigate to next contig in contig table",
+    description = "Navigate to next contig or genome (configurable)",
     type = "navigation",
     action = function(regions_module_output, main_state_rv, input) {
-      change_contig_action(regions_module_output, main_state_rv, input, "down")
+      change_navigation_action(regions_module_output, main_state_rv, input, "down")
     }
   ),
   "Alt+ArrowUp" = list(
-    description = "Navigate to previous contig in contig table",
+    description = "Navigate to previous contig or genome (configurable)",
     type = "navigation",
     action = function(regions_module_output, main_state_rv, input) {
-      change_contig_action(regions_module_output, main_state_rv, input, "up")
+      change_navigation_action(regions_module_output, main_state_rv, input, "up")
     }
   ),
   "Ctrl+Alt+ArrowUp" = list(
@@ -584,15 +681,24 @@ keyboard_summary <- function() {
   state_save_shortcuts <- grep("^Ctrl\\+Alt\\+[1-9]$", names(keyboard_shortcuts), value = TRUE)
   tab_shortcuts <- names(keyboard_shortcuts)[sapply(keyboard_shortcuts, function(x) x$type == "tab_switch")]
   other_shortcuts <- setdiff(names(keyboard_shortcuts), c(alt_zoom_shortcuts, state_load_shortcuts, state_save_shortcuts, tab_shortcuts))
+  nav_mode <- cache_get_if_exists("navigate_up_down_type", "genome")
+  if (!nav_mode %in% c("genome", "contig")) {
+    nav_mode <- "genome"
+  }
   
   html_content <- "<h5>Actions</h5><ul>"
   
   # add main action shortcuts first
   for (shortcut_name in other_shortcuts) {
+    description <- keyboard_shortcuts[[shortcut_name]]$description
+    if (shortcut_name %in% c("Alt+ArrowDown", "Alt+ArrowUp")) {
+      direction_text <- if (shortcut_name == "Alt+ArrowDown") "next" else "previous"
+      description <- sprintf("Navigate to %s %s", direction_text, nav_mode)
+    }
     html_content <- paste0(
       html_content,
       "<li><strong>", shortcut_name, ":</strong> ",
-      keyboard_shortcuts[[shortcut_name]]$description, "</li>"
+      description, "</li>"
     )
   }
   

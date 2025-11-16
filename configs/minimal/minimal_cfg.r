@@ -21,6 +21,18 @@ read_cached <- function(key, path, read_f = read.delim) {
 }
 
 ########################################################
+# set default navigation mode
+########################################################
+
+navigate_up_down_type <- "genome"
+# validate navigation mode
+if (!navigate_up_down_type %in% c("genome", "contig")) {
+  stop(sprintf("invalid navigate_up_down_type: %s", navigate_up_down_type))
+}
+# cache navigation mode
+cache_set("navigate_up_down_type", navigate_up_down_type)
+
+########################################################
 # get functions
 ########################################################
 

@@ -19,6 +19,18 @@ fns <- list.files(dir, full.names = TRUE, pattern = "*.txt")
 set_lookup(fns)
 
 ########################################################
+# set default navigation mode
+########################################################
+
+navigate_up_down_type <- "genome"
+# validate navigation mode
+if (!navigate_up_down_type %in% c("genome", "contig")) {
+  stop(sprintf("invalid navigate_up_down_type: %s", navigate_up_down_type))
+}
+# cache navigation mode
+cache_set("navigate_up_down_type", navigate_up_down_type)
+
+########################################################
 # Register assemblies, genomes and contigs
 ########################################################
 
@@ -237,8 +249,8 @@ get_variants_gene_table_f <- function(assembly) {
 
 # load variants table with gene fields
 get_variants_table_f <- function(assembly) {
-  vars_table <- get_data("MINIMAP_VARS_TABLE", tag = assembly)
-  vars_genic <- get_data("MINIMAP_VARS_GENIC", tag = assembly)
+  vars_table <- get_data("POLY_VARIANTS_TABLE", tag = assembly)
+  vars_genic <- get_data("POLY_VARIANTS_GENIC", tag = assembly)
   
   if (is.null(vars_table)) {
     return(NULL)
@@ -250,9 +262,9 @@ get_variants_table_f <- function(assembly) {
   
   # left join to add gene fields
   merged <- merge(vars_table, vars_genic, 
-                  by.x = "variant_id", by.y = "row_id", 
+                  by = "variant_id", 
                   all.x = TRUE, sort = FALSE)
-  
+  merged$row_id = merged$variant_id  
   return(merged)
 }
 
@@ -264,8 +276,8 @@ register_tab(
   is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
   get_variants_table_f = get_variants_table_f,
-  get_variants_support_f = function(assembly) get_data("MINIMAP_VARS_SUPPORT", tag = assembly),
-  get_variants_coverage_f = function(assembly) get_data("MINIMAP_VARS_COVERAGE", tag = assembly),
+  get_variants_support_f = function(assembly) get_data("POLY_VARIANTS_SUPPORT", tag = assembly),
+  get_variants_coverage_f = function(assembly) get_data("POLY_VARIANTS_COVERAGE", tag = assembly),
   use_genes = TRUE,
   supports_export = TRUE
 )
@@ -300,9 +312,9 @@ register_tab(
   tab_code = "tabs/rearrangements/rearrangements_tab.r",
   is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
-  get_rearrange_events_f = function(assembly) get_data("MINIMAP_REARRANGE_EVENTS", tag = assembly),
-  get_rearrange_support_f = function(assembly) get_data("MINIMAP_REARRANGE_SUPPORT", tag = assembly),
-  get_rearrange_coverage_f = function(assembly) get_data("MINIMAP_REARRANGE_COVERAGE", tag = assembly),
+  get_rearrange_events_f = function(assembly) get_data("POLY_REARRANGE_EVENTS", tag = assembly),
+  get_rearrange_support_f = function(assembly) get_data("POLY_REARRANGE_SUPPORT", tag = assembly),
+  get_rearrange_coverage_f = function(assembly) get_data("POLY_REARRANGE_COVERAGE", tag = assembly),
   use_genes = TRUE,
   supports_export = TRUE
 )
