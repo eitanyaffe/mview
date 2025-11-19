@@ -334,3 +334,67 @@ register_tab(
 #   max_element_mutation_percent = 1.0,
 #   supports_export = TRUE
 # )
+
+########################################################
+# register associations tab
+########################################################
+
+# get library IDs from associations library table
+get_associations_library_ids <- function(assembly) {
+  lib_table <- get_data("BINNING_ASSOCIATIONS_LIBRARY_TABLE", tag = assembly, null.on.missing = TRUE)
+  if (is.null(lib_table)) {
+    return(c("early", "pre", "post", "late"))  # fallback to default
+  }
+  # filter by assembly and return LIB_ID column
+  lib_table <- lib_table[lib_table$ASSEMBLY_ID == assembly, ]
+  if (nrow(lib_table) == 0) {
+    return(c("early", "pre", "post", "late"))  # fallback to default
+  }
+  return(lib_table$LIB_ID)
+}
+
+# associations tab
+register_tab(
+  tab_id = "associations",
+  tab_label = "Associations",
+  tab_code = "tabs/associations/associations_tab.r",
+  get_abundance_f = function(assembly) get_data("BINNING_ABUNDANCE_LR_MAT", tag = assembly, null.on.missing = TRUE),
+  get_abundance_summary_f = function(assembly) get_data("BINNING_ABUNDANCE_LR_SUMMARY", tag = assembly, null.on.missing = TRUE),
+  get_coverage_f = function(assembly) get_data("BINNING_COV_LR_MAT", tag = assembly, null.on.missing = TRUE),
+  get_library_ids_f = get_associations_library_ids,
+  get_bin_adj_total_f = function(assembly) get_data("BINNING_BIN_ADJ_mean_total_read_count", tag = assembly, null.on.missing = TRUE),
+  get_bin_adj_associated_f = function(assembly) get_data("BINNING_BIN_ADJ_mean_associated_read_count", tag = assembly, null.on.missing = TRUE),
+  get_bin_adj_support_f = function(assembly) get_data("BINNING_BIN_ADJ_mean_support_read_count", tag = assembly, null.on.missing = TRUE),
+  get_seg_adj_total_f = function(assembly) get_data("BINNING_SEG_ADJ_total_read_count", tag = assembly, null.on.missing = TRUE),
+  get_seg_adj_associated_f = function(assembly) get_data("BINNING_SEG_ADJ_associated_read_count", tag = assembly, null.on.missing = TRUE),
+  get_seg_adj_count_f = function(assembly) get_data("BINNING_SEG_ADJ_count", tag = assembly, null.on.missing = TRUE),
+  get_bin_segment_table_f = function(assembly) get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE),
+  get_host_table_f = function(assembly) get_data("BINNING_HOST_TABLE", tag = assembly, null.on.missing = TRUE)
+)
+
+########################################################
+# bin segments profile function
+########################################################
+
+# function to get segments with bin colors for segments profile
+get_bin_segments_f <- function(assembly) {
+  seg_table <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
+  if (is.null(seg_table)) {
+    return(NULL)
+  }
+  
+  # generate colors for each unique bin
+  unique_bins <- sort(unique(seg_table$bin))
+  bin_colors <- rainbow(length(unique_bins))
+  names(bin_colors) <- unique_bins
+  
+  # add color column
+  seg_table$bin_color <- bin_colors[seg_table$bin]
+  
+  # format for segments_profile (needs: assembly, contig, start, end, desc, id)
+  seg_table$assembly <- assembly
+  seg_table$desc <- paste0("Bin: ", seg_table$bin)
+  seg_table$id <- seg_table$segment
+  
+  return(seg_table)
+}

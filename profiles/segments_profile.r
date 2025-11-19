@@ -1,6 +1,7 @@
 segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
                             segments_f = NULL,
                             color = "#2E86AB",
+                            color_field = NULL,
                             auto_register = TRUE) {
 
   plot_f <- function(profile, cxt, gg) {
@@ -39,9 +40,25 @@ segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
       return(list(plot = gg, legends = list()))
     }
     
+    # determine color field name if color_field is provided
+    color_field_name <- NULL
+    if (!is.null(profile$color_field)) {
+      color_field_name <- profile$color_field
+      if (!grepl("_color$", color_field_name)) {
+        color_field_name <- paste0(color_field_name, "_color")
+      }
+    }
     
-    # use profile settings directly (minimal approach)
-    current_color <- profile$color
+    # determine fill colors
+    if (!is.null(color_field_name) && color_field_name %in% names(filtered_segments)) {
+      # use color field if available
+      fill_colors <- filtered_segments[[color_field_name]]
+      # set default for missing colors
+      fill_colors[is.na(fill_colors) | fill_colors == ""] <- profile$color
+    } else {
+      # use single color
+      fill_colors <- profile$color
+    }
     
     # create hover text
     hover_text <- paste0(
@@ -51,23 +68,42 @@ segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
     )
     
     # add segments layer as rectangles
-    gg <- gg + 
-      ggplot2::geom_rect(
-        data = filtered_segments,
-        ggplot2::aes(
-          xmin = gstart, xmax = gend,
-          ymin = -0.15, ymax = 0.15,
-          text = hover_text
-        ),
-        fill = current_color,
-        color = "black",
-        size = 0.5
-      ) +
+    if (!is.null(color_field_name) && color_field_name %in% names(filtered_segments)) {
+      # use color field for fill - use .data pronoun for dynamic column access
+      gg <- gg + 
+        ggplot2::geom_rect(
+          data = filtered_segments,
+          ggplot2::aes(
+            xmin = gstart, xmax = gend,
+            ymin = -0.15, ymax = 0.15,
+            text = hover_text,
+            fill = .data[[color_field_name]]
+          ),
+          color = "black",
+          size = 0.5
+        ) +
+        ggplot2::scale_fill_identity()
+    } else {
+      # use single color
+      gg <- gg + 
+        ggplot2::geom_rect(
+          data = filtered_segments,
+          ggplot2::aes(
+            xmin = gstart, xmax = gend,
+            ymin = -0.15, ymax = 0.15,
+            text = hover_text
+          ),
+          fill = fill_colors,
+          color = "black",
+          size = 0.5
+        )
+    }
+    gg <- gg +
       ggplot2::geom_text(
         data = filtered_segments,
         ggplot2::aes(
           x = gend + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
-          y = -0.05,
+          y = 0.25,
           label = id,
           text = hover_text
         ),
@@ -76,7 +112,7 @@ segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
         hjust = 0,
         vjust = 0.5
       ) +
-      ggplot2::ylim(-0.5, 0.5)
+      ggplot2::ylim(-0.5, 0.6)
     
     return(list(plot = gg, legends = list()))
   }
@@ -88,6 +124,7 @@ segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
     params = NULL, plot_f = plot_f,
     segments_f = segments_f,
     color = color,
+    color_field = color_field,
     auto_register = auto_register
   )
 }

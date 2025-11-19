@@ -190,6 +190,18 @@ segments_profile(
 )
 
 ########################################################
+# bin segments profile
+########################################################
+
+segments_profile(
+  id = "bin_segments",
+  name = "Bin Segments",
+  segments_f = get_bin_segments_f,
+  color_field = "bin",
+  height = 40
+)
+
+########################################################
 # variants profile
 ########################################################
 
