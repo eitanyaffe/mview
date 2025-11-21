@@ -1,5 +1,5 @@
-segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
-                            segments_f = NULL,
+segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
+                          segments_f = NULL,
                             color = "#2E86AB",
                             color_field = NULL,
                             auto_register = TRUE) {
@@ -85,17 +85,17 @@ segments_profile <- function(id, name, height = 30, is_fixed = TRUE,
         ggplot2::scale_fill_identity()
     } else {
       # use single color
-      gg <- gg + 
-        ggplot2::geom_rect(
-          data = filtered_segments,
-          ggplot2::aes(
-            xmin = gstart, xmax = gend,
-            ymin = -0.15, ymax = 0.15,
-            text = hover_text
-          ),
+    gg <- gg + 
+      ggplot2::geom_rect(
+        data = filtered_segments,
+        ggplot2::aes(
+          xmin = gstart, xmax = gend,
+          ymin = -0.15, ymax = 0.15,
+          text = hover_text
+        ),
           fill = fill_colors,
-          color = "black",
-          size = 0.5
+        color = "black",
+        size = 0.5
         )
     }
     gg <- gg +

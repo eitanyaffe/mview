@@ -35,6 +35,7 @@ cache_set("navigate_up_down_type", navigate_up_down_type)
 ########################################################
 
 aids <- get_data("ASSEMBLY_TABLE")$ASSEMBLY_ID
+aids <- c("BAA", "BAM", "EBC", "BAH", "EAL", "EAA", "EAV", "EBQ")
 
 # Sort assembly IDs to prioritize EBC
 aids <- aids[order(aids != "EBC")]

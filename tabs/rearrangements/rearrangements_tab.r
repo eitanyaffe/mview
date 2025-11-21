@@ -478,8 +478,8 @@ if (is_dynamic) {
     update_rearrangements_data()
   })
 } else {
-  # static mode: auto-load when assembly or contigs change
-  observeEvent(list(state$assembly, state$contigs), {
+  # static mode: auto-load when assembly, contigs, or zoom change
+  observeEvent(list(state$assembly, state$contigs, state$zoom), {
     # load if we have a valid assembly
     if (!is.null(state$assembly)) {
       update_rearrangements_data()

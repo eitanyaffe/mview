@@ -429,12 +429,19 @@ load_rearrangements_from_files <- function(assembly, contigs, zoom, tab_config) 
     }
     
     # return data in same format as query_rearrangements_for_context
-    return(list(
+    result <- list(
       events = events_table,
       support = support_matrix_final,
       coverage = coverage_matrix_final,
       library_ids = available_libs
-    ))
+    )
+    
+    # filter by zoom coordinates if specified
+    if (!is.null(zoom) && length(zoom) == 2) {
+      result <- filter_rearrangements_by_region(result, contigs, zoom, assembly)
+    }
+    
+    return(result)
     
   }, error = function(e) {
     warning(sprintf("error loading rearrangements from files: %s", e$message))

@@ -186,7 +186,8 @@ rrna_profile(
 segments_profile(
   id = "regions",
   name = "Regions",
-  segments_f = "segments.current_regions"
+  segments_f = "segments.current_regions",
+  height = 60
 )
 
 ########################################################
@@ -195,10 +196,10 @@ segments_profile(
 
 segments_profile(
   id = "bin_segments",
-  name = "Bin Segments",
+  name = "Segments",
   segments_f = get_bin_segments_f,
   color_field = "bin",
-  height = 40
+  height = 60
 )
 
 ########################################################

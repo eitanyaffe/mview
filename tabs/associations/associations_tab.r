@@ -1,5 +1,8 @@
 # associations tab implementation
 
+# source graph visualization code
+source("tabs/associations/association_graph.r")
+
 # validate and extract tab parameters
 tab <- get_tab_by_id("associations")
 if (is.null(tab)) {
@@ -42,6 +45,15 @@ show_bins <- reactiveVal(cache_get_if_exists("associations.show_bins", TRUE))
 
 # reactive value for coverage field
 coverage_field <- reactiveVal(cache_get_if_exists("associations.coverage_field", "total"))
+
+# reactive values for graph color schemes
+host_color_scheme <- reactiveVal(cache_get_if_exists("associations.host_color_scheme", "none"))
+taxa_level <- reactiveVal(cache_get_if_exists("associations.taxa_level", "species"))
+element_color_scheme <- reactiveVal(cache_get_if_exists("associations.element_color_scheme", "none"))
+edge_color_scheme <- reactiveVal(cache_get_if_exists("associations.edge_color_scheme", "none"))
+lib1 <- reactiveVal(cache_get_if_exists("associations.lib1", NULL))
+lib2 <- reactiveVal(cache_get_if_exists("associations.lib2", NULL))
+show_host_labels <- reactiveVal(cache_get_if_exists("associations.show_host_labels", FALSE))
 
 # set the tab panel UI
 set_tab_panel_f(function() {
@@ -97,7 +109,49 @@ set_tab_panel_f(function() {
         tabsetPanel(
           id = "associationsTablesTabset",
           tabPanel("Host Table", DTOutput("associationsHostTable")),
-          tabPanel("Segments", DTOutput("associationsSegmentsTable"))
+          tabPanel("Segments", DTOutput("associationsSegmentsTable")),
+          tabPanel("Graph", 
+            fluidRow(
+              column(3,
+                wellPanel(
+                  h5("Graph Controls"),
+                  selectInput("associationsHostColorScheme", "Host Color:",
+                    choices = list("None" = "none", "Taxa" = "taxa", "Abundance" = "abundance"),
+                    selected = cache_get_if_exists("associations.host_color_scheme", "none")),
+                  conditionalPanel(
+                    condition = "input.associationsHostColorScheme == 'taxa'",
+                    selectInput("associationsTaxaLevel", "Taxa Level:",
+                      choices = list("Species" = "species", "Genus" = "genus", "Family" = "family", 
+                                   "Order" = "order", "Class" = "class", "Phylum" = "phylum", "Domain" = "domain"),
+                      selected = cache_get_if_exists("associations.taxa_level", "species"))
+                  ),
+                  selectInput("associationsElementColorScheme", "Element Color:",
+                    choices = list("None" = "none", "Abundance" = "abundance"),
+                    selected = cache_get_if_exists("associations.element_color_scheme", "none")),
+                  selectInput("associationsEdgeColorScheme", "Edge Color:",
+                    choices = list("None" = "none", "Percent" = "percent", "Percent Delta" = "percent_delta"),
+                    selected = cache_get_if_exists("associations.edge_color_scheme", "none")),
+                  conditionalPanel(
+                    condition = "input.associationsEdgeColorScheme == 'percent_delta'",
+                    selectInput("associationsLib1", "Library 1:",
+                      choices = list(),
+                      selected = NULL),
+                    selectInput("associationsLib2", "Library 2:",
+                      choices = list(),
+                      selected = NULL)
+                  ),
+                  checkboxInput("associationsShowHostLabels", "Show Host Labels",
+                    value = cache_get_if_exists("associations.show_host_labels", FALSE))
+                )
+              ),
+              column(7,
+                plotly::plotlyOutput("associationsGraphPlot", height = "1000px")
+              ),
+              column(2,
+                plotly::plotlyOutput("associationsGraphLegend", height = "1000px")
+              )
+            )
+          )
         )
       )
     )
@@ -370,9 +424,12 @@ load_seg_associations <- function(bin_id, field) {
     }
   }
   
-  # get library columns
+  # get library columns (exclude key fields and metadata columns)
   lib_ids <- get_library_ids()
-  lib_cols <- names(seg_assoc)[!names(seg_assoc) %in% c("seg_src", "seg_tgt")]
+  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+                     "contig_src", "start_src", "end_src", 
+                     "contig_tgt", "start_tgt", "end_tgt")
+  lib_cols <- names(seg_assoc)[!names(seg_assoc) %in% metadata_cols]
   
   # build result matrix: rows = associated segments, cols = libraries
   result <- list()
@@ -548,7 +605,10 @@ load_seg_percents <- function(bin_id) {
   }
   
   lib_ids <- get_library_ids()
-  lib_cols <- names(count_rows)[!names(count_rows) %in% c("seg_src", "seg_tgt")]
+  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+                     "contig_src", "start_src", "end_src", 
+                     "contig_tgt", "start_tgt", "end_tgt")
+  lib_cols <- names(count_rows)[!names(count_rows) %in% metadata_cols]
   
   # build result: percent = count / associated_read_count
   result <- list()
@@ -557,8 +617,18 @@ load_seg_percents <- function(bin_id) {
     seg_src <- count_rows$seg_src[i]
     key <- paste0(seg_src, "->", seg_tgt)
     
-    # find matching row in associated_mat
-    assoc_row <- associated_rows[associated_rows$seg_src == seg_src & associated_rows$seg_tgt == seg_tgt, ]
+    # find matching row in associated_mat (match on seg_src, seg_tgt, and sides if present)
+    if ("side_src" %in% names(count_rows) && "side_tgt" %in% names(count_rows) &&
+        "side_src" %in% names(associated_rows) && "side_tgt" %in% names(associated_rows)) {
+      side_src <- count_rows$side_src[i]
+      side_tgt <- count_rows$side_tgt[i]
+      assoc_row <- associated_rows[associated_rows$seg_src == seg_src & 
+                                   associated_rows$seg_tgt == seg_tgt &
+                                   associated_rows$side_src == side_src &
+                                   associated_rows$side_tgt == side_tgt, ]
+    } else {
+      assoc_row <- associated_rows[associated_rows$seg_src == seg_src & associated_rows$seg_tgt == seg_tgt, ]
+    }
     if (nrow(assoc_row) == 0) {
       next
     }
@@ -610,6 +680,88 @@ observeEvent(input$associationsClearSelectionBtn, {
   # clear selection in segments table
   proxy <- DT::dataTableProxy("associationsSegmentsTable")
   DT::selectRows(proxy, NULL)
+})
+
+# observers for graph color scheme inputs
+observeEvent(input$associationsHostColorScheme, {
+  host_color_scheme(input$associationsHostColorScheme)
+  cache_set("associations.host_color_scheme", input$associationsHostColorScheme)
+})
+
+observeEvent(input$associationsTaxaLevel, {
+  taxa_level(input$associationsTaxaLevel)
+  cache_set("associations.taxa_level", input$associationsTaxaLevel)
+})
+
+observeEvent(input$associationsElementColorScheme, {
+  element_color_scheme(input$associationsElementColorScheme)
+  cache_set("associations.element_color_scheme", input$associationsElementColorScheme)
+})
+
+observeEvent(input$associationsEdgeColorScheme, {
+  edge_color_scheme(input$associationsEdgeColorScheme)
+  cache_set("associations.edge_color_scheme", input$associationsEdgeColorScheme)
+})
+
+observeEvent(input$associationsLib1, {
+  lib1(input$associationsLib1)
+  cache_set("associations.lib1", input$associationsLib1)
+})
+
+observeEvent(input$associationsLib2, {
+  lib2(input$associationsLib2)
+  cache_set("associations.lib2", input$associationsLib2)
+})
+
+observeEvent(input$associationsShowHostLabels, {
+  show_host_labels(input$associationsShowHostLabels)
+  cache_set("associations.show_host_labels", input$associationsShowHostLabels)
+})
+
+# observer to populate library dropdowns when assembly changes
+observe({
+  if (is.null(state$assembly)) {
+    return()
+  }
+  
+  lib_ids <- get_library_ids()
+  if (is.null(lib_ids) || length(lib_ids) == 0) {
+    return()
+  }
+  
+  # create choices with assembly prefix (e.g., EBC_pre)
+  lib_choices <- setNames(paste0(state$assembly, "_", lib_ids), lib_ids)
+  
+  # set default to pre and post if available
+  default_lib1 <- NULL
+  default_lib2 <- NULL
+  if ("pre" %in% lib_ids) {
+    default_lib1 <- paste0(state$assembly, "_pre")
+  } else if (length(lib_ids) > 0) {
+    default_lib1 <- lib_choices[1]
+  }
+  if ("post" %in% lib_ids) {
+    default_lib2 <- paste0(state$assembly, "_post")
+  } else if (length(lib_ids) > 1) {
+    default_lib2 <- lib_choices[2]
+  }
+  
+  # update dropdowns if session is available
+  if (exists("session", envir = parent.frame())) {
+    session <- get("session", envir = parent.frame())
+    updateSelectInput(session, "associationsLib1", choices = lib_choices, selected = default_lib1)
+    updateSelectInput(session, "associationsLib2", choices = lib_choices, selected = default_lib2)
+  }
+  
+  # update reactive values if not already set
+  if (is.null(lib1())) {
+    lib1(default_lib1)
+    cache_set("associations.lib1", default_lib1)
+  }
+  if (is.null(lib2())) {
+    lib2(default_lib2)
+    cache_set("associations.lib2", default_lib2)
+  }
 })
 
 # observer for select host button
@@ -1191,6 +1343,67 @@ observeEvent(plotly::event_data("plotly_click", source = "associations_percents_
       }
       proxy <- DT::dataTableProxy("associationsSegmentsTable")
       DT::selectRows(proxy, matching_rows[1])
+    }
+  }
+})
+
+# ---- Graph Renderer ----
+
+# graph plot
+output$associationsGraphPlot <- plotly::renderPlotly({
+  render_associations_graph(
+    state$assembly, 
+    selected_bin(), 
+    get_host_table_f, 
+    get_bin_adj_total_f,
+    get_abundance_summary_f,
+    get_bin_adj_support_f,
+    get_bin_adj_associated_f,
+    get_bin_segment_table_f,
+    host_color_scheme(),
+    taxa_level(),
+    element_color_scheme(),
+    edge_color_scheme(),
+    lib1(),
+    lib2(),
+    show_host_labels()
+  )
+})
+
+# graph legend plot (refresh when graph is plotted)
+output$associationsGraphLegend <- plotly::renderPlotly({
+  # depend on same reactive values as graph to ensure refresh
+  selected_bin()  # dependency to refresh when graph updates
+  state$assembly
+  
+  render_associations_legend(
+    state$assembly,
+    get_host_table_f,
+    get_abundance_summary_f,
+    get_bin_adj_total_f,
+    host_color_scheme(),
+    taxa_level(),
+    edge_color_scheme()
+  )
+})
+
+# click observer for graph plot
+observeEvent(plotly::event_data("plotly_click", source = "associations_graph_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "associations_graph_plot")
+  if (is.null(event_data) || is.null(event_data$key)) {
+    return()
+  }
+  
+  clicked_bin <- as.character(event_data$key)
+  if (!is.null(clicked_bin) && clicked_bin != "") {
+    # update selected bin
+    selected_bin(clicked_bin)
+    cache_set("associations.selected_bin", clicked_bin)
+    
+    # update text input if session is available
+    if (exists("session", envir = parent.frame())) {
+      session <- get("session", envir = parent.frame())
+      updateTextInput(session, "associationsBinInput", value = clicked_bin)
     }
   }
 })

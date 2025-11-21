@@ -387,12 +387,19 @@ load_variants_from_files <- function(assembly, contigs, zoom, tab_config) {
     variants_table <- variants_table[match(rownames(support_matrix_final), variants_table$variant_id), ]
     
     # return data in same format as query_variants_for_context
-    return(list(
+    result <- list(
       variants = variants_table,
       support = support_matrix_final,
       coverage = coverage_matrix_final,
       library_ids = available_libs
-    ))
+    )
+    
+    # filter by zoom coordinates if specified
+    if (!is.null(zoom) && length(zoom) == 2) {
+      result <- filter_variants_by_region(result, contigs, zoom, assembly)
+    }
+    
+    return(result)
     
   }, error = function(e) {
     warning(sprintf("error loading variants from files: %s", e$message))
