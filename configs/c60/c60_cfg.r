@@ -77,7 +77,7 @@ register_genomes_f(function(assembly = NULL) {
     if (is.null(df)) {
         return(NULL)
     }
-    # df$gid <- df$contig
+    
     rr = data.frame(gid = df$bin, df[,-match(c("bin","domain"), names(df))])
     rr = rr[order(-rr$length),]
 })

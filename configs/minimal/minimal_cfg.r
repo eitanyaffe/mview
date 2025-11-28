@@ -70,13 +70,19 @@ get_genomes_f <- function(assembly = NULL) {
 }
 
 get_segment_map_f <- function(assembly = NULL) {
-  contigs <- get_contigs_f(assembly)
-  if (is.null(contigs)) return(NULL)
-  data.frame(
-    segment = paste0("s", seq_len(nrow(contigs))),
-    gid = contigs$contig,
-    stringsAsFactors = FALSE
-  )
+  if (is.null(assembly)) return(NULL)
+  
+  # get segments (segment -> contig mapping)
+  segments <- get_segments_f(assembly)
+  if (is.null(segments)) return(NULL)
+  
+  # get contig_map (contig -> gid mapping)
+  cmap_path <- file.path(tables_dir, paste0("contig_map_table_", assembly, ".txt"))
+  if (!file.exists(cmap_path)) return(NULL)
+  contig_map <- read_cached(paste0("contigmap_", assembly), cmap_path)
+
+  ix <- match(contig_map$contig, segments$contig)
+  data.frame(segment = segments$segment[ix], gid = contig_map$gid, stringsAsFactors = FALSE)  
 }
 
 get_aln_f <- function(assembly = NULL) {

@@ -58,9 +58,10 @@ pre_plot <- function(profile) {
 post_plot <- function(gg, profile) {
   # Add vertical lines between contigs (at contig ends, not starts)
   cdf <- cxt_get_entire_view()
+  
   if (!is.null(cdf) && nrow(cdf) > 1) {
     # Only draw lines at the END of each contig (except the last one)
-    contig_ends <- cdf$end[-nrow(cdf)]  # all except last
+    contig_ends <- cdf$vend[-nrow(cdf)]  # all except last
     gg <- gg + ggplot2::geom_vline(xintercept = contig_ends, color = "gray")
   }
   gg

@@ -144,9 +144,10 @@ output$basic_info <- renderText({
       } else if (nrow(zoom_contigs) == 1) {
         # single contig - convert to local coordinates
         contig_name <- zoom_contigs$contig[1]
-        contig_start <- zoom_contigs$start[1]
-        local_start <- round(state$zoom[1] - contig_start) + 1
-        local_end <- round(state$zoom[2] - contig_start)
+        vstart <- zoom_contigs$vstart[1]
+        local_start_offset <- zoom_contigs$start[1]
+        local_start <- round(state$zoom[1] - vstart) + local_start_offset
+        local_end <- round(state$zoom[2] - vstart) + local_start_offset
         zoom_text <- sprintf("%s: %d-%d", contig_name, local_start, local_end)
       } else {
         zoom_text <- sprintf("global: %d – %d", round(state$zoom[1]), round(state$zoom[2]))

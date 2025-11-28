@@ -79,7 +79,7 @@ output$mainTabsPanel <- renderUI({
       numericInput(
         inputId = "min_contig_length",
         label = "Minimum contig length (kb)",
-        value = cache_get_if_exists("input_min_contig_length", 1000),
+        value = cache_get_if_exists("input_min_contig_length", 5),
         min = 0,
         step = 1
       ),

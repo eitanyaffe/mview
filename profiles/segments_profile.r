@@ -104,14 +104,14 @@ segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
       ggplot2::geom_text(
         data = filtered_segments,
         ggplot2::aes(
-          x = gend + (xlim[2] - xlim[1]) * 0.017,
+          x = gstart + diff(xlim) * 0.01,
           y = 0.25,
           label = id,
           text = hover_text
         ),
         color = "black",
-        size = 3,
-        hjust = 0,
+        size = 2,
+        hjust = 1,
         vjust = 0.5
       ) +
       ggplot2::ylim(-0.5, 0.6)

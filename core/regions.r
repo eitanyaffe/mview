@@ -162,10 +162,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             # spans multiple contigs or no contigs
             default_result
           } else {
-            # single contig case - compute local coordinates
+            # single contig case - convert virtual to local coordinates
             contig_name <- zoom_contigs$contig[1]
-            local_start <- round(region_row$zoom_start - zoom_contigs$start[1]) + 1
-            local_end <- round(region_row$zoom_end - zoom_contigs$start[1])
+            vstart <- zoom_contigs$vstart[1]
+            local_start_offset <- zoom_contigs$start[1]
+            local_start <- round(region_row$zoom_start - vstart) + local_start_offset
+            local_end <- round(region_row$zoom_end - vstart) + local_start_offset
             
             list(
               contig = contig_name,
@@ -496,12 +498,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             if (nrow(zoom_segments) >= 1) {
               # use contig of first segment that overlaps with zoom
               query_contig <- zoom_segments$contig[1]
-              segment_global_start <- zoom_segments$start[1]
+              vstart <- zoom_segments$vstart[1]
+              local_start_offset <- zoom_segments$start[1]
               
-              # convert global coordinates to local coordinates
-              # local_coord = global_coord - segment_global_start + 1
-              query_start <- as.integer(max(1, round(current_app_state$zoom[1] - segment_global_start) + 1))
-              query_end <- as.integer(round(current_app_state$zoom[2] - segment_global_start))
+              # convert virtual coordinates to local coordinates
+              query_start <- as.integer(max(1, round(current_app_state$zoom[1] - vstart) + local_start_offset))
+              query_end <- as.integer(round(current_app_state$zoom[2] - vstart) + local_start_offset)
               
               # ensure end is at least start
               query_end <- max(query_end, query_start)

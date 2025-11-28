@@ -21,6 +21,7 @@ get.highlight.options <- function(contigs, index, enable_highlighting = TRUE) {
 }
 
 output$contigTable <- renderDT({
+    
     dat <- get_contigs(state$assembly)
     
     # apply length filtering based on options (convert kb to bp)

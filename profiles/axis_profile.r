@@ -1,48 +1,58 @@
-  
-     # default parameters
-   default_axis_params <- list(
-     show_nt = list(
-       group_id = "axis",
-       type = "boolean",
-       default = TRUE
-     ),
-     nt_threshold = list(
-       group_id = "axis",
-       type = "integer",
-       default = 200
-     ),
-     scale_factor = list(
-       group_id = "axis",
-       type = "double",
-       default = 2
-     )
-   )
-  
+# default parameters
+default_axis_params <- list(
+  show_nt = list(
+    group_id = "axis",
+    type = "boolean",
+    default = TRUE
+  ),
+  nt_threshold = list(
+    group_id = "axis",
+    type = "integer",
+    default = 200
+  ),
+  scale_factor = list(
+    group_id = "axis",
+    type = "double",
+    default = 2
+  )
+)
+
+# compute nice tick interval for a given range
+compute_nice_interval <- function(visible_range, target_ticks = 10) {
+  if (visible_range <= 0) return(NULL)
+  raw_interval <- visible_range / target_ticks
+  magnitude <- 10^floor(log10(raw_interval))
+  normalized <- raw_interval / magnitude
+  nice <- if (normalized <= 1) 1 else if (normalized <= 2) 2 else if (normalized <= 5) 5 else 10
+  max(1, nice * magnitude)
+}
+
+# compute tick positions in local coordinates
+compute_local_ticks <- function(local_start, local_end, nice_interval) {
+  start_tick <- ceiling(local_start / nice_interval) * nice_interval
+  end_tick <- floor(local_end / nice_interval) * nice_interval
+  if (start_tick > end_tick) return(numeric(0))
+  ticks <- seq(start_tick, end_tick, by = nice_interval)
+  ticks <- unique(round(ticks))
+  ticks[ticks != 0]
+}
+
 #' Create a simple axis profile
-#' @param id Unique profile id
-#' @param name Display name
-#' @param height Height in pixels
-#' @param auto_register Whether to register immediately
-#' @return Profile object
 axis_profile <- function(id = "simple_axis",
                          name = "simple axis",
-                         height = 100, is_fixed = TRUE,
+                         height = 40, is_fixed = TRUE,
                          params = default_axis_params,
                          auto_register = TRUE) {
 
   data_f <- function() NULL
 
-  # helper function to extract sequence for a contig and range from cached fasta data
+  # extract sequence for a contig range from cached fasta
   get_sequence <- function(assembly, contig, start_pos, end_pos) {
     tryCatch({
-      # get cached fasta sequences
       sequences <- get_fasta(assembly)
+      if (is.null(sequences)) return(NULL)
       
-      if (is.null(sequences)) {
-        return(NULL)
-      }
-      
-      # find the target contig
+      # find contig in fasta
       contig_seq <- NULL
       for (seq_name in names(sequences)) {
         if (seq_name == contig || grepl(paste0("^", contig, "($|\\s)"), seq_name)) {
@@ -50,184 +60,138 @@ axis_profile <- function(id = "simple_axis",
           break
         }
       }
+      if (is.null(contig_seq)) return(NULL)
       
-      if (is.null(contig_seq)) {
-        return(NULL)
-      }
-      
-      # get the full sequence string
-      full_sequence <- as.character(contig_seq)
-      
-      # extract the requested range (1-based coordinates)
-      if (start_pos < 1) start_pos <- 1
-      if (end_pos > nchar(full_sequence)) end_pos <- nchar(full_sequence)
+      # extract range
+      full_seq <- as.character(contig_seq)
+      start_pos <- max(1, start_pos)
+      end_pos <- min(nchar(full_seq), end_pos)
       if (start_pos > end_pos) return(NULL)
-      
-      substr(full_sequence, start_pos, end_pos)
-    }, error = function(e) {
-      cat(sprintf("error reading sequence: %s\n", e$message))
-      NULL
-    })
+      substr(full_seq, start_pos, end_pos)
+    }, error = function(e) NULL)
   }
 
-  # compute coordinate annotations for the current view
+  # compute tick annotations for current view (used by hover/click handlers)
   get_annotations_f <- function(profile) {
-    contig_df_all <- cxt_get_entire_view()
-    # browser()
-    if (is.null(contig_df_all) || nrow(contig_df_all) == 0) return(NULL)
+    contig_df <- cxt_get_entire_view()
+    if (is.null(contig_df) || nrow(contig_df) == 0) return(NULL)
 
     zoom_xlim <- cxt_get_xlim()
-    if (is.null(zoom_xlim)) zoom_xlim <- c(min(contig_df_all$start), max(contig_df_all$end))
-    contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
+    if (is.null(zoom_xlim)) zoom_xlim <- c(min(contig_df$vstart), max(contig_df$vend))
+    
+    # filter to visible contigs using virtual coords
+    visible <- contig_df[contig_df$vstart < zoom_xlim[2] & contig_df$vend > zoom_xlim[1], , drop = FALSE]
+    if (nrow(visible) != 1) return(NULL)
 
-    if (nrow(contig_df) != 1) return(NULL)
-
-    contig_start <- contig_df$start[1]
-    contig_end <- contig_df$end[1]
-
-    # compute tick marks in contig-local coordinates
-    local_visible_start <- max(0, zoom_xlim[1] - contig_start)
-    local_visible_end <- min(contig_end - contig_start, zoom_xlim[2] - contig_start)
-    local_visible_range <- local_visible_end - local_visible_start
-    if (local_visible_range <= 0) return(NULL)
-
-    target_ticks <- 10
-    raw_interval <- local_visible_range / target_ticks
-    magnitude <- 10^floor(log10(raw_interval))
-    normalized <- raw_interval / magnitude
-    nice_interval <- if (normalized <= 1) {
-        1 * magnitude
-    } else if (normalized <= 2) {
-        2 * magnitude
-    } else if (normalized <= 5) {
-        5 * magnitude
-    } else {
-        10 * magnitude
-    }
-    nice_interval <- max(1, nice_interval)
-
-    start_tick_local <- ceiling(local_visible_start / nice_interval) * nice_interval
-    end_tick_local <- floor(local_visible_end / nice_interval) * nice_interval
-    local_ticks <- if (start_tick_local <= end_tick_local) {
-        seq(start_tick_local, end_tick_local, by = nice_interval)
-    } else {
-        numeric(0)
-    }
-    if (length(local_ticks) > 0) {
-        local_ticks <- round(local_ticks)
-        local_ticks <- unique(local_ticks)
-        local_ticks <- local_ticks[local_ticks != 0]
-    }
+    # compute local visible range
+    vstart <- visible$vstart[1]
+    local_start <- visible$start[1]
+    local_end <- visible$end[1]
+    local_visible_start <- max(local_start, zoom_xlim[1] - vstart + local_start)
+    local_visible_end <- min(local_end, zoom_xlim[2] - vstart + local_start)
+    
+    nice_interval <- compute_nice_interval(local_visible_end - local_visible_start)
+    if (is.null(nice_interval)) return(NULL)
+    
+    local_ticks <- compute_local_ticks(local_visible_start, local_visible_end, nice_interval)
     if (length(local_ticks) == 0) return(NULL)
 
-    global_ticks <- contig_start + local_ticks
-    cat("axis_profile: returning ", length(global_ticks), " tick positions\n")
-    return(data.frame(
-        x = global_ticks,
-        y = 0,
-        label = format(local_ticks, big.mark = ",", scientific = FALSE)
-    ))
+    # convert to virtual coords for plotting
+    global_ticks <- vstart + local_ticks - local_start
+    data.frame(
+      x = global_ticks,
+      y = 0,
+      label = format(local_ticks, big.mark = ",", scientific = FALSE)
+    )
   }
 
   plot_f <- function(profile, gg) {
-    contig_df_all <- cxt_get_entire_view()
-    if (is.null(contig_df_all) || nrow(contig_df_all) == 0) return(list(plot = gg, legends = list()))
+    contig_df <- cxt_get_entire_view()
+    if (is.null(contig_df) || nrow(contig_df) == 0) return(list(plot = gg, legends = list()))
 
+    # get zoom range in virtual coords
     xlim <- cxt_get_xlim()
-    zoom_xlim <- if (!is.null(xlim) && length(xlim) == 2) range(xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
-    contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
-
-    if (nrow(contig_df) == 0) return(list(plot = gg, legends = list()))
+    zoom_xlim <- if (!is.null(xlim) && length(xlim) == 2) {
+      range(xlim)
+    } else {
+      c(min(contig_df$vstart), max(contig_df$vend))
+    }
     
-    # get threshold parameter
-    nt_threshold <- get_param("axis", "nt_threshold")()
+    # filter to visible contigs using virtual coords
+    visible_df <- contig_df[contig_df$vstart < zoom_xlim[2] & contig_df$vend > zoom_xlim[1], , drop = FALSE]
+    if (nrow(visible_df) == 0) return(list(plot = gg, legends = list()))
+
     window_size <- zoom_xlim[2] - zoom_xlim[1] + 1
 
-    if (nrow(contig_df) == 1) {
-      name_data <- data.frame(x = (zoom_xlim[1] + zoom_xlim[2]) / 2, y = 0.45, label = contig_df$contig)
+    # add contig name labels (clip to zoom range so labels stay visible)
+    if (nrow(visible_df) == 1) {
+      name_data <- data.frame(x = (zoom_xlim[1] + zoom_xlim[2]) / 2, y = 0.45, label = visible_df$contig)
     } else {
-      name_data <- data.frame(x = (contig_df$start + contig_df$end) / 2, y = 0.55, label = contig_df$contig)
+      clipped_start <- pmax(visible_df$vstart, zoom_xlim[1])
+      clipped_end <- pmin(visible_df$vend, zoom_xlim[2])
+      name_data <- data.frame(x = (clipped_start + clipped_end) / 2, y = 0.55, label = visible_df$contig)
     }
-    gg <- gg + ggplot2::geom_text(data = name_data, ggplot2::aes(x = x, y = y, label = label), color = "black", size = 3, vjust = 0.5)
+    gg <- gg + ggplot2::geom_text(data = name_data, ggplot2::aes(x = x, y = y, label = label), 
+                                   color = "black", size = 3, vjust = 0.5)
 
-    if (nrow(contig_df) == 1) {
-      axis_start <- max(min(contig_df$start), zoom_xlim[1])
-      axis_end <- min(max(contig_df$end), zoom_xlim[2])
-      axis_line_data <- data.frame(x = axis_start, y = 0.8, xend = axis_end, yend = 0.8)
-      gg <- gg + ggplot2::geom_segment(data = axis_line_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), color = "black", size = 0.4)
-    }
+    # single contig: draw axis line and ticks
+    if (nrow(visible_df) == 1) {
+      vstart <- visible_df$vstart[1]
+      vend <- visible_df$vend[1]
+      local_start <- visible_df$start[1]
+      local_end <- visible_df$end[1]
+      
+      # axis line clipped to zoom range
+      axis_start <- max(vstart, zoom_xlim[1])
+      axis_end <- min(vend, zoom_xlim[2])
+      axis_data <- data.frame(x = axis_start, y = 0.8, xend = axis_end, yend = 0.8)
+      gg <- gg + ggplot2::geom_segment(data = axis_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), 
+                                        color = "black", size = 0.4)
 
-    if (nrow(contig_df) == 1) {
-      contig_start <- contig_df$start[1]
-      contig_end <- contig_df$end[1]
-
-      # compute tick marks in contig-local coordinates
-      local_visible_start <- floor(max(0, zoom_xlim[1] - contig_start))
-      local_visible_end <- ceiling(min(contig_end - contig_start, zoom_xlim[2] - contig_start))
-      local_visible_range <- local_visible_end - local_visible_start
-      if (local_visible_range > 0) {
-        target_ticks <- 10
-        raw_interval <- local_visible_range / target_ticks
-        magnitude <- 10^floor(log10(raw_interval))
-        normalized <- raw_interval / magnitude
-        nice_interval <- if (normalized <= 1) 1 * magnitude else if (normalized <= 2) 2 * magnitude else if (normalized <= 5) 5 * magnitude else 10 * magnitude
-        nice_interval <- max(1, nice_interval)
-
-        start_tick_local <- ceiling(local_visible_start / nice_interval) * nice_interval
-        end_tick_local <- floor(local_visible_end / nice_interval) * nice_interval
-        local_ticks <- if (start_tick_local <= end_tick_local) seq(start_tick_local, end_tick_local, by = nice_interval) else numeric(0)
-        if (length(local_ticks) > 0) {
-          local_ticks <- round(local_ticks)
-          local_ticks <- unique(local_ticks)
-          local_ticks <- local_ticks[local_ticks != 0]
-        }
-        if (length(local_ticks) > 0) {
-          tick_height <- 0.05
-          global_ticks <- contig_start + local_ticks
-          tick_data <- data.frame(x = global_ticks, y = 0.8, xend = global_ticks, yend = 0.8 - tick_height)
-          gg <- gg + ggplot2::geom_segment(data = tick_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), color = "black", size = 0.3)
+      # compute visible range in local coords
+      local_visible_start <- max(local_start, zoom_xlim[1] - vstart + local_start)
+      local_visible_end <- min(local_end, zoom_xlim[2] - vstart + local_start)
+      local_range <- local_visible_end - local_visible_start
+      
+      if (local_range > 0) {
+        # add tick marks
+        nice_interval <- compute_nice_interval(local_range)
+        if (!is.null(nice_interval)) {
+          local_ticks <- compute_local_ticks(local_visible_start, local_visible_end, nice_interval)
+          if (length(local_ticks) > 0) {
+            global_ticks <- vstart + local_ticks - local_start
+            tick_data <- data.frame(x = global_ticks, y = 0.8, xend = global_ticks, yend = 0.75)
+            gg <- gg + ggplot2::geom_segment(data = tick_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), 
+                                              color = "black", size = 0.3)
+          }
         }
         
-        # show nucleotides if enabled and window is small enough
+        # show nucleotides if zoomed in enough
         show_nt <- get_param("axis", "show_nt")()
+        nt_threshold <- get_param("axis", "nt_threshold")()
         if (show_nt && window_size <= nt_threshold) {
-          contig <- contig_df$contig[1]
+          contig <- visible_df$contig[1]
           assembly <- cxt_get_assembly()
-          cat("axis_profile: showing nucleotides for contig ", contig, " in assembly ", assembly, "\n")
-          sequence <- get_sequence(assembly, contig, 
-                                 local_visible_start, local_visible_end)
+          sequence <- get_sequence(assembly, contig, local_visible_start, local_visible_end)
           
           if (!is.null(sequence) && nchar(sequence) > 0) {
-            # create nucleotide positions and labels
-            nt_positions <- seq(local_visible_start + 1, local_visible_end)
+            nt_local_positions <- seq(local_visible_start, local_visible_start + nchar(sequence) - 1)
+            nt_global_positions <- vstart + nt_local_positions - local_start
             nt_chars <- strsplit(sequence, "")[[1]]
             
-            # limit to visible range
-            visible_indices <- nt_positions >= (zoom_xlim[1] - contig_start + 1) & 
-                             nt_positions <= (zoom_xlim[2] - contig_start + 1)
-            nt_positions <- nt_positions[visible_indices]
-            nt_chars <- nt_chars[visible_indices]
+            # font size scales with zoom
+            scale_factor <- get_param("axis", "scale_factor")()
+            font_size <- scale_factor * max(0.1, min(2.0, 100.0 / window_size))
             
-            if (length(nt_positions) > 0) {
-              global_nt_positions <- contig_start + nt_positions - 1
-              
-              # calculate font size based on zoom level to avoid collisions
-              scale_factor <- get_param("axis", "scale_factor")()
-              size_factor <- max(0.1, min(2.0, 100.0 / window_size))
-              font_size <- scale_factor * size_factor
-              
-              nt_data <- data.frame(x = global_nt_positions, y = 0.85, label = toupper(nt_chars))
-              gg <- gg + ggplot2::geom_text(data = nt_data, 
-                                          ggplot2::aes(x = x, y = y, label = label), 
-                                          color = "darkblue", size = font_size, 
-                                          family = "mono", vjust = 0.5)
-            }
+            nt_data <- data.frame(x = nt_global_positions, y = 0.85, label = toupper(nt_chars))
+            gg <- gg + ggplot2::geom_text(data = nt_data, ggplot2::aes(x = x, y = y, label = label), 
+                                           color = "darkblue", size = font_size, family = "mono", vjust = 0.5)
           }
         }
       }
     }
 
-    return(list(plot = gg + ggplot2::coord_cartesian(ylim = c(0.35, 0.9), clip = "off"), legends = list()))
+    list(plot = gg + ggplot2::coord_cartesian(ylim = c(0.35, 0.9), clip = "off"), legends = list())
   }
 
   profile_create(
