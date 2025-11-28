@@ -304,7 +304,7 @@ create_simplified_variant_legend <- function() {
 
 # unified function to plot mutations for both align and synteny profiles
 # based on align_profile_full.r mutation plotting logic
-plot_mutations_unified <- function(gg, mutation_data, profile, cxt) {
+plot_mutations_unified <- function(gg, mutation_data, profile) {
   if (is.null(mutation_data) || nrow(mutation_data) == 0) {
     return(gg)
   }
@@ -332,7 +332,8 @@ plot_mutations_unified <- function(gg, mutation_data, profile, cxt) {
   }
   
   # determine plot style based on zoom level (from align_profile_full logic)
-  xlim_range <- cxt$mapper$xlim[2] - cxt$mapper$xlim[1]
+  xlim <- cxt_get_xlim()
+  xlim_range <- xlim[2] - xlim[1]
   use_rectangles <- xlim_range < 1000
   
   if (use_rectangles) {

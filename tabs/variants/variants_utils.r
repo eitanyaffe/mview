@@ -39,15 +39,14 @@ query_variants_for_context <- function(assembly, contigs, zoom, tab_config) {
     return(NULL)
   }
   
-  # get contigs data and build context for intervals
-  contigs_table <- get_contigs(assembly)
-  if (is.null(contigs_table)) {
+  # get segments for selected contigs and build context for intervals
+  all_segments <- get_segments(assembly)
+  if (is.null(all_segments)) {
     return(NULL)
   }
-  
-  # build context for intervals
-  cxt <- build_context(contigs, contigs_table, zoom, assembly)
-  if (is.null(cxt) || is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
+  # get intervals from global context
+  intervals <- cxt_get_zoom_view()
+  if (is.null(intervals) || nrow(intervals) == 0) {
     return(NULL)
   }
   
@@ -104,7 +103,7 @@ query_variants_for_context <- function(assembly, contigs, zoom, tab_config) {
   # call aln_query_variants with alignment filter parameters
   variants_results <- aln_query_variants(
     store_list = stores,
-    intervals_df = cxt$intervals,
+    intervals_df = intervals,
     min_variants_variant_support = min_reads,
     min_variants_library_support = min_libraries,
     min_variants_coverage_support = min_coverage,
@@ -269,29 +268,26 @@ filter_variants_by_region <- function(variant_data, contigs, zoom, assembly) {
     # need to convert local coordinates to global coordinates
     contigs_table <- get_contigs(assembly)
     if (!is.null(contigs_table)) {
-      cxt <- build_context(unique(variants_df$contig), contigs_table, NULL, assembly)
-      if (!is.null(cxt) && !is.null(cxt$mapper)) {
-        # convert variant coordinates to global
-        variants_df$gcoord <- cxt$mapper$l2g(variants_df$contig, variants_df$coord)
-        
-        # filter by zoom range
-        keep_zoom <- variants_df$gcoord >= zoom[1] & variants_df$gcoord <= zoom[2]
-        variants_df <- variants_df[keep_zoom, ]
-        
-        # remove temporary gcoord column
-        variants_df$gcoord <- NULL
-        
-        if (nrow(variants_df) == 0) {
-          return(NULL)
-        }
-        
-        # filter support and coverage matrices
-        if (!is.null(variant_data$support)) {
-          variant_data$support <- variant_data$support[keep_zoom, , drop = FALSE]
-        }
-        if (!is.null(variant_data$coverage)) {
-          variant_data$coverage <- variant_data$coverage[keep_zoom, , drop = FALSE]
-        }
+      # convert variant coordinates to global using context services
+      variants_df$gcoord <- cxt_contig2global(variants_df$contig, variants_df$coord)
+      
+      # filter by zoom range
+      keep_zoom <- variants_df$gcoord >= zoom[1] & variants_df$gcoord <= zoom[2]
+      variants_df <- variants_df[keep_zoom, ]
+      
+      # remove temporary gcoord column
+      variants_df$gcoord <- NULL
+      
+      if (nrow(variants_df) == 0) {
+        return(NULL)
+      }
+      
+      # filter support and coverage matrices
+      if (!is.null(variant_data$support)) {
+        variant_data$support <- variant_data$support[keep_zoom, , drop = FALSE]
+      }
+      if (!is.null(variant_data$coverage)) {
+        variant_data$coverage <- variant_data$coverage[keep_zoom, , drop = FALSE]
       }
     }
   }

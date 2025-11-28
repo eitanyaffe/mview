@@ -92,7 +92,10 @@ observeEvent(input$goto_alignment_location_trigger, {
   # push current region to undo before changing
   regions_module_output$push_undo_state()
 
-  state$contigs <- selected_alignment$contig_id
+  # get segments for selected contig
+  segments <- get_segments(state$assembly)
+  selected_segments <- segments[segments$contig == selected_alignment$contig_id, ]
+  state$segments <- selected_segments
   gstart <- selected_alignment$contig_start
   gend <- selected_alignment$contig_end
   dd <- (gend - gstart) / 2

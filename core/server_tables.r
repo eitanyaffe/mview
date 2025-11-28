@@ -52,7 +52,7 @@ output$contigTable <- renderDT({
         dat,
         rownames = FALSE,
         selection = list(mode = selection_mode, target = "row"),
-        options = get.highlight.options(state$contigs, index, enable_highlighting)
+        options = get.highlight.options(get_state_contigs(), index, enable_highlighting)
     )
 })
 
@@ -64,26 +64,35 @@ output$genomeTable <- renderDT({
 })
 
 output$mapTable <- renderDT({
-    dat <- get_contig_map(state$assembly)
-    index <- which(names(dat) == "contig")
+    dat <- get_segment_map(state$assembly)
+    index <- which(names(dat) == "segment")
     # check if highlighting is enabled in options
     enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
+    current_segments <- get_state_segments()$segment
     datatable(
         dat,
         rownames = FALSE,
         selection = list(mode = "multiple", target = "row"),
-        options = get.highlight.options(state$contigs, index, enable_highlighting)
+        options = get.highlight.options(current_segments, index, enable_highlighting)
     )
 })
 
 output$selectedTable <- renderDT({
-    contigs_data <- get_contigs(state$assembly)
-    contig_map_data <- get_contig_map(state$assembly)
-    selected_df <- contigs_data[contigs_data$contig %in% state$contigs, ]
-    selected_df$gid_list <- sapply(selected_df$contig, function(contig) {
-        paste(contig_map_data$gid[contig_map_data$contig == contig], collapse = ", ")
+    segments_data <- get_segments(state$assembly)
+    segment_map_data <- get_segment_map(state$assembly)
+    current_segments <- get_state_segments()
+    if (is.null(current_segments) || nrow(current_segments) == 0) {
+        return(datatable(data.frame(segment = character(), contig = character(), 
+                                    length = integer(), gid_list = character()),
+                        rownames = FALSE, selection = list(mode = "multiple", target = "row")))
+    }
+    current_segment_ids <- current_segments$segment
+    selected_df <- segments_data[segments_data$segment %in% current_segment_ids, ]
+    selected_df$length <- selected_df$end - selected_df$start + 1
+    selected_df$gid_list <- sapply(selected_df$segment, function(seg) {
+        paste(segment_map_data$gid[segment_map_data$segment == seg], collapse = ", ")
     })
-    selected_df <- selected_df[, c("contig", "length", "gid_list")]
+    selected_df <- selected_df[, c("segment", "contig", "length", "gid_list")]
     datatable(selected_df,
         rownames = FALSE,
         selection = list(mode = "multiple", target = "row")

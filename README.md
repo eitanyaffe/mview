@@ -18,6 +18,17 @@ Mview is built around four key components that work together to create flexible 
 
 Users visualize their data by creating configuration files that point to their tables while using existing profiles. The architecture supports the implementation of new profiles.
 
+### Segment-based visualization
+
+mview uses a segment-based coordinate system. A **segment** is a sub-contig interval defined by a contig name, start, and end coordinates. A **bin** (or genome) is a collection of segments. The current **view** is an ordered sequence of segments that determines what is displayed in the visualization.
+
+This design enables flexible visualization of genomic regions:
+- Display arbitrary sub-regions of contigs
+- Reorder segments independently of their genomic coordinates
+- Visualize bins composed of segments from multiple contigs
+
+For simpler use cases, you can create a 1-to-1 mapping between contigs and segments (each segment spans an entire contig), effectively treating the viewer as contig-based. If you want to segment your contigs, alntools provides segmentation based on partially aligned reads (see [alntools documentation](../alntools/README.md)).
+
 ## Installation
 
 ### Installation Overview
@@ -47,10 +58,7 @@ git clone https://github.com/eitanyaffe/mview.git
 Install required packages in R:
 
 ```r
-install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui", "seqinr"))
-
-# For PDF export functionality, install patchwork package
-install.packages("patchwork")
+install.packages(c("shiny", "DT", "plotly", "ggplot2", "shinyjs", "shinyjqui", "seqinr", "patchwork", "Rcpp", "visNetwork", "sortable"))
 ```
 
 **PDF Export:**

@@ -41,14 +41,18 @@ gene_profile <- function(id, name, height = 30, is_fixed = TRUE,
     }
   }
 
-  plot_f <- function(profile, cxt, gg) {
-    genes <- gene_f(cxt)
-    if (is.null(genes)) {
+  plot_f <- function(profile, gg) {
+    # Get genes for current assembly
+    genes <- gene_f(cxt_get_assembly())
+    if (is.null(genes) || nrow(genes) == 0) {
       return(list(plot = gg, legends = list()))
     }
-    mode <- get_display_mode(cxt$mapper$xlim, profile$threshold)
+    
+    xlim <- cxt_get_xlim()
+    mode <- get_display_mode(xlim, profile$threshold)
     cat(sprintf("mode: %s\n", mode))
-    return(plot_gene_profile(profile, cxt, genes, gg, mode))
+    
+    return(plot_gene_profile(profile, genes, gg, mode))
   }
 
   # Create profile

@@ -4,10 +4,10 @@
 # Load shared utilities for mutation coloring and legends
 source("profiles/align/align_utils.r")
 
-synteny_profile_summary <- function(profile, cxt, data_list, gg, current_binsize) {
+synteny_profile_summary <- function(profile, data_list, gg, current_binsize) {
   # filter data to current view first using new function
-  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp, cxt)
-  mutations <- filter_synteny_matrix(data_list$mutations, cxt)
+  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp)
+  mutations <- filter_synteny_matrix(data_list$mutations)
   
   if (is.null(sequenced_bp) || is.null(mutations) || nrow(sequenced_bp) == 0) {
     warning("no data in current view for summary mode")
@@ -34,7 +34,7 @@ synteny_profile_summary <- function(profile, cxt, data_list, gg, current_binsize
   }
   
   # add global coordinates to summary data
-  summary_data <- filter_segments(summary_data, cxt, cxt$mapper$xlim)
+  summary_data <- cxt_filter_segments(summary_data)
   
   if (is.null(summary_data) || nrow(summary_data) == 0) {
     warning("no summary data after coordinate mapping")

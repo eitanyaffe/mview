@@ -56,7 +56,7 @@ output$resizableContainer <- renderUI({
 output$profilePlots <- renderUI({
   # Make this reactive to view changes
   req(input$view_id)
-  req(state$contigs)
+  req(nrow(get_state_segments()) > 0)
   profiles <- profiles_get_all()
   if (length(profiles) == 0) {
     return(NULL)
@@ -107,17 +107,19 @@ invalidate_plot <- function() {
 # Observer to update cached ggplot objects when data/profiles change
 observe({
   refresh_trigger()  # establish reactive dependency on manual refresh trigger
-  cxt <- build_context(
-    state_contigs = state$contigs,
-    contig_table = get_contigs(state$assembly),
-    zoom = state$zoom,
-    assembly = state$assembly
-  )
+  
+  # Update context state
+  cxt_set_assembly(state$assembly)
+  cxt_set_view(get_state_segments())
+  
+  if (!is.null(state$zoom)) {
+    cxt_set_zoom(state$zoom)
+  }
+  
   req(input$view_id)
-  req(cxt)
 
   # Update the cached plotly objects
-  update_gg_objects(cxt, profile_plotly_objects)
+  update_gg_objects(profile_plotly_objects)
   
   # mark plots as up to date after successful plotting
   plot_updated(TRUE)
@@ -139,18 +141,13 @@ observe({
 
   req(plotly_objects_result)  # Don't proceed if objects not ready
   
-  cxt <- build_context(
-    state_contigs = state$contigs,
-    contig_table = get_contigs(state$assembly),
-    zoom = state$zoom,
-    assembly = state$assembly
-  )
-  req(cxt)
+  # Context already set by previous observer
+  req(cxt_get_assembly())
 
   state$plotly_registered <- FALSE
 
   # Get combined plotly object using cached objects
-  plot_result <- plot_profiles_cached(plotly_objects_result, cxt, container_height)
+  plot_result <- plot_profiles_cached(plotly_objects_result, container_height)
   combined_plotly_obj <- if (!is.null(plot_result)) plot_result$plot else NULL
   
   # Store legends in state for the legend tab
@@ -215,16 +212,10 @@ get_current_xlim <- function(state) {
     return(state$zoom)
   }
   
-  # build context to get full range
-  cxt <- build_context(
-    state_contigs = state$contigs,
-    contig_table = get_contigs(state$assembly),
-    zoom = NULL,
-    assembly = state$assembly
-  )
-  
-  if (!is.null(cxt) && !is.null(cxt$mapper)) {
-    return(cxt$mapper$xlim)
+  # get full range from context
+  xlim <- cxt_get_xlim()
+  if (!is.null(xlim) && length(xlim) == 2) {
+    return(xlim)
   }
   
   c(0, 1000)  # fallback

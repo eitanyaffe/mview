@@ -44,7 +44,7 @@ assign_gene_colors <- function(df, profile) {
   return(df)
 }
 
-plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
+plot_gene_profile <- function(profile, genes, gg, mode) {
   if (is.null(genes) || nrow(genes) == 0) {
     return(list(plot = gg, legends = list()))
   }
@@ -55,12 +55,47 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
   df$start <- as.numeric(df$start)
   df$end <- as.numeric(df$end)
 
-  # Filter to visible range
-  df <- filter_segments(df, cxt, cxt$mapper$xlim)
-  if (is.null(df) || nrow(df) == 0) {
+  # Pre-filter: only keep genes on visible contigs
+  visible_contigs <- cxt_get_contigs()
+  df <- df[df$contig %in% visible_contigs, ]
+  
+  if (nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }
 
+  # Remove any genes with NA coordinates before transformation
+  valid_coords <- !is.na(df$contig) & !is.na(df$start) & !is.na(df$end)
+  df <- df[valid_coords, ]
+  
+  if (nrow(df) == 0) {
+    return(list(plot = gg, legends = list()))
+  }
+  
+  # Transform gene coordinates to view coordinates
+  tryCatch({
+    df <- cxt_contig2view_interval(df, "split")
+  }, error = function(e) {
+    df <<- NULL
+  })
+  if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
+    return(list(plot = gg, legends = list()))
+  }
+  
+  # Filter to visible range
+  xlim <- cxt_get_xlim()
+  if (!is.null(xlim) && length(xlim) == 2) {
+    visible <- !is.na(df$vstart) & !is.na(df$vend) & 
+               df$vstart <= xlim[2] & df$vend >= xlim[1]
+    df <- df[visible, ]
+  }
+  
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return(list(plot = gg, legends = list()))
+  }
+
+  # Rename vstart/vend to gstart/gend for backward compatibility
+  df$gstart <- df$vstart
+  df$gend <- df$vend
 
   # assign colors based on color field
   df <- assign_gene_colors(df, profile)
@@ -91,7 +126,7 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
       df <- df[sample(nrow(df), 5000), ]
       cat("sampled to 5000 genes for efficiency\n")
     }
-
+  
     # Plot genes as simple horizontal lines without strand indicators
     # draw genes as vertical segments with color based on grouping variable
     gg <- gg + ggplot2::geom_segment(
@@ -155,3 +190,4 @@ plot_gene_profile <- function(profile, cxt, genes, gg, mode) {
 
   return(list(plot = gg, legends = legends))
 }
+

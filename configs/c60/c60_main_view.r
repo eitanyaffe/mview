@@ -32,8 +32,8 @@ if (get_current_view_parameter("show_self_align")) {
   align_profile(
     id = "align_self",
     name = "Self Align",
-    aln_f = function(cxt) {
-    get_data("MINIMAP_SELF_ALN", tag = cxt$assembly, read_f = aln_load)
+    aln_f = function() {
+    get_data("MINIMAP_SELF_ALN", tag = cxt_get_assembly(), read_f = aln_load)
     },
     params = default_alignment_params
   )
@@ -43,8 +43,8 @@ make_align_profile <- function(timepoint) {
   align_profile(
     id = paste0("align_", timepoint),
     name = timepoint,
-    aln_f = function(cxt) {
-      tag <- get_map_tag(cxt$assembly, timepoint)
+    aln_f = function() {
+      tag <- get_map_tag(cxt_get_assembly(), timepoint)
       get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
     },
     params = default_alignment_params
@@ -72,8 +72,8 @@ make_align_profile_other <- function(assembly_other, timepoint) {
   align_profile(
     id = paste0("align_", assembly_other, "_", timepoint),
     name = paste0(assembly_other, " ", timepoint),
-    aln_f = function(cxt) {
-      tag <- get_map_tag_other(cxt$assembly, assembly_other, timepoint)
+    aln_f = function() {
+      tag <- get_map_tag_other(cxt_get_assembly(), assembly_other, timepoint)
       ifn = "/Users/eitany/work/makeshift-dev/export/long/pb-b20/default/minimap/v1.08/map-hifi/lib/EBC/EBN_-1/align.aln"
       aln_load(ifn)
       # get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
@@ -157,8 +157,8 @@ gene_profile(
 rrna_profile(
   id = "rrna",
   name = "rRNA",
-  get_gff_f = function(cxt) {
-    get_data("BARRNAP_TABLE", tag = cxt$assembly, null.on.missing = TRUE, read_f = read_gff_f)
+  get_gff_f = function() {
+    get_data("BARRNAP_TABLE", tag = cxt_get_assembly(), null.on.missing = TRUE, read_f = read_gff_f)
   }
 )
 

@@ -92,6 +92,7 @@ profile_create <- function(
     id, name, type, height,
     attr = list(), params = list(), plot_f = NULL, get_annotations = NULL, auto_register = FALSE, ...) {
   # Basic validation
+  
   stopifnot(
     is.character(id) && length(id) == 1 && nzchar(id),
     is.character(name) && length(name) == 1 && nzchar(name),

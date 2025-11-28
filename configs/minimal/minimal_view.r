@@ -23,8 +23,8 @@ init_alntools(verbose = FALSE)
 align_profile(
   id = "alignments",
   name = "Alignments",
-  aln_f = function(cxt) {
-    get_aln_f(cxt$assembly)
+  aln_f = function() {
+    get_aln_f(cxt_get_assembly())
   },
   height = 400,
   params = default_alignment_params
@@ -37,7 +37,7 @@ align_profile(
 gene_profile(
   id = "genes",
   name = "Genes",
-  height = default_gene_params$height$default,
+  height = 30,
   gene_f = get_genes_f,
   color_field = "tax",
   label_field = "label",

@@ -38,13 +38,14 @@ format_bp <- function(bp, digits = 1) {
 }
 
 print_region <- function(state, title = "Region", show_title = TRUE) {
-  # Format contig display based on count
-  contig_display <- if (length(state$contigs) == 0) {
+  # Format segment display based on count
+  segments <- get_state_segments()
+  segment_display <- if (nrow(segments) == 0) {
     "None"
-  } else if (length(state$contigs) == 1) {
-    as.character(state$contigs[1])
+  } else if (nrow(segments) == 1) {
+    sprintf("%s (%s:%d-%d)", segments$segment[1], segments$contig[1], segments$start[1], segments$end[1])
   } else {
-    paste(length(state$contigs), "contigs")
+    paste(nrow(segments), "segments")
   }
 
   assembly_display <- if (is.null(state$assembly) || state$assembly == "") {
@@ -61,8 +62,8 @@ print_region <- function(state, title = "Region", show_title = TRUE) {
     format_bp(dd)
   }
   basic_info <- paste0(
-    "Subject: ", assembly_display, ", Contigs: ",
-    contig_display, ", Zoom: ", zoom_display
+    "Subject: ", assembly_display, ", Segments: ",
+    segment_display, ", Zoom: ", zoom_display
   )
   if (show_title) {
     cat(title, ":", basic_info, "\n")
@@ -78,7 +79,7 @@ print_intervals <- function(intervals) {
     return()
   }
 
-  for (i in 1:nrow(intervals)) {
+  for (i in seq_len(nrow(intervals))) {
     cat(sprintf(
       "interval %d: contig=%s, start=%d, end=%d\n",
       i, intervals$contig[i], intervals$start[i], intervals$end[i]

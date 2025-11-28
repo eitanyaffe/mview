@@ -11,6 +11,10 @@ get_server <- function() {
 
         # load tabs
         load_tabs()
+        
+        # selector tab (UI function and server code - must be before server_tabs.r)
+        source("core/selector_tab.r", local = TRUE)
+        
         source("core/server_tabs.r", local = TRUE)
         source("core/server_legend.r", local = TRUE)
         
@@ -60,6 +64,22 @@ rl_core <- function(project_id) {
 
     # data
     source("core/data.r", local = FALSE)
+
+    # compile C++ context
+    if (!requireNamespace("Rcpp", quietly = TRUE)) {
+        stop("Rcpp package is required. Install with: install.packages('Rcpp')")
+    }
+    library(Rcpp)
+    Rcpp::sourceCpp("cpp/R_context.cpp", cacheDir = ".Rcpp_dir", rebuild = FALSE)
+
+    # Ensure .context_env exists globally before loading context.r
+    if (!exists(".context_env", envir = .GlobalEnv)) {
+      assign(".context_env", new.env(parent = emptyenv()), envir = .GlobalEnv)
+      .context_env$contexts <- list()
+      .context_env$current_assembly <- NULL
+      .context_env$current_context <- NULL
+      .context_env$current_segments <- NULL
+    }
 
     # context
     source("core/context.r", local = FALSE)

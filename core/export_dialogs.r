@@ -176,7 +176,11 @@ create_export_dirs <- function(output_dir, context_options, single_region_mode =
 export_region <- function(region_data, context_option, dirs, export_params, use_simple_names = FALSE) {
   # set state for this region
   if (!is.null(region_data$contigs) && region_data$contigs != "") {
-    state$contigs <- trimws(strsplit(region_data$contigs, ",")[[1]])
+    contig_list <- trimws(strsplit(region_data$contigs, ",")[[1]])
+    # get segments for these contigs
+    segments <- get_segments(state$assembly)
+    selected_segments <- segments[segments$contig %in% contig_list, ]
+    state$segments <- selected_segments
   }
 
   region_zoom <- NULL
@@ -198,16 +202,11 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     return(FALSE)
   }
   
-  # build context and plot profiles
-  cxt <- build_context(
-    state_contigs = state$contigs,
-    contig_table = get_contigs(state$assembly),
-    zoom = context_zoom,
-    assembly = state$assembly
-  )
-
-  # early return if no context
-  if (is.null(cxt)) return(FALSE)
+  # save current zoom and set export zoom temporarily
+  saved_zoom <- state$zoom
+  if (!is.null(context_zoom)) {
+    cxt_set_zoom(context_zoom)
+  }
   
   # generate region name
   region_name <- if (!is.null(region_data$id)) region_data$id else "region"
@@ -216,7 +215,7 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   # create region_info for tabs
   region_info <- list(
     assembly = state$assembly,
-    contigs = state$contigs,
+    contigs = get_state_contigs(),
     zoom = state$zoom,
     context_zoom = context_zoom,
     region_name = region_name
@@ -309,7 +308,13 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   }
   
   # NOW plot profiles (after cache has been populated by tab export functions)
-  plot_result <- plot_profiles_ggplot(cxt)
+  plot_result <- plot_profiles_ggplot()
+  
+  # restore original zoom
+  if (!is.null(saved_zoom)) {
+    cxt_set_zoom(saved_zoom)
+  }
+  
   if (is.null(plot_result) || is.null(plot_result$plot)) return(FALSE)
 
   # save profiles
@@ -580,16 +585,17 @@ observeEvent(input$confirm_export_view, {
     }
     
     # generate region name for filenames
+    current_contigs <- get_state_contigs()
     region_name <- if (!is.null(state$zoom)) {
-      paste0(paste(state$contigs, collapse = "_"), "_", 
+      paste0(paste(current_contigs, collapse = "_"), "_", 
              round(state$zoom[1]), "_", round(state$zoom[2]))
     } else {
-      paste(state$contigs, collapse = "_")
+      paste(current_contigs, collapse = "_")
     }
     region_name <- sanitize_filename(region_name)
     
     # store original state
-    original_contigs <- state$contigs
+    original_segments <- get_state_segments()
     original_zoom <- state$zoom
     original_assembly <- state$assembly
     
@@ -608,7 +614,7 @@ observeEvent(input$confirm_export_view, {
     # create region data from current state
     current_region <- list(
       id = region_name,
-      contigs = paste(state$contigs, collapse = ","),
+      contigs = paste(get_state_contigs(), collapse = ","),
       zoom_start = if (!is.null(state$zoom)) state$zoom[1] else NULL,
       zoom_end = if (!is.null(state$zoom)) state$zoom[2] else NULL,
       assembly = state$assembly
@@ -684,7 +690,7 @@ observeEvent(input$confirm_export_regions, {
     }
     
     # store original state
-    original_contigs <- state$contigs
+    original_segments <- get_state_segments()
     original_zoom <- state$zoom
     original_assembly <- state$assembly
     
@@ -725,7 +731,7 @@ observeEvent(input$confirm_export_regions, {
     }
     
     # restore original state
-    state$contigs <- original_contigs
+    state$segments <- original_segments
     state$zoom <- original_zoom
     state$assembly <- original_assembly
     

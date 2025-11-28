@@ -30,7 +30,7 @@ axis_profile <- function(id = "simple_axis",
                          params = default_axis_params,
                          auto_register = TRUE) {
 
-  data_f <- function(cxt) NULL
+  data_f <- function() NULL
 
   # helper function to extract sequence for a contig and range from cached fasta data
   get_sequence <- function(assembly, contig, start_pos, end_pos) {
@@ -71,11 +71,13 @@ axis_profile <- function(id = "simple_axis",
   }
 
   # compute coordinate annotations for the current view
-  get_annotations_f <- function(profile, cxt) {
-    if (is.null(cxt$mapper) || is.null(cxt$mapper$cdf) || nrow(cxt$mapper$cdf) == 0) return(NULL)
+  get_annotations_f <- function(profile) {
+    contig_df_all <- cxt_get_entire_view()
+    # browser()
+    if (is.null(contig_df_all) || nrow(contig_df_all) == 0) return(NULL)
 
-    contig_df_all <- cxt$mapper$cdf
-    zoom_xlim <- if (!is.null(cxt$mapper$xlim)) range(cxt$mapper$xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
+    zoom_xlim <- cxt_get_xlim()
+    if (is.null(zoom_xlim)) zoom_xlim <- c(min(contig_df_all$start), max(contig_df_all$end))
     contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
 
     if (nrow(contig_df) != 1) return(NULL)
@@ -127,11 +129,12 @@ axis_profile <- function(id = "simple_axis",
     ))
   }
 
-  plot_f <- function(profile, cxt, gg) {
-    if (is.null(cxt$mapper) || is.null(cxt$mapper$cdf) || nrow(cxt$mapper$cdf) == 0) return(list(plot = gg, legends = list()))
+  plot_f <- function(profile, gg) {
+    contig_df_all <- cxt_get_entire_view()
+    if (is.null(contig_df_all) || nrow(contig_df_all) == 0) return(list(plot = gg, legends = list()))
 
-    contig_df_all <- cxt$mapper$cdf
-    zoom_xlim <- if (!is.null(cxt$mapper$xlim)) range(cxt$mapper$xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
+    xlim <- cxt_get_xlim()
+    zoom_xlim <- if (!is.null(xlim) && length(xlim) == 2) range(xlim) else c(min(contig_df_all$start), max(contig_df_all$end))
     contig_df <- contig_df_all[contig_df_all$start < zoom_xlim[2] & contig_df_all$end > zoom_xlim[1], , drop = FALSE]
 
     if (nrow(contig_df) == 0) return(list(plot = gg, legends = list()))
@@ -189,7 +192,7 @@ axis_profile <- function(id = "simple_axis",
         show_nt <- get_param("axis", "show_nt")()
         if (show_nt && window_size <= nt_threshold) {
           contig <- contig_df$contig[1]
-          assembly <- cxt$assembly
+          assembly <- cxt_get_assembly()
           cat("axis_profile: showing nucleotides for contig ", contig, " in assembly ", assembly, "\n")
           sequence <- get_sequence(assembly, contig, 
                                  local_visible_start, local_visible_end)

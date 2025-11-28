@@ -52,6 +52,23 @@ register_contigs_f(function(assembly = NULL) {
   data.frame(contig = df$contig, length = df$length, coverage = df$coverage, circular = df$circular)
 })
 
+# Register segments function
+register_segments_f(function(assembly = NULL) {
+  df <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly)
+  if (is.null(df)) {
+    return(NULL)
+  }
+  # Return required columns: segment, contig, start, end, length
+  data.frame(
+    segment = df$segment,
+    contig = df$contig,
+    start = df$start,
+    end = df$end,
+    length = df$length,
+    stringsAsFactors = FALSE
+  )
+})
+
 # Register genomes function
 register_genomes_f(function(assembly = NULL) {
     # df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
@@ -65,15 +82,13 @@ register_genomes_f(function(assembly = NULL) {
     rr = rr[order(-rr$length),]
 })
 
-# Register contig map function
-register_contig_map_f(function(assembly = NULL) {
-    # df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
+# Register segment map function
+register_segment_map_f(function(assembly = NULL) {
     df <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly)
     if (is.null(df)) {
         return(NULL)
     }
-    # data.frame(contig = df$contig, gid = df$contig)
-    rr = data.frame(contig = df$contig, gid = df$bin)
+    rr = data.frame(segment = df$segment, gid = df$bin)
     unique(rr)
 })
 
@@ -158,10 +173,10 @@ get_mge_color <- function(prot_desc_vector, mge_groups, mge_colors) {
 }
 
 # get_genes_f used by gene profile and the gene tab
-get_genes_f <- function(cxt) {
-  cache(paste0(cxt$assembly, "_genes"), {
-    genes <- get_data("PRODIGAL_GENE_TABLE", tag = cxt$assembly)
-    uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = cxt$assembly)
+get_genes_f <- function(assembly) {
+  cache(paste0(assembly, "_genes"), {
+    genes <- get_data("PRODIGAL_GENE_TABLE", tag = assembly)
+    uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = assembly)
     ix <- match(genes$gene, uniref$gene)
     fields <- c("uniref", "identity", "coverage", "evalue", "bitscore", "prot_desc", "tax", "uniref_count")
     for (field in fields) {
@@ -231,8 +246,7 @@ get_aln_f <- function(assembly, library_id) {
 # define get_gene_table_f function for variant queries
 get_variants_gene_table_f <- function(assembly) {
   # get genes data using the existing get_genes_f function
-  cxt <- list(assembly = assembly)
-  genes_data <- get_genes_f(cxt)
+  genes_data <- get_genes_f(assembly)
 
   # convert to alntools gene table format
   gene_table <- data.frame(

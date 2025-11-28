@@ -48,6 +48,19 @@ get_contigs_f <- function(assembly = NULL) {
   data.frame(contig = df$contig, length = df$length, circular = df$circular)
 }
 
+get_segments_f <- function(assembly = NULL) {
+  contigs <- get_contigs_f(assembly)
+  if (is.null(contigs)) return(NULL)
+  data.frame(
+    segment = paste0("s", seq_len(nrow(contigs))),
+    contig = contigs$contig,
+    start = 1L,
+    end = contigs$length,
+    length = contigs$length,
+    stringsAsFactors = FALSE
+  )
+}
+
 get_genomes_f <- function(assembly = NULL) {
   if (is.null(assembly)) return(NULL)
   path <- file.path(tables_dir, paste0("genome_table_", assembly, ".txt"))
@@ -56,12 +69,14 @@ get_genomes_f <- function(assembly = NULL) {
   data.frame(gid = df$gid, length = df$length)
 }
 
-get_contig_map_f <- function(assembly = NULL) {
-  if (is.null(assembly)) return(NULL)
-  path <- file.path(tables_dir, paste0("contig_map_table_", assembly, ".txt"))
-  if (!file.exists(path)) return(NULL)
-  df <- read_cached(paste0("contigmap_", assembly), path)
-  data.frame(contig = df$contig, gid = df$gid)
+get_segment_map_f <- function(assembly = NULL) {
+  contigs <- get_contigs_f(assembly)
+  if (is.null(contigs)) return(NULL)
+  data.frame(
+    segment = paste0("s", seq_len(nrow(contigs))),
+    gid = contigs$contig,
+    stringsAsFactors = FALSE
+  )
 }
 
 get_aln_f <- function(assembly = NULL) {
@@ -133,11 +148,11 @@ mge_colors <- list(
   abx = "red"
 )
 
-get_genes_f <- function(cxt) {
+get_genes_f <- function(assembly) {
   gpath <- file.path(tables_dir, "gene_table.txt")
   if (!file.exists(gpath)) return(NULL)
   genes <- read_cached("gene_table", gpath)
-  genes <- genes[genes$assembly == cxt$assembly, ]
+  genes <- genes[genes$assembly == assembly, ]
   # select fields
   fields <- c("gene","contig","start","end","strand","uniref","identity","coverage","evalue","bitscore","prot_desc","tax","uniref_count")
   genes <- genes[, intersect(names(genes), fields)]
@@ -169,8 +184,9 @@ set_assemblies(aids)
 
 # register data functions
 register_contigs_f(get_contigs_f)
+register_segments_f(get_segments_f)
 register_genomes_f(get_genomes_f)
-register_contig_map_f(get_contig_map_f)
+register_segment_map_f(get_segment_map_f)
 register_fasta_f(get_fasta_f)
 
 ########################################################

@@ -39,10 +39,10 @@ create_detail_hover_text <- function(plot_data, profile, include_mutations = FAL
   return(hover_text)
 }
 
-synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize) {
+synteny_profile_detail <- function(profile, data_list, gg, current_binsize) {
   # filter data to current view first using new function
-  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp, cxt)
-  mutations <- filter_synteny_matrix(data_list$mutations, cxt)
+  sequenced_bp <- filter_synteny_matrix(data_list$sequenced_bp)
+  mutations <- filter_synteny_matrix(data_list$mutations)
   
   if (is.null(sequenced_bp) || is.null(mutations) || nrow(sequenced_bp) == 0) {
     warning("no data in current view for detail mode")
@@ -69,7 +69,7 @@ synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize)
   }
   
   # add global coordinates to plot data
-  plot_data <- filter_segments(plot_data, cxt, cxt$mapper$xlim)
+  plot_data <- cxt_filter_segments(plot_data)
   
   if (is.null(plot_data) || nrow(plot_data) == 0) {
     warning("no plot data after coordinate mapping")
@@ -90,13 +90,13 @@ synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize)
   
   # check if we should overlay consensus mutations
       
-  should_show_mutations <- should_show_consensus_mutations(cxt, profile)
+  should_show_mutations <- should_show_consensus_mutations(profile)
 
   if (should_show_mutations && profile$show_mutations) {
     # only load consensus data when we actually need it
-    consensus_data <- load_consensus_data(profile$consensus_f, cxt, current_binsize)
+    consensus_data <- load_consensus_data(profile$consensus_f, current_binsize)
     if (!is.null(consensus_data)) {
-        mutation_plot_data <- prepare_consensus_mutation_data(plot_data, consensus_data, cxt, profile, current_binsize)
+        mutation_plot_data <- prepare_consensus_mutation_data(plot_data, consensus_data, profile, current_binsize)
         if (!is.null(mutation_plot_data) && nrow(mutation_plot_data) > 0) {
           # build hover text for synteny-specific format
           if (profile$show_hover) {
@@ -117,7 +117,7 @@ synteny_profile_detail <- function(profile, cxt, data_list, gg, current_binsize)
           mutation_plot_data$ytop <- mutation_plot_data$y_pos + 0.5 - bin_gap
           mutation_plot_data$gcoord <- mutation_plot_data$coord
           
-          gg <- plot_mutations_unified(gg, mutation_plot_data, profile, cxt)
+          gg <- plot_mutations_unified(gg, mutation_plot_data, profile)
         }
     }
   }
@@ -274,19 +274,20 @@ add_library_labels <- function(gg, lib_cols) {
 }
 
 # check if consensus mutations should be shown based on zoom level
-should_show_consensus_mutations <- function(cxt, profile) {
-  if (is.null(cxt$mapper$xlim) || length(cxt$mapper$xlim) != 2) {
+should_show_consensus_mutations <- function(profile) {
+  xlim <- cxt_get_xlim()
+  if (is.null(xlim) || length(xlim) != 2) {
     return(FALSE)
   }
   
-  range_bp <- (cxt$mapper$xlim[2] + 1) - cxt$mapper$xlim[1]
+  range_bp <- (xlim[2] + 1) - xlim[1]
   return(range_bp <= profile$full_threshold)
 }
 
 
 
 # prepare consensus mutation data for plotting with efficient filtering
-prepare_consensus_mutation_data <- function(plot_data, consensus_data, cxt, profile, current_binsize) {
+prepare_consensus_mutation_data <- function(plot_data, consensus_data, profile, current_binsize) {
   if (is.null(consensus_data) || nrow(consensus_data) == 0) {
     return(NULL)
   }
@@ -324,7 +325,7 @@ prepare_consensus_mutation_data <- function(plot_data, consensus_data, cxt, prof
   )
   
   # map genomic coordinates
-  mutation_plot_data <- filter_coords(mutation_plot_data, cxt, cxt$mapper$xlim)
+  mutation_plot_data <- cxt_filter_coords(mutation_plot_data)
   
   return(mutation_plot_data)
 }

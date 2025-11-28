@@ -1,131 +1,441 @@
-get_intervals <- function(mapper, zoom) {
-  cdf <- mapper$cdf
-  if (!is.null(zoom)) {
-    cdf <- cdf[cdf$start <= zoom[2] & cdf$end >= zoom[1], ]
-    cdf$start <- pmax(cdf$start, zoom[1])
-    cdf$end <- pmin(cdf$end, zoom[2])
-  }
-  start_rr <- mapper$g2l(cdf$start + 1)
-  end_rr <- mapper$g2l(cdf$end)
-  
-  # create intervals dataframe with validation
-  start_coords <- start_rr$coord + 1
-  end_coords <- end_rr$coord
-  
-  # ensure end >= start for all intervals
-  end_coords <- pmax(end_coords, start_coords)
-  
-  rr <- data.frame(contig = cdf$contig, start = start_coords, end = end_coords)
+# Context API - Service-oriented design
+# Profiles and tabs call context services; they never create contexts.
+
+# Private storage for contexts - PERSIST across reloads
+if (!exists(".context_env")) {
+  .context_env <- new.env(parent = emptyenv())
+  .context_env$current_assembly <- NULL
+  .context_env$contexts <- list()  # keyed by assembly ID
+  .context_env$current_context <- NULL
+  .context_env$current_segments <- NULL
+  cat("[context.r] Created fresh context environment\n")
+} else {
+  cat("[context.r] Reusing existing context environment\n")
 }
 
-build_context <- function(state_contigs, contig_table, zoom, assembly) {
-  req(state_contigs)
-  req(contig_table)
-  valid_contigs <- state_contigs[state_contigs %in% contig_table$contig]
-  if (length(valid_contigs) == 0) {
-    return(NULL)
+# Merge C++ result back to input df using key columns (match pattern)
+merge_context_result <- function(df_input, df_result, key_cols) {
+  if (is.null(df_input) || nrow(df_input) == 0) {
+    return(df_result)
   }
-
-  cdf <- contig_table[match(valid_contigs, contig_table$contig), ]
-
-  if (nrow(cdf) == 0) {
-    return(NULL)
+  
+  if (is.null(df_result) || nrow(df_result) == 0) {
+    return(df_input)
   }
-  cdf$start <- cumsum(c(0, head(cdf$length, -1)))
-  cdf$end <- cdf$start + cdf$length
-  mapper <- list(
-    g2l = function(gcoords) {
-      ii <- findInterval(gcoords, c(cdf$start, Inf), left.open = TRUE, all.inside = TRUE)
-      if (any(ii <= 0 | ii > nrow(cdf))) stop("Some coordinate indices are out of range")
-      data.frame(contig = cdf$contig[ii], coord = gcoords - cdf$start[ii], gcoord = gcoords)
-    },
-    l2g = function(contigs, coords) {
-      idx <- match(contigs, cdf$contig)
-      if (any(is.na(idx))) {
-        browser()
-        stop(sprintf(
-          "Some contigs are not found in the contig table: %s",
-          paste(contigs[is.na(idx)], collapse = ", ")
-        ))
-      }
-      cdf$start[idx] + coords
-    },
-    cdf = cdf
-  )
+  
+  # Create key columns in both data frames
+  df_input$..key.. <- do.call(paste, c(df_input[key_cols], sep = "|"))
+  df_result$..key.. <- do.call(paste, c(df_result[key_cols], sep = "|"))
+  
+  # Find matches: for each result row, find matching input row index
+  # This handles 1:many by allowing multiple result rows to match same input row
+  result_cols <- setdiff(names(df_result), c(key_cols, "..key.."))
+  
+  # Build output by matching each result row to input
+  # For 1:many mappings, we replicate input rows
+  input_ix <- match(df_result$..key.., df_input$..key..)
+  
+  if (any(is.na(input_ix))) {
+    # Result rows without input match should not happen
+    missing_keys <- unique(df_result$..key..[is.na(input_ix)])
+    stop(sprintf("internal: result rows have no input match for %d keys, e.g. %s",
+                 length(missing_keys), paste(head(missing_keys, 5), collapse = ", ")))
+  }
+  
+  # Start with input rows (replicated for 1:many case)
+  merged <- df_input[input_ix, , drop = FALSE]
+  
+  # Add result columns
+  for (col in result_cols) {
+    merged[[col]] <- df_result[[col]]
+  }
+  
+  # Remove temporary key column
+  merged$..key.. <- NULL
+  
+  return(merged)
+}
 
-  if (!is.null(zoom)) {
-    mapper$xlim <- range(zoom)
+################################################################################
+# SETTERS
+################################################################################
+
+# Set current assembly and initialize context with contig/segment tables
+cxt_set_assembly <- function(assembly_id) {
+  if (is.null(assembly_id) || assembly_id == "") {
+    .context_env$current_assembly <- NULL
+    .context_env$current_context <- NULL
+    .context_env$current_segments <- NULL
+    cat("[cxt_set_assembly] Assembly ID is NULL or empty, context reset.\n")
+    return(invisible(FALSE))
+  }
+  
+  
+  # Check if context already exists for this assembly
+  if (!is.null(.context_env$contexts[[assembly_id]])) {
+    cat(sprintf("[cxt_set_assembly] Reusing existing context for assembly '%s'\n", assembly_id))
+    .context_env$current_assembly <- assembly_id
+    .context_env$current_context <- .context_env$contexts[[assembly_id]]
   } else {
-    mapper$xlim <- range(cdf$start, cdf$end)
+    cat(sprintf("[cxt_set_assembly] Creating new context for assembly '%s'\n", assembly_id))
+    # Create new context pointer (once per assembly)
+    .context_env$contexts[[assembly_id]] <- context_create()  # No parameters
+    .context_env$current_assembly <- assembly_id
+    .context_env$current_context <- .context_env$contexts[[assembly_id]]
   }
-  intervals <- get_intervals(mapper, zoom)
-  list(mapper = mapper, zoom = zoom, contigs = valid_contigs, assembly = assembly, intervals = intervals)
+  
+  # Always update tables (in case data changed)
+  contig_table <- get_contigs(assembly_id)
+  full_segments <- get_segments(assembly_id)
+  
+  # make sure contig table only contains contigs that are in the segments table
+  ix = match(unique(full_segments$contig), contig_table$contig)
+  if (any(is.na(ix))) {
+    stop(sprintf("Cannot get contigs for assembly '%s'", assembly_id))
+  }
+  contig_table = contig_table[ix, ]
+
+  if (is.null(contig_table) || nrow(contig_table) == 0) {
+    stop(sprintf("Cannot get contigs for assembly '%s'", assembly_id))
+  }
+  if (is.null(full_segments) || nrow(full_segments) == 0) {
+    stop(sprintf("Cannot get segments for assembly '%s'", assembly_id))
+  }
+  
+  # Ensure full_segments has 'length' column
+  if (!"length" %in% names(full_segments)) {
+    full_segments$length <- full_segments$end - full_segments$start + 1
+  }
+  
+  # Validate contig and segment table organization
+  segment_contigs <- unique(full_segments$contig)
+  contig_table_contigs <- contig_table$contig
+  
+  # Check that unique contigs in segments match contigs in contig table
+  contigs_only_in_contig_table <- setdiff(contig_table_contigs, segment_contigs)
+  contigs_only_in_segments_table <- setdiff(segment_contigs, contig_table_contigs)
+  if (length(segment_contigs) != length(contig_table_contigs) || !all(segment_contigs == contig_table_contigs)) {
+    stop(
+      sprintf(
+        paste0(
+          "Assembly error: contig sets in contig table and segment table do not match.\n",
+          " - Number of contigs in contig table: %d\n",
+          " - Number of unique contigs in segments table: %d\n",
+          " - Contigs in contig table only: %s\n",
+          " - Contigs in segments table only: %s\n",
+          "This usually indicates a problem in your assembly data.\n",
+          "Please check that the 'contig' column in both the contig table and segment table have exactly matching entries."
+        ),
+        length(contig_table_contigs),
+        length(segment_contigs),
+        paste(contigs_only_in_contig_table, collapse = ", "),
+        paste(contigs_only_in_segments_table, collapse = ", ")
+      )
+    )
+  }
+  
+  # Check that total segment lengths match total contig lengths
+  total_segment_length <- sum(full_segments$length)
+  total_contig_length <- sum(contig_table$length)
+  if (total_segment_length != total_contig_length) {
+    stop("error: total segment lengths do not match total contig lengths")
+  }
+  
+  cat(sprintf("[cxt_set_assembly] Setting tables: %d contigs, %d segments\n", 
+              nrow(contig_table), nrow(full_segments)))
+  
+  # Initialize/update the context with current tables
+  context_set_tables(.context_env$current_context, full_segments, contig_table)
+  
+  # Reset segments when assembly changes
+  .context_env$current_segments <- NULL
+  
+  # Reset zoom to full range of the new assembly
+  cxt_set_zoom(NULL)
+  
+  invisible(TRUE)
 }
 
-# Safely filters point data and adds global coordinates
-filter_coords <- function(df, cxt, xlim = NULL) {
+# Set selected segments for the current view
+cxt_set_view <- function(selected_segments) {
+  if (is.null(.context_env$current_assembly)) {
+    warning("cxt_set_view: assembly not set, call cxt_set_assembly first")
+    return(invisible(FALSE))
+  }
+  
+  if (is.null(selected_segments) || nrow(selected_segments) == 0) {
+    cat("[cxt_set_view] empty segments, clearing view\n")
+    .context_env$current_segments <- data.frame(
+      segment = character(),
+      contig = character(),
+      start = integer(),
+      end = integer(),
+      stringsAsFactors = FALSE
+    )
+    context_update_selected_segments(.context_env$current_context, 
+                                    .context_env$current_segments, 
+                                    numeric())
+    return(invisible(TRUE))
+  }
+  
+  # Validate columns
+  if (!all(c("segment", "contig", "start", "end") %in% names(selected_segments))) {
+    warning("cxt_set_view: selected_segments must have columns: segment, contig, start, end")
+    return(invisible(FALSE))
+  }
+  
+  # Filter to valid contigs
+  contig_table <- get_contigs(.context_env$current_assembly)
+  plotted_segments <- selected_segments[selected_segments$contig %in% contig_table$contig, ]
+  
+  cat(sprintf("[cxt_set_view] Setting view with %d segments (from %d input segments)\n", 
+              nrow(plotted_segments), nrow(selected_segments)))
+  
+  # Store for cxt_set_zoom
+  .context_env$current_segments <- plotted_segments
+  
+  # Update C++ context (no zoom yet)
+  context_update_selected_segments(.context_env$current_context, plotted_segments, numeric())
+  
+  invisible(TRUE)
+}
+
+# Set zoom level (xlim) for the current view
+cxt_set_zoom <- function(xlim) {
+  if (is.null(.context_env$current_assembly)) {
+    warning("cxt_set_zoom: assembly not set, call cxt_set_assembly first")
+    return(invisible(FALSE))
+  }
+  
+  if (is.null(.context_env$current_segments)) {
+    warning("cxt_set_zoom: view not set, call cxt_set_view first")
+    return(invisible(FALSE))
+  }
+  
+  zoom_vec <- if (!is.null(xlim) && length(xlim) == 2) {
+    as.numeric(xlim)
+  } else {
+    numeric()
+  }
+  
+  if (length(zoom_vec) == 2) {
+    cat(sprintf("[cxt_set_zoom] Setting zoom to [%.0f, %.0f]\n", zoom_vec[1], zoom_vec[2]))
+  } else {
+    cat("[cxt_set_zoom] Resetting zoom to full range\n")
+  }
+  
+  # Update context with same segments but new zoom
+  context_update_selected_segments(.context_env$current_context, 
+                                  .context_env$current_segments, 
+                                  zoom_vec)
+  
+  invisible(TRUE)
+}
+
+################################################################################
+# GETTERS
+################################################################################
+
+# Get current assembly ID
+cxt_get_assembly <- function() {
+  .context_env$current_assembly
+}
+
+# Get current xlim (zoom range in vcoord)
+cxt_get_xlim <- function() {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_get_xlim: no current context")
+    return(c(0, 0))
+  }
+  
+  context_get_xlim(.context_env$current_context)
+}
+
+# Get entire view intervals (all plotted segments, no xlim clipping)
+cxt_get_entire_view <- function(merge_adjacent = TRUE) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_get_entire_view: no current context")
+    return(data.frame(vstart = numeric(), vend = numeric(), contig = character(), 
+                      start = integer(), end = integer(), segment_ids = character(), 
+                      n_segments = integer()))
+  }
+  
+  context_get_view_intervals(.context_env$current_context, FALSE, merge_adjacent)
+}
+
+# Get zoom view intervals (clipped to xlim)
+cxt_get_zoom_view <- function(merge_adjacent = TRUE) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_get_zoom_view: no current context")
+    return(data.frame(vstart = numeric(), vend = numeric(), contig = character(), 
+                      start = integer(), end = integer(), segment_ids = character(), 
+                      n_segments = integer()))
+  }
+  
+  context_get_view_intervals(.context_env$current_context, TRUE, merge_adjacent)
+}
+
+# Get raw plotted segments from C++ (low-level)
+cxt_get_plotted_segments <- function() {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_get_plotted_segments: no current context")
+    return(data.frame())
+  }
+  
+  context_get_plotted_segments(.context_env$current_context)
+}
+
+# Get unique contigs in current view
+cxt_get_contigs <- function() {
+  if (is.null(.context_env$current_segments)) {
+    warning("cxt_get_contigs: no current segments")
+    return(character())
+  }
+  
+  unique(.context_env$current_segments$contig)
+}
+
+# Get segment IDs in current view
+cxt_get_segments <- function() {
+  if (is.null(.context_env$current_segments)) {
+    warning("cxt_get_segments: no current segments")
+    return(character())
+  }
+  
+  .context_env$current_segments$segment
+}
+
+################################################################################
+# COORD TRANSFORMERS
+################################################################################
+
+# Convert contig coords to global vcoords
+cxt_contig2global <- function(contigs, coords) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_contig2global: no current context")
+    return(rep(NA_real_, length(contigs)))
+  }
+  
+  df <- data.frame(contig = contigs, coord = coords, stringsAsFactors = FALSE)
+  df_minimal <- df[c("contig", "coord")]
+  result_minimal <- context_contig2view_point(.context_env$current_context, df_minimal)
+  result <- merge_context_result(df, result_minimal, c("contig", "coord"))
+  result$vcoord
+}
+
+# Convert global vcoords to contig coords
+cxt_global2contig <- function(gcoords) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_global2contig: no current context")
+    return(data.frame(contig = character(), coord = integer(), gcoord = numeric()))
+  }
+  
+  df <- data.frame(vcoord = gcoords)
+  df_minimal <- df[c("vcoord")]
+  result_minimal <- context_view2contig_point(.context_env$current_context, df_minimal)
+  result <- merge_context_result(df, result_minimal, c("vcoord"))
+  data.frame(
+    contig = result$contig,
+    coord = result$coord,
+    gcoord = gcoords,
+    stringsAsFactors = FALSE
+  )
+}
+
+################################################################################
+# INTERVAL FUNCTIONS
+################################################################################
+
+# Convert contig intervals to vcoord intervals
+cxt_contig2view_interval <- function(df, crossing_intervals = "drop") {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_contig2view_interval: no current context")
+    return(data.frame())
+  }
+  
+  if (is.null(df) || nrow(df) == 0) {
+    return(data.frame())
+  }
+  
+  df_minimal <- df[c("contig", "start", "end")]
+  result_minimal <- context_contig2view_interval(.context_env$current_context, df_minimal, crossing_intervals)
+  merge_context_result(df, result_minimal, c("contig", "start", "end"))
+}
+
+# Filter point coords to current xlim and add vcoord
+cxt_filter_coords <- function(df) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_filter_coords: no current context")
+    return(NULL)
+  }
+  
   if (is.null(df) || nrow(df) == 0) {
     return(NULL)
   }
-
-  # Check required columns
+  
   if (!all(c("contig", "coord") %in% names(df))) {
-    warning("missing required columns in filter_coords: contig, coord")
+    warning("cxt_filter_coords: df must have columns: contig, coord")
     return(NULL)
   }
-
-  # Map contig names to those in context
-  df <- df[df$contig %in% cxt$mapper$cdf$contig, ]
-  if (nrow(df) == 0) {
+  
+  df_minimal <- df[c("contig", "coord")]
+  xlim <- cxt_get_xlim()
+  xlim_vec <- if (length(xlim) == 2) as.numeric(xlim) else numeric()
+  result_minimal <- context_filter_coords(.context_env$current_context, df_minimal, xlim_vec)
+  
+  if (is.null(result_minimal) || nrow(result_minimal) == 0) {
     return(NULL)
   }
-
-  # Add global coordinates
-  df$gcoord <- cxt$mapper$l2g(df$contig, df$coord)
-
-  # Filter by xlim if provided
-  if (!is.null(xlim)) {
-    in_range <- df$gcoord >= xlim[1] & df$gcoord <= xlim[2]
-    if (!any(in_range)) {
-      return(NULL)
-    }
-    df <- df[in_range, ]
+  
+  result <- merge_context_result(df, result_minimal, c("contig", "coord"))
+  
+  # Add gcoord for backward compatibility
+  if ("vcoord" %in% names(result)) {
+    result$gcoord <- result$vcoord
   }
-
-  return(df)
+  
+  result
 }
 
-# Safely filters segment data and adds global coordinates
-filter_segments <- function(df, cxt, xlim = NULL) {
+# Filter interval segments to current xlim and add vstart/vend
+cxt_filter_segments <- function(df) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_filter_segments: no current context")
+    return(NULL)
+  }
+  
   if (is.null(df) || nrow(df) == 0) {
     return(NULL)
   }
-
-  # Check required columns
+  
   if (!all(c("contig", "start", "end") %in% names(df))) {
-    warning("missing required columns in filter_segments: contig, start, end")
+    warning("cxt_filter_segments: df must have columns: contig, start, end")
     return(NULL)
   }
-
-  # Map contig names to those in context
-  df <- df[df$contig %in% cxt$mapper$cdf$contig, ]
-  if (nrow(df) == 0) {
+  
+  df_minimal <- df[c("contig", "start", "end")]
+  xlim <- cxt_get_xlim()
+  xlim_vec <- if (length(xlim) == 2) as.numeric(xlim) else numeric()
+  result_minimal <- context_filter_segments(.context_env$current_context, df_minimal, xlim_vec)
+  
+  if (is.null(result_minimal) || nrow(result_minimal) == 0) {
     return(NULL)
   }
-
-  # Add global coordinates
-  df$gstart <- cxt$mapper$l2g(df$contig, df$start)
-  df$gend <- cxt$mapper$l2g(df$contig, df$end)
-
-  # Filter by xlim if provided
-  if (!is.null(xlim)) {
-    # Keep segments with any overlap with xlim (partial or complete)
-    has_overlap <- df$gstart <= xlim[2] & df$gend >= xlim[1]
-    if (!any(has_overlap)) {
-      return(NULL)
-    }
-    df <- df[has_overlap, ]
+  
+  result <- merge_context_result(df, result_minimal, c("contig", "start", "end"))
+  
+  # Add gstart/gend for backward compatibility
+  if ("vstart" %in% names(result)) {
+    result$gstart <- result$vstart
   }
-
-  return(df)
+  if ("vend" %in% names(result)) {
+    result$gend <- result$vend
+  }
+  
+  result
 }
+
+################################################################################
+# VIEW INTERVALS
+################################################################################
+

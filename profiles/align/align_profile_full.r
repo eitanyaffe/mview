@@ -26,7 +26,7 @@ get_alignment_colors <- function(alignments, chunks, style) {
   }
 }
 
-align_query_full_mode <- function(aln, cxt, 
+align_query_full_mode <- function(aln, 
 height_style_str = "by_mutations", 
 max_reads = 1000,
 clip_mode = "all",
@@ -39,6 +39,9 @@ max_margin = 10,
 chunk_type = "break_on_overlap",
 min_indel_length = 3) {
   
+  intervals <- cxt_get_zoom_view()
+  xlim <- cxt_get_xlim()
+  
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
   aln_id <- if (is(aln, "externalptr")) {
@@ -50,7 +53,7 @@ min_indel_length = 3) {
   cache_key <- paste0("full_query_",
                      digest::digest(list(
                        aln_id = aln_id,
-                       xlim = cxt$mapper$xlim,
+                       xlim = xlim,
                        height_style_str = height_style_str,
                        max_reads = max_reads,
                        clip_mode = clip_mode,
@@ -63,10 +66,10 @@ min_indel_length = 3) {
                        chunk_type = chunk_type,
                        min_indel_length = min_indel_length
                      ), algo = "md5"))
-
+  
   # Use cache for the full query
   df <- cache(cache_key, {
-    aln_query_full(aln, cxt$intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_margin), chunk_type, as.integer(min_indel_length))
+    aln_query_full(aln, intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_margin), chunk_type, as.integer(min_indel_length))
   })
   cat(sprintf("done with aln_query_full\n"))
   
@@ -78,7 +81,7 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates  
     alns$start <- alns$contig_start
     alns$end <- alns$contig_end
-    alignments <- filter_segments(alns, cxt, cxt$mapper$xlim)
+    alignments <- cxt_filter_segments(alns)
   }
 
   # Process mutations
@@ -88,7 +91,7 @@ min_indel_length = 3) {
     muts$contig <- muts$contig_id
     # alntools full mode outputs 1-based coordinates
     muts$coord <- muts$position
-    mutations <- filter_coords(muts, cxt, cxt$mapper$xlim)
+    mutations <- cxt_filter_coords(muts)
   }
 
   # Process reads
@@ -99,7 +102,7 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates
     reads$start <- reads$span_start
     reads$end <- reads$span_end
-    reads <- filter_segments(reads, cxt, cxt$mapper$xlim)
+    reads <- cxt_filter_segments(reads)
   }
 
   # Process chunks
@@ -110,13 +113,14 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates
     chunks$start <- chunks$span_start
     chunks$end <- chunks$span_end
-    chunks <- filter_segments(chunks, cxt, cxt$mapper$xlim)
+    chunks <- cxt_filter_segments(chunks)
   }
 
   return(list(alignments = alignments, mutations = mutations, reads = reads, chunks = chunks))
 }
 
-align_profile_full <- function(profile, cxt, aln, gg) {
+align_profile_full <- function(profile, aln, gg) {
+  intervals <- cxt_get_zoom_view()
   height_style <- profile$height_style
   if (!is.element(height_style, c("by_mutations", "by_coord_left", "by_coord_right"))) {
     height_style <- "by_mutations"
@@ -124,7 +128,6 @@ align_profile_full <- function(profile, cxt, aln, gg) {
 
   df <- align_query_full_mode(
     aln = aln, 
-    cxt = cxt, 
     height_style = height_style, 
     max_reads = profile$max_reads, 
     clip_mode = profile$clip_mode,
@@ -177,8 +180,9 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     alignments$rect_ymax <- alignments$height + 1
 
     # determine clipped status
-    left_in_plot = alignments$gstart > cxt$mapper$xlim[1]
-    right_in_plot = alignments$gend < cxt$mapper$xlim[2]
+    xlim <- cxt_get_xlim()
+    left_in_plot = alignments$gstart > xlim[1]
+    right_in_plot = alignments$gend < xlim[2]
 
     clip_read_start = alignments$read_start > 0
     clip_read_end = alignments$read_end < alignments$read_length
@@ -206,7 +210,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     }
 
     # determine if we should show gray borders based on view range
-    range_bp <- (cxt$mapper$xlim[2] + 1) - cxt$mapper$xlim[1]
+    range_bp <- (xlim[2] + 1) - xlim[1]
     show_borders <- range_bp <= 200000  # show borders only under 1Mb
     border_color <- if (show_borders) "gray50" else NA
     
@@ -279,7 +283,7 @@ align_profile_full <- function(profile, cxt, aln, gg) {
     mutations$ytop <- mutations$height + 1
 
     # use unified mutation plotting function
-    gg <- plot_mutations_unified(gg, mutations, profile, cxt)
+    gg <- plot_mutations_unified(gg, mutations, profile)
   }
   
   # apply force_max_y if set

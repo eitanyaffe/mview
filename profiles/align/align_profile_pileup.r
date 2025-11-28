@@ -1,6 +1,9 @@
 # Pileup mode for alignment profile
 
-align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, min_indel_length = 3) {
+align_query_pileup_mode <- function(aln, report_mode_str = "all", clip_mode = "all", clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, max_alignment_length = 0, min_indel_length = 3) {
+  intervals <- cxt_get_zoom_view()
+  xlim <- cxt_get_xlim()
+  
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
   aln_id <- if (is(aln, "externalptr")) {
@@ -12,7 +15,7 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode
   cache_key <- paste0("pileup_query_",
                      digest::digest(list(
                        aln_id = aln_id,
-                       xlim = cxt$mapper$xlim,
+                       xlim = xlim,
                        report_mode_str = report_mode_str,
                        clip_mode = clip_mode,
                        clip_margin = clip_margin,
@@ -25,20 +28,21 @@ align_query_pileup_mode <- function(aln, cxt, report_mode_str = "all", clip_mode
 
   # Use cache for the pileup query
   df <- cache(cache_key, {
-    aln_query_pileup(aln, cxt$intervals, report_mode_str = report_mode_str, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length), min_indel_length = as.integer(min_indel_length))
+    aln_query_pileup(aln, intervals, report_mode_str = report_mode_str, clip_mode_str = clip_mode, clip_margin = clip_margin, min_mutations_percent = as.numeric(min_mutations_percent), max_mutations_percent = as.numeric(max_mutations_percent), min_alignment_length = as.integer(min_alignment_length), max_alignment_length = as.integer(max_alignment_length), min_indel_length = as.integer(min_indel_length))
   })
 
   if (!is.null(df) && nrow(df) > 0) {
     # alntools pileup outputs 1-based coordinates
     df$coord <- df$position
-    return(filter_coords(df, cxt, cxt$mapper$xlim))
+    return(cxt_filter_coords(df))
   }
 
   return(NULL)
 }
 
-align_profile_pileup <- function(profile, cxt, aln, gg) {
-    df <- align_query_pileup_mode(aln, cxt, report_mode_str = "all", 
+align_profile_pileup <- function(profile, aln, gg) {
+  intervals <- cxt_get_zoom_view()
+    df <- align_query_pileup_mode(aln, report_mode_str = "all", 
                                 clip_mode = profile$clip_mode, 
                                 clip_margin = profile$clip_margin,
                                 min_mutations_percent = as.numeric(profile$min_mutations_percent), 

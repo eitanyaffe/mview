@@ -232,22 +232,24 @@ align_profile <- function(id, name, is_fixed = FALSE,
     }
   }
 
-  plot_f <- function(profile, cxt, gg) {
+  plot_f <- function(profile, gg) {
     # Check that intervals dataframe has at least one row
-    if (is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
+    intervals <- cxt_get_zoom_view()
+    if (is.null(intervals) || !is.data.frame(intervals) || nrow(intervals) == 0) {
       warning("intervals dataframe is empty")
       return(list(plot = gg, legends = list()))
     }
 
-    aln <- if (is.function(aln_f)) aln_f(cxt) else aln_f
+    aln <- if (is.function(aln_f)) aln_f() else aln_f
 
     # !!! we have multiple alignments, we need to get the correct one
     cache_set("aln_obj", aln)
     
-  if (any(!is.element(cxt$contigs, aln_get_contigs(aln)$contig_id))) {
-    warning("contigs not found in alignment")
-    return(list(plot = gg, legends = list()))
-  }
+    contigs <- cxt_get_contigs()
+    if (any(!is.element(contigs, aln_get_contigs(aln)$contig_id))) {
+      warning("contigs not found in alignment")
+      return(list(plot = gg, legends = list()))
+    }
 
 
     if (is.null(aln) || !inherits(aln, "externalptr")) {
@@ -255,16 +257,17 @@ align_profile <- function(id, name, is_fixed = FALSE,
       return(list(plot = gg, legends = list()))
     }
 
-    mode <- get_display_mode(cxt$mapper$xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style, profile$use_pileup)
+    xlim <- cxt_get_xlim()
+    mode <- get_display_mode(xlim, profile$full_threshold, profile$pileup_threshold, profile$plot_style, profile$use_pileup)
     cat(sprintf("mode: %s\n", mode))
 
     # Call mode-specific plot function
     if (mode == "full") {
-      return(align_profile_full(profile, cxt, aln, gg))
+      return(align_profile_full(profile, aln, gg))
     } else if (mode == "pileup") {
-      return(align_profile_pileup(profile, cxt, aln, gg))
+      return(align_profile_pileup(profile, aln, gg))
     } else { # mode == "bin"
-      return(align_profile_bin(profile, cxt, aln, gg))
+      return(align_profile_bin(profile, aln, gg))
     }
   }
 

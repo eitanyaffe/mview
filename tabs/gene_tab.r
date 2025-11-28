@@ -14,16 +14,10 @@ set_tab_panel_f(function() {
   )
 })
 
-# function to get genes for the current context (assembly, contigs, zoom)
+# function to get genes for the current context (uses global context)
 get_genes_for_context <- function(assembly, contigs, zoom) {
-  # early return if no assembly or contigs
-  if (is.null(assembly) || length(contigs) == 0) {
-    return(NULL)
-  }
-
-  # get contigs data and build context
-  contigs_table <- get_contigs(assembly)
-  if (is.null(contigs_table)) {
+  # early return if no assembly
+  if (is.null(assembly)) {
     return(NULL)
   }
 
@@ -31,10 +25,9 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
   if (is.null(tab$get_genes_f)) {
     stop("get_genes_f is not defined for tab ", tab$tab_id)
   }
-  # get gene data using the tab's gene function if provided
-  cxt <- build_context(contigs, contigs_table, zoom, assembly)
-  if (is.null(cxt)) return(NULL)
-  genes <- tab$get_genes_f(cxt)
+  
+  # get gene data using the tab's gene function
+  genes <- tab$get_genes_f(assembly)
 
   if (is.null(genes) || nrow(genes) == 0) {
     return(NULL)
@@ -53,14 +46,8 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
   genes$start <- as.numeric(genes$start)
   genes$end <- as.numeric(genes$end)
 
-  # build context for filtering
-  cxt <- build_context(contigs, contigs_table, zoom, assembly)
-  if (is.null(cxt)) {
-    return(NULL)
-  }
-
   # filter to visible range using the context
-  filtered_genes <- filter_segments(genes, cxt, cxt$mapper$xlim)
+  filtered_genes <- cxt_filter_segments(genes)
 
   # verify we have the expected columns after filtering
   if (!is.null(filtered_genes)) {
@@ -78,7 +65,7 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
 # ---- DataTable Renderer ----
 
 output$genesTable <- renderDT({
-  genes_df <- get_genes_for_context(state$assembly, state$contigs, state$zoom)
+  genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
 
   if (is.null(genes_df) || nrow(genes_df) == 0) {
     return(datatable(
@@ -172,7 +159,7 @@ output$genesTable <- renderDT({
 observeEvent(input$showGeneDetailsBtn, {
   selected_row <- input$genesTable_rows_selected
   if (length(selected_row) > 0) {
-    genes_df <- get_genes_for_context(state$assembly, state$contigs, state$zoom)
+    genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
     if (!is.null(genes_df) && nrow(genes_df) > 0) {
       selected_gene <- genes_df[selected_row, ]
 
@@ -199,7 +186,7 @@ observeEvent(input$showGeneDetailsBtn, {
 observeEvent(input$zoomToGeneBtn, {
   selected_row <- input$genesTable_rows_selected
   if (length(selected_row) > 0) {
-    genes_df <- get_genes_for_context(state$assembly, state$contigs, state$zoom)
+    genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
     if (!is.null(genes_df) && nrow(genes_df) > 0) {
       selected_gene <- genes_df[selected_row, ]
 
@@ -218,7 +205,7 @@ observeEvent(input$zoomToGeneBtn, {
 
 observeEvent(input$createRegionsBtn, {
   # get all genes in context
-  all_genes_df <- get_genes_for_context(state$assembly, state$contigs, state$zoom)
+  all_genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
   
   # get indices of currently visible/filtered rows
   visible_indices <- input$genesTable_rows_all

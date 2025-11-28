@@ -403,22 +403,9 @@ observeEvent(input$gotoRearrangementsBtn, {
     return()
   }
   
-  # build context to get global coordinates
-  contigs_table <- get_contigs(state$assembly)
-  if (is.null(contigs_table)) {
-    showNotification("Cannot get contig information", type = "error")
-    return()
-  }
-  
-  cxt <- build_context(state$contigs, contigs_table, state$zoom, state$assembly)
-  if (is.null(cxt)) {
-    showNotification("Cannot build context for navigation", type = "error")
-    return()
-  }
-  
-  # convert to global coordinates using the context mapper
+  # convert to global coordinates using context services
   # use out_clip as the coordinate for rearrangements
-  selected_events$gcoord <- cxt$mapper$l2g(selected_events$contig, selected_events$out_clip)
+  selected_events$gcoord <- cxt_contig2global(selected_events$contig, selected_events$out_clip)
   
   # calculate spanning range with appropriate margin
   min_coord <- min(selected_events$gcoord)
@@ -464,7 +451,7 @@ observeEvent(input$clearRearrangementsBtn, {
 # common function to update rearrangements data
 update_rearrangements_data <- function() {
   # query rearrangements
-  rearrange_data <- query_rearrangements(state$assembly, state$contigs, state$zoom)
+  rearrange_data <- query_rearrangements(state$assembly, get_state_contigs(), state$zoom)
   
   # store raw data
   state$raw_rearrange_data <- rearrange_data
@@ -478,8 +465,8 @@ if (is_dynamic) {
     update_rearrangements_data()
   })
 } else {
-  # static mode: auto-load when assembly, contigs, or zoom change
-  observeEvent(list(state$assembly, state$contigs, state$zoom), {
+  # static mode: auto-load when assembly, segments, or zoom change
+  observeEvent(list(state$assembly, state$segments, state$zoom), {
     # load if we have a valid assembly
     if (!is.null(state$assembly)) {
       update_rearrangements_data()

@@ -7,12 +7,11 @@ library(plotly)
 library(patchwork)
 
 #' Pre-plot function: sets up the base ggplot object for a profile
-#' @param cxt Context object
 #' @param profile The profile object
 #' @return A ggplot object with base layers (grid, y-label, etc.)
-pre_plot <- function(cxt, profile) {
+pre_plot <- function(profile) {
   gg <- ggplot2::ggplot() +
-    ggplot2::coord_cartesian(xlim = cxt$mapper$xlim) +
+    ggplot2::coord_cartesian(xlim = cxt_get_xlim()) +
     ggplot2::theme(
       axis.title.x = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_blank(),
@@ -48,19 +47,20 @@ pre_plot <- function(cxt, profile) {
       panel.grid.major.y = ggplot2::element_line()
     )
   }
+  
   gg
 }
 
 #' Post-plot function: can add overlays (e.g. vlines) on top of the profile plot
-#' @param cxt Context object
 #' @param gg The ggplot object after profile$plot_f
 #' @param profile The profile object
 #' @return The ggplot object with overlays added
-post_plot <- function(cxt, gg, profile) {
+post_plot <- function(gg, profile) {
   # Add vertical lines between contigs (at contig ends, not starts)
-  if (!is.null(cxt$mapper$cdf) && nrow(cxt$mapper$cdf) > 1) {
+  cdf <- cxt_get_entire_view()
+  if (!is.null(cdf) && nrow(cdf) > 1) {
     # Only draw lines at the END of each contig (except the last one)
-    contig_ends <- cxt$mapper$cdf$end[-nrow(cxt$mapper$cdf)]  # all except last
+    contig_ends <- cdf$end[-nrow(cdf)]  # all except last
     gg <- gg + ggplot2::geom_vline(xintercept = contig_ends, color = "gray")
   }
   gg
@@ -68,10 +68,11 @@ post_plot <- function(cxt, gg, profile) {
 
 #' Update cached ggplot objects for all registered profiles
 #' This function does the expensive ggplot creation and ggplotly conversion
-#' @param cxt The context object containing mapper and other dynamic info
 #' @param profile_plotly_objects Reactive value to store results
-update_gg_objects <- function(cxt, profile_plotly_objects) {
+update_gg_objects <- function(profile_plotly_objects) {
   profiles <- profiles_get_all()
+  cat(sprintf("[update_gg_objects] Starting with %d profiles\n", length(profiles)))
+  
   if (length(profiles) == 0) {
     profile_plotly_objects(NULL)
     return()
@@ -82,6 +83,7 @@ update_gg_objects <- function(cxt, profile_plotly_objects) {
 
   for (id in names(profiles)) {
     profile <- profiles[[id]]
+    cat(sprintf("[update_gg_objects] Processing profile: %s\n", id))
 
     # apply default height fields if missing
     if (is.null(profile$is_fixed)) profile$is_fixed <- FALSE
@@ -109,14 +111,15 @@ update_gg_objects <- function(cxt, profile_plotly_objects) {
     }
 
     # Create base ggplot
-    gg <- pre_plot(cxt, profile)
+    gg <- pre_plot(profile)
 
     # Get the profile's plot result
-    pf_result <- profile$plot_f(profile, cxt, gg)
+    pf_result <- profile$plot_f(profile, gg)
 
     # profiles must return list(plot = gg, legends = list_of_legends)
     if (is.list(pf_result)) {
       gg_plot <- pf_result$plot
+      cat(sprintf("[update_gg_objects] %s: is.null(plot) = %s\n", id, is.null(gg_plot)))
       profile_legends <- pf_result$legends
       if (!is.null(profile_legends) && length(profile_legends) > 0) {
         legends[[id]] <- profile_legends
@@ -132,7 +135,7 @@ update_gg_objects <- function(cxt, profile_plotly_objects) {
     }
 
     # Add overlays
-    gg_final <- post_plot(cxt, gg_plot, profile)
+    gg_final <- post_plot( gg_plot, profile)
 
     # Convert to plotly, using 'text' aesthetic when hover is enabled
     if (isFALSE(profile$show_hover)) {
@@ -245,10 +248,9 @@ calculate_height_fractions <- function(plotly_list, container_height_px) {
 
 #' Plot all registered profiles using cached plotly objects
 #' @param plotly_objects_result Result from update_gg_objects containing plotly_list and legends
-#' @param cxt The context object containing mapper and other dynamic info
 #' @param container_height_px Container height in pixels (NULL = calculate from profile heights)
 #' @return A list with plotly object and total height: list(plot = plotly_obj)
-plot_profiles_cached <- function(plotly_objects_result, cxt, container_height_px = NULL) {
+plot_profiles_cached <- function(plotly_objects_result, container_height_px = NULL) {
   if (is.null(plotly_objects_result) || is.null(plotly_objects_result$plotly_list)) {
     return(NULL)
   }
@@ -286,7 +288,7 @@ plot_profiles_cached <- function(plotly_objects_result, cxt, container_height_px
 
   # Configure the combined plot
   layout_args <- list(
-    xaxis = list(title = "", range = cxt$mapper$xlim),
+    xaxis = list(title = "", range = cxt_get_xlim()),
     margin = list(l = 150, r = 20, t = 30, b = 30)
   )
   
@@ -301,7 +303,7 @@ plot_profiles_cached <- function(plotly_objects_result, cxt, container_height_px
     get_ann_f <- profile$get_annotations
     if (is.null(get_ann_f) || !is.function(get_ann_f)) next
 
-    coord_data <- get_ann_f(profile, cxt)
+    coord_data <- get_ann_f(profile)
     if (is.null(coord_data) || nrow(coord_data) == 0) next
 
     # target this subplot's y-axis for annotation placement
@@ -354,9 +356,8 @@ plot_profiles_cached <- function(plotly_objects_result, cxt, container_height_px
 }
 
 #' Plot all registered profiles
-#' @param cxt The context object containing mapper and other dynamic info
 #' @return A list with plotly object and total height in pixels: list(plot = plotly_obj)
-plot_profiles <- function(cxt) {
+plot_profiles <- function() {
   profiles <- profiles_get_all()
   if (length(profiles) == 0) {
     return(NULL)
@@ -396,10 +397,10 @@ plot_profiles <- function(cxt) {
     }
 
     # Create base ggplot
-    gg <- pre_plot(cxt, profile)
+    gg <- pre_plot( profile)
 
     # Get the profile's plot result
-    pf_result <- profile$plot_f(profile, cxt, gg)
+    pf_result <- profile$plot_f(profile, gg)
 
     # profiles must return list(plot = gg, legends = list_of_legends)
     if (is.list(pf_result)) {
@@ -419,7 +420,7 @@ plot_profiles <- function(cxt) {
     }
 
     # Add overlays
-    gg_final <- post_plot(cxt, gg_plot, profile)
+    gg_final <- post_plot( gg_plot, profile)
 
     # Convert to plotly, using 'text' aesthetic when hover is enabled
     if (isFALSE(profile$show_hover)) {
@@ -470,7 +471,7 @@ plot_profiles <- function(cxt) {
 
   # Configure the combined plot
   layout_args <- list(
-    xaxis = list(title = "", range = cxt$mapper$xlim),
+    xaxis = list(title = "", range = cxt_get_xlim()),
     margin = list(l = 150, r = 20, t = 30, b = 30)
   )
   
@@ -485,7 +486,7 @@ plot_profiles <- function(cxt) {
     get_ann_f <- profile$get_annotations
     if (is.null(get_ann_f) || !is.function(get_ann_f)) next
 
-    coord_data <- get_ann_f(profile, cxt)
+    coord_data <- get_ann_f(profile)
     if (is.null(coord_data) || nrow(coord_data) == 0) next
 
     # target this subplot's y-axis for annotation placement
@@ -538,9 +539,8 @@ plot_profiles <- function(cxt) {
 }
 
 #' Plot all registered profiles as ggplot objects for PDF export
-#' @param cxt The context object containing mapper and other dynamic info
 #' @return A list with combined ggplot object and total height: list(plot = ggplot_obj, total_height = numeric)
-plot_profiles_ggplot <- function(cxt) {
+plot_profiles_ggplot <- function() {
   profiles <- profiles_get_all()
   if (length(profiles) == 0) {
     return(NULL)
@@ -580,10 +580,10 @@ plot_profiles_ggplot <- function(cxt) {
     }
 
     # Create base ggplot
-    gg <- pre_plot(cxt, profile)
+    gg <- pre_plot( profile)
 
     # Get the profile's plot result
-    pf_result <- profile$plot_f(profile, cxt, gg)
+    pf_result <- profile$plot_f(profile, gg)
 
     # profiles must return list(plot = gg, legends = list_of_legends)
     if (is.list(pf_result)) {
@@ -603,7 +603,7 @@ plot_profiles_ggplot <- function(cxt) {
     }
 
     # Add overlays
-    gg_final <- post_plot(cxt, gg_plot, profile)
+    gg_final <- post_plot( gg_plot, profile)
     
     # Apply styling for PDF export (ensure it's not overridden)
     if (!isTRUE(profile$attr$hide_y_label)) {
@@ -664,7 +664,7 @@ plot_profiles_ggplot <- function(cxt) {
       get_ann_f <- profile$get_annotations
       if (is.null(get_ann_f) || !is.function(get_ann_f)) next
       
-      coord_data <- get_ann_f(profile, cxt)
+      coord_data <- get_ann_f(profile)
       if (is.null(coord_data) || nrow(coord_data) == 0) next
       
       coord_annotations <- rbind(coord_annotations, coord_data)

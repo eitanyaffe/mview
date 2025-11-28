@@ -9,6 +9,7 @@ output$mainTabsPanel <- renderUI({
       "Regions",
       regions_ui("regions_module")
     ),
+    selector_tab_ui(),
     tabPanel(
       "Contigs",
       checkboxInput("allowMultipleContigsChk", "allow multiple", 

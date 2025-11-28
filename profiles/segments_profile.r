@@ -4,12 +4,13 @@ segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
                             color_field = NULL,
                             auto_register = TRUE) {
 
-  plot_f <- function(profile, cxt, gg) {
+  plot_f <- function(profile, gg) {
     # get segments data
+    assembly <- cxt_get_assembly()
     segments <- NULL
     if (is.function(profile$segments_f)) {
       # function provided
-      segments <- profile$segments_f(cxt$assembly)
+      segments <- profile$segments_f(assembly)
     } else if (is.character(profile$segments_f)) {
       # cache key provided
       if (cache_exists(profile$segments_f)) {
@@ -26,7 +27,7 @@ segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
     
     # filter segments by current assembly first (if assembly column exists)
     if ("assembly" %in% colnames(segments)) {
-      assembly_segments <- segments[segments$assembly == cxt$assembly, ]
+      assembly_segments <- segments[segments$assembly == assembly, ]
       if (is.null(assembly_segments) || nrow(assembly_segments) == 0) {
         return(list(plot = gg, legends = list()))
       }
@@ -35,7 +36,7 @@ segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
     }
     
     # filter segments using context
-    filtered_segments <- filter_segments(assembly_segments, cxt, cxt$mapper$xlim)
+    filtered_segments <- cxt_filter_segments(assembly_segments)
     if (is.null(filtered_segments) || nrow(filtered_segments) == 0) {
       return(list(plot = gg, legends = list()))
     }
@@ -98,11 +99,12 @@ segments_profile <- function(id, name, height = 60, is_fixed = TRUE,
         size = 0.5
         )
     }
+    xlim <- cxt_get_xlim()
     gg <- gg +
       ggplot2::geom_text(
         data = filtered_segments,
         ggplot2::aes(
-          x = gend + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
+          x = gend + (xlim[2] - xlim[1]) * 0.017,
           y = 0.25,
           label = id,
           text = hover_text

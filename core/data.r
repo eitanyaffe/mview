@@ -4,8 +4,9 @@
 .data_env <- new.env(parent = emptyenv())
 .data_env$lookups <- NULL
 .data_env$register_contigs_f <- NULL
+.data_env$register_segments_f <- NULL
 .data_env$register_genomes_f <- NULL
-.data_env$register_contig_map_f <- NULL
+.data_env$register_segment_map_f <- NULL
 .data_env$register_fasta_f <- NULL
 .data_env$assemblies <- NULL
 .data_env$regions_dir <- NULL
@@ -105,7 +106,7 @@ get_path <- function(id, tag = "") {
 }
 
 make_get_data_f <- function(id, tag = "", read_f = read.delim) {
-  function(cxt) {
+  function() {
     get_data(id, tag, read_f)
   }
 }
@@ -123,10 +124,15 @@ clear_data <- function(id, tag = "") {
   }
 }
 
-# Register functions for contigs, genomes, and contig mapping
+# Register functions for contigs, segments, genomes, and contig mapping
 register_contigs_f <- function(f) {
   cat(sprintf("registering contigs function\n"))
   .data_env$register_contigs_f <- f
+}
+
+register_segments_f <- function(f) {
+  cat(sprintf("registering segments function\n"))
+  .data_env$register_segments_f <- f
 }
 
 register_genomes_f <- function(f) {
@@ -134,9 +140,9 @@ register_genomes_f <- function(f) {
   .data_env$register_genomes_f <- f
 }
 
-register_contig_map_f <- function(f) {
-  cat(sprintf("registering contig map function\n"))
-  .data_env$register_contig_map_f <- f
+register_segment_map_f <- function(f) {
+  cat(sprintf("registering segment map function\n"))
+  .data_env$register_segment_map_f <- f
 }
 
 register_fasta_f <- function(f) {
@@ -158,6 +164,17 @@ get_contigs <- function(assembly = NULL) {
   rr
 }
 
+# Get segments using the registered function
+get_segments <- function(assembly = NULL) {
+  if (is.null(.data_env$register_segments_f)) {
+    stop("segments function not registered, call register_segments_f first")
+  }
+  key <- sprintf("global.segments.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_segments_f(assembly)
+  })
+}
+
 # Get genomes using the registered function
 get_genomes <- function(assembly = NULL) {
   if (is.null(.data_env$register_genomes_f)) {
@@ -169,14 +186,14 @@ get_genomes <- function(assembly = NULL) {
   })
 }
 
-# Get contig map using the registered function
-get_contig_map <- function(assembly = NULL) {
-  if (is.null(.data_env$register_contig_map_f)) {
-    stop("contig map function not registered, call register_contig_map_f first")
+# Get segment map using the registered function
+get_segment_map <- function(assembly = NULL) {
+  if (is.null(.data_env$register_segment_map_f)) {
+    stop("segment map function not registered, call register_segment_map_f first")
   }
-  key <- sprintf("global.contig_map.%s", if (is.null(assembly)) "default" else assembly)
+  key <- sprintf("global.segment_map.%s", if (is.null(assembly)) "default" else assembly)
   cache(key, {
-    .data_env$register_contig_map_f(assembly)
+    .data_env$register_segment_map_f(assembly)
   })
 }
 

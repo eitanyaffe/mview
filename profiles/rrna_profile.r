@@ -28,10 +28,10 @@ rrna_profile <- function(id, name, get_gff_f, colors = default_rrna_colors,
                          auto_register = TRUE) {
   
   # create data function that handles caching and color/label assignment
-  rrna_f <- function(cxt) {
-    rrna <- cache(paste0(cxt$assembly, "_rrna_", id), {
+  rrna_f <- function(assembly) {
+    rrna <- cache(paste0(assembly, "_rrna_", id), {
       # get_gff_f should call get_data with read_f=read_gff_f
-      get_gff_f(cxt)
+      get_gff_f()
     })
     
     if (is.null(rrna) || nrow(rrna) == 0) {

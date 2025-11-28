@@ -146,11 +146,13 @@ change_genome_action <- function(regions_module_output, main_state_rv, input, di
     return()
   }
   
-  contig_map_data <- get_contig_map(main_state_rv$assembly)
-  if (is.null(contig_map_data) || nrow(contig_map_data) == 0) {
-    cat(sprintf("alt+arrow%s: no contig map available\n", direction))
+  segment_map_data <- get_segment_map(main_state_rv$assembly)
+  if (is.null(segment_map_data) || nrow(segment_map_data) == 0) {
+    cat(sprintf("alt+arrow%s: no segment map available\n", direction))
     return()
   }
+  
+  all_segments <- get_segments(main_state_rv$assembly)
   
   selected_rows <- input$genomeTable_rows_selected
   genome_proxy <- DT::dataTableProxy("genomeTable")
@@ -158,16 +160,16 @@ change_genome_action <- function(regions_module_output, main_state_rv, input, di
   if (is.null(selected_rows) || length(selected_rows) == 0) {
     new_row_index <- input$genomeTable_rows_all[1]
     new_gid <- genomes_data$gid[new_row_index]
-    new_contigs <- unique(contig_map_data$contig[contig_map_data$gid == new_gid])
+    new_segment_ids <- unique(segment_map_data$segment[segment_map_data$gid == new_gid])
     
-    if (length(new_contigs) == 0) {
-      cat(sprintf("alt+arrow%s: genome %s has no contigs\n", direction, new_gid))
+    if (length(new_segment_ids) == 0) {
+      cat(sprintf("alt+arrow%s: genome %s has no segments\n", direction, new_gid))
       return()
     }
     
     regions_module_output$push_undo_state()
     DT::selectRows(genome_proxy, 1)
-    main_state_rv$contigs <- new_contigs
+    main_state_rv$segments <- all_segments[all_segments$segment %in% new_segment_ids, ]
     main_state_rv$zoom <- NULL
     cat("selected first genome in table\n")
     return()
@@ -196,16 +198,16 @@ change_genome_action <- function(regions_module_output, main_state_rv, input, di
   
   new_row_index <- input$genomeTable_rows_all[new_table_index]
   new_gid <- genomes_data$gid[new_row_index]
-  new_contigs <- unique(contig_map_data$contig[contig_map_data$gid == new_gid])
+  new_segment_ids <- unique(segment_map_data$segment[segment_map_data$gid == new_gid])
   
-  if (length(new_contigs) == 0) {
-    cat(sprintf("alt+arrow%s: genome %s has no contigs\n", direction, new_gid))
+  if (length(new_segment_ids) == 0) {
+    cat(sprintf("alt+arrow%s: genome %s has no segments\n", direction, new_gid))
     return()
   }
   
   regions_module_output$push_undo_state()
   DT::selectRows(genome_proxy, new_row_index)
-  main_state_rv$contigs <- new_contigs
+  main_state_rv$segments <- all_segments[all_segments$segment %in% new_segment_ids, ]
   main_state_rv$zoom <- NULL
   
   cat(sprintf("navigated to %s genome: %s\n",

@@ -279,21 +279,8 @@ observeEvent(input$gotoVariantsBtn, {
   # get selected variants
   selected_vars <- variant_data$variants[valid_rows, ]
   
-  # build context to get global coordinates
-  contigs_table <- get_contigs(state$assembly)
-  if (is.null(contigs_table)) {
-    showNotification("Cannot get contig information", type = "error")
-    return()
-  }
-  
-  cxt <- build_context(state$contigs, contigs_table, state$zoom, state$assembly)
-  if (is.null(cxt)) {
-    showNotification("Cannot build context for navigation", type = "error")
-    return()
-  }
-  
-  # convert to global coordinates using the context mapper
-  selected_vars$gcoord <- cxt$mapper$l2g(selected_vars$contig, selected_vars$coord)
+  # convert to global coordinates using context services
+  selected_vars$gcoord <- cxt_contig2global(selected_vars$contig, selected_vars$coord)
   
   # calculate spanning range with appropriate margin
   min_coord <- min(selected_vars$gcoord)
@@ -339,7 +326,7 @@ observeEvent(input$clearVariantsBtn, {
 # common function to update variants data
 update_variants_data <- function() {
   # query variants
-  variant_data <- query_variants(state$assembly, state$contigs, state$zoom)
+  variant_data <- query_variants(state$assembly, get_state_contigs(), state$zoom)
   
   # store raw data
   state$raw_variant_data <- variant_data
@@ -388,8 +375,8 @@ if (is_dynamic) {
     update_variants_data()
   })
 } else {
-  # static mode: auto-load when assembly, contigs, or zoom change
-  observeEvent(list(state$assembly, state$contigs, state$zoom), {
+  # static mode: auto-load when assembly, segments, or zoom change
+  observeEvent(list(state$assembly, state$segments, state$zoom), {
     # load if we have a valid assembly
     if (!is.null(state$assembly)) {
       update_variants_data()

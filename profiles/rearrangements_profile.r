@@ -59,7 +59,7 @@ rearrangements_profile <- function(id, name, height = 100, is_fixed = TRUE,
     return(rearrangements_df)
   }
 
-  plot_f <- function(profile, cxt, gg) {
+  plot_f <- function(profile, gg) {
     # get rearrangements data from cache
     rearrangements <- NULL
     if (cache_exists("rearrangements.current")) {
@@ -70,15 +70,17 @@ rearrangements_profile <- function(id, name, height = 100, is_fixed = TRUE,
       return(list(plot = gg, legends = list()))
     }
     
+    xlim <- cxt_get_xlim()
+    
     # filter rearrangements using context coordinates
     # we need to filter by both clip_out and clip_in positions
     # first filter by clip_out
     rearrangements$coord <- rearrangements$out_clip
-    filtered_by_out <- filter_coords(rearrangements, cxt, cxt$mapper$xlim)
+    filtered_by_out <- cxt_filter_coords(rearrangements)
     
     # then filter by clip_in
     rearrangements$coord <- rearrangements$in_clip
-    filtered_by_in <- filter_coords(rearrangements, cxt, cxt$mapper$xlim)
+    filtered_by_in <- cxt_filter_coords(rearrangements)
     
     # combine both filters (events that have either clip_out or clip_in in view)
     if (is.null(filtered_by_out) && is.null(filtered_by_in)) {
@@ -100,8 +102,8 @@ rearrangements_profile <- function(id, name, height = 100, is_fixed = TRUE,
     }
     
     # add global coordinates for both clip positions
-    filtered_rearrangements$gcoord_out <- cxt$mapper$l2g(filtered_rearrangements$contig, filtered_rearrangements$out_clip)
-    filtered_rearrangements$gcoord_in <- cxt$mapper$l2g(filtered_rearrangements$contig, filtered_rearrangements$in_clip)
+    filtered_rearrangements$gcoord_out <- cxt_contig2global(filtered_rearrangements$contig, filtered_rearrangements$out_clip)
+    filtered_rearrangements$gcoord_in <- cxt_contig2global(filtered_rearrangements$contig, filtered_rearrangements$in_clip)
 
     filtered_rearrangements$gcoord_right <- pmax(filtered_rearrangements$gcoord_out, filtered_rearrangements$gcoord_in)
 
@@ -252,7 +254,7 @@ rearrangements_profile <- function(id, name, height = 100, is_fixed = TRUE,
         ggplot2::geom_text(
           data = non_selected,
           ggplot2::aes(
-            x = gcoord_right + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
+            x = gcoord_right + (xlim[2] - xlim[1]) * 0.017,
             y = plot_height,
             label = event_id,
             text = non_selected_hover
@@ -272,7 +274,7 @@ rearrangements_profile <- function(id, name, height = 100, is_fixed = TRUE,
         ggplot2::geom_text(
           data = selected,
           ggplot2::aes(
-            x = gcoord_right + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
+            x = gcoord_right + (xlim[2] - xlim[1]) * 0.017,
             y = plot_height,
             label = event_id,
             text = selected_hover

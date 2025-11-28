@@ -37,15 +37,14 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
     return(NULL)
   }
   
-  # get contigs data and build context for intervals
-  contigs_table <- get_contigs(assembly)
-  if (is.null(contigs_table)) {
+  # get segments for selected contigs and build context for intervals
+  all_segments <- get_segments(assembly)
+  if (is.null(all_segments)) {
     return(NULL)
   }
-  
-  # build context for intervals
-  cxt <- build_context(contigs, contigs_table, zoom, assembly)
-  if (is.null(cxt) || is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
+  # get intervals from global context
+  intervals <- cxt_get_zoom_view()
+  if (is.null(intervals) || nrow(intervals) == 0) {
     return(NULL)
   }
   
@@ -58,7 +57,7 @@ query_rearrangements_for_context <- function(assembly, contigs, zoom, tab_config
   # call aln_rearrange
   rearrange_results <- aln_rearrange(
     store_list = stores,
-    intervals_df = cxt$intervals,
+    intervals_df = intervals,
     max_margin = as.integer(max_margin),
     min_element_length = as.integer(min_element_length),
     min_anchor_length = as.integer(min_anchor_length),
@@ -195,35 +194,32 @@ filter_rearrangements_by_region <- function(rearrange_data, contigs, zoom, assem
     if (!is.null(contigs_table)) {
       contig_col <- if ("contig" %in% colnames(events_df)) "contig" else "contig_id"
       
-      cxt <- build_context(unique(events_df[[contig_col]]), contigs_table, NULL, assembly)
-      if (!is.null(cxt) && !is.null(cxt$mapper)) {
-        # convert event coordinates to global (use out_clip coordinate)
-        events_df$gcoord <- cxt$mapper$l2g(events_df[[contig_col]], events_df$out_clip)
-        
-        # filter by zoom range
-        keep_zoom <- events_df$gcoord >= zoom[1] & events_df$gcoord <= zoom[2]
-        events_df <- events_df[keep_zoom, ]
-        
-        # remove temporary gcoord column
-        events_df$gcoord <- NULL
-        
-        if (nrow(events_df) == 0) {
-          return(NULL)
-        }
-        
-        # filter support and coverage matrices
-        if (!is.null(rearrange_data$support)) {
-          rearrange_data$support <- rearrange_data$support[keep_zoom, , drop = FALSE]
-        }
-        if (!is.null(rearrange_data$coverage)) {
-          rearrange_data$coverage <- rearrange_data$coverage[keep_zoom, , drop = FALSE]
-        }
-        
-        # filter read_events if present
-        if (!is.null(rearrange_data$read_events)) {
-          kept_event_ids <- events_df$event_id
-          rearrange_data$read_events <- rearrange_data$read_events[rearrange_data$read_events$event_id %in% kept_event_ids, ]
-        }
+      # convert event coordinates to global using context services
+      events_df$gcoord <- cxt_contig2global(events_df[[contig_col]], events_df$out_clip)
+      
+      # filter by zoom range
+      keep_zoom <- events_df$gcoord >= zoom[1] & events_df$gcoord <= zoom[2]
+      events_df <- events_df[keep_zoom, ]
+      
+      # remove temporary gcoord column
+      events_df$gcoord <- NULL
+      
+      if (nrow(events_df) == 0) {
+        return(NULL)
+      }
+      
+      # filter support and coverage matrices
+      if (!is.null(rearrange_data$support)) {
+        rearrange_data$support <- rearrange_data$support[keep_zoom, , drop = FALSE]
+      }
+      if (!is.null(rearrange_data$coverage)) {
+        rearrange_data$coverage <- rearrange_data$coverage[keep_zoom, , drop = FALSE]
+      }
+      
+      # filter read_events if present
+      if (!is.null(rearrange_data$read_events)) {
+        kept_event_ids <- events_df$event_id
+        rearrange_data$read_events <- rearrange_data$read_events[rearrange_data$read_events$event_id %in% kept_event_ids, ]
       }
     }
   }

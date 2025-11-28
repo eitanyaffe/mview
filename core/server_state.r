@@ -1,5 +1,82 @@
 # ---- State and Logging Management ----
 
+# Get state segments data.frame
+get_state_segments <- function() {
+  return(state$segments)
+}
+
+# Get unique contigs from state segments
+get_state_contigs <- function() {
+  if (is.null(state$segments) || nrow(state$segments) == 0) {
+    return(character())
+  }
+  return(unique(state$segments$contig))
+}
+
+# Get intervals from state segments, optionally merging adjacent segments
+get_state_intervals <- function(merge_adjacent_segments = FALSE) {
+  if (is.null(state$segments) || nrow(state$segments) == 0) {
+    return(data.frame(contig = character(), start = integer(), end = integer(), stringsAsFactors = FALSE))
+  }
+  
+  if (!merge_adjacent_segments) {
+    return(data.frame(
+      contig = state$segments$contig,
+      start = state$segments$start,
+      end = state$segments$end,
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  # merge adjacent segments from same contig
+  segments <- state$segments
+  segments <- segments[order(segments$contig, segments$start), ]
+  
+  merged_intervals <- list()
+  current_contig <- NULL
+  current_start <- NULL
+  current_end <- NULL
+  
+  for (i in seq_len(nrow(segments))) {
+    seg <- segments[i, ]
+    
+    if (is.null(current_contig) || seg$contig != current_contig || seg$start != current_end + 1) {
+      # start new interval
+      if (!is.null(current_contig)) {
+        merged_intervals[[length(merged_intervals) + 1]] <- list(
+          contig = current_contig,
+          start = current_start,
+          end = current_end
+        )
+      }
+      current_contig <- seg$contig
+      current_start <- seg$start
+      current_end <- seg$end
+    } else {
+      # extend current interval
+      current_end <- seg$end
+    }
+  }
+  
+  # add last interval
+  if (!is.null(current_contig)) {
+    merged_intervals[[length(merged_intervals) + 1]] <- list(
+      contig = current_contig,
+      start = current_start,
+      end = current_end
+    )
+  }
+  
+  # convert to data.frame
+  if (length(merged_intervals) == 0) {
+    return(data.frame(contig = character(), start = integer(), end = integer(), stringsAsFactors = FALSE))
+  }
+  
+  do.call(rbind, lapply(merged_intervals, function(x) {
+    data.frame(contig = x$contig, start = x$start, end = x$end, stringsAsFactors = FALSE)
+  }))
+}
+
 # Get mouse coordinate info for display
 get_mouse_info <- function(state) {
   if (is.null(state$mouse_coords)) {
@@ -13,21 +90,9 @@ get_mouse_info <- function(state) {
     return(NULL)
   }
   
-  # build context for coordinate mapping
-  cxt <- build_context(
-    state_contigs = state$contigs,
-    contig_table = get_contigs(state$assembly),
-    zoom = state$zoom,
-    assembly = state$assembly
-  )
-  
-  if (is.null(cxt) || is.null(cxt$mapper)) {
-    return(sprintf("plot(%.1f,%.1f)", plot_x, plot_y))
-  }
-  
-  # convert to contig coordinates
+  # convert to contig coordinates using context service
   tryCatch({
-    local_info <- cxt$mapper$g2l(plot_x)
+    local_info <- cxt_global2contig(plot_x)
     sprintf("Coord: %d", round(local_info$coord[1]))
   }, error = function(e) {
     sprintf("out of range, y:%.1f", plot_y)
@@ -35,7 +100,13 @@ get_mouse_info <- function(state) {
 }
 
 state <- reactiveValues(
-  contigs = character(),
+  segments = data.frame(
+    segment = character(),
+    contig = character(),
+    start = integer(),
+    end = integer(),
+    stringsAsFactors = FALSE
+  ),
   zoom = NULL,
   current_xlim = NULL,
   assembly = get_assemblies()[1],
@@ -62,16 +133,11 @@ output$basic_info <- renderText({
   } else {
     window_size <- round(state$zoom[2]) - round(state$zoom[1])
     window_size_text <- format_bp(window_size)
-    cxt <- build_context(
-      state_contigs = state$contigs,
-      contig_table = get_contigs(state$assembly),
-      zoom = state$zoom,
-      assembly = state$assembly)
     
-    if (!is.null(cxt) && !is.null(cxt$mapper)) {
-      # find which contigs are covered by zoom using mapper$cdf
-      cdf <- cxt$mapper$cdf
-      zoom_contigs <- cdf[cdf$start < state$zoom[2] & cdf$end > state$zoom[1], ]
+    # find which contigs are covered by zoom using cdf
+    cdf <- cxt_get_entire_view()
+    if (!is.null(cdf) && nrow(cdf) > 0) {
+      zoom_contigs <- cdf[cdf$vstart < state$zoom[2] & cdf$vend > state$zoom[1], ]
       
       if (nrow(zoom_contigs) > 1) {
         zoom_text <- "Zoom: multiple contigs"
@@ -116,11 +182,11 @@ output$contig_count <- renderUI({
     sprintf("Assembly: %s", state$assembly)
   }
 
-  contig_text <- sprintf("Contigs: %d", length(state$contigs))
+  segment_text <- sprintf("Segments: %d", nrow(get_state_segments()))
   list(
     tags$div(style = "margin-bottom: 4px;", assembly_text),
-    tags$div(style = "margin-bottom: 4px;", contig_text),
-    tags$div(style = "white-space: pre-wrap;", paste("  ", paste(state$contigs, collapse = ", "))),
+    tags$div(style = "margin-bottom: 4px;", segment_text),
+    tags$div(style = "white-space: pre-wrap;", paste("  ", paste(get_state_segments()$segment, collapse = ", "))),
     tags$div(style = "margin-top: 6px;", zoom_text)
   )
 })

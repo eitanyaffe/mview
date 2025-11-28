@@ -95,25 +95,15 @@ output$navRefreshBtnUI <- renderUI({
 
 # helper function to get middle coordinate when zoom is null
 get_middle_coordinate <- function(main_state_rv) {
-  # build context to get full range
-  cxt <- build_context(
-    state_contigs = main_state_rv$contigs,
-    contig_table = get_contigs(main_state_rv$assembly),
-    zoom = NULL,
-    assembly = main_state_rv$assembly
-  )
+  # get full range from context
+  xlim <- cxt_get_xlim()
   
-  if (!is.null(cxt) && !is.null(cxt$mapper) && !is.null(cxt$mapper$xlim)) {
-    return((cxt$mapper$xlim[1] + cxt$mapper$xlim[2]) / 2)
+  if (!is.null(xlim) && length(xlim) == 2) {
+    return((xlim[1] + xlim[2]) / 2)
   }
   
-  # fallback: if we have contigs, try to get their center
-  if (length(main_state_rv$contigs) > 0) {
-    # this is a basic fallback - in practice the context should work
-    return(50000)  # arbitrary center
-  }
-  
-  return(NULL)
+  # fallback
+  return(50000)  # arbitrary center
 }
 
 # helper function to zoom to specific window size around center

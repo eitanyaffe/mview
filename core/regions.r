@@ -133,29 +133,69 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return(default_result)
         }
         
-        # try to build context
-        cxt <- tryCatch({
-          build_context(contigs_list, get_contigs(region_row$assembly), 
-                       c(region_row$zoom_start, region_row$zoom_end), region_row$assembly)
-        }, error = function(e) NULL)
-        
-        if (is.null(cxt) || is.null(cxt$mapper)) {
+        # get segments for the contigs in this region
+        all_segments <- get_segments(region_row$assembly)
+        if (is.null(all_segments)) {
+          return(default_result)
+        }
+        region_segments <- all_segments[all_segments$contig %in% contigs_list, ]
+        if (nrow(region_segments) == 0) {
           return(default_result)
         }
         
-        # check which contigs the region spans
-        cdf <- cxt$mapper$cdf
-        zoom_contigs <- cdf[cdf$start < region_row$zoom_end & cdf$end > region_row$zoom_start, ]
+        # save current context state
+        saved_assembly <- cxt_get_assembly()
+        saved_segments <- tryCatch(get_state_segments(), error = function(e) NULL)
+        saved_zoom <- tryCatch(cxt_get_xlim(), error = function(e) NULL)
         
-        if (nrow(zoom_contigs) != 1) {
-          # spans multiple contigs or no contigs
+        # set up context for this region temporarily
+        tryCatch({
+          cxt_set_assembly(region_row$assembly)
+          cxt_set_view(region_segments)
+          cxt_set_zoom(c(region_row$zoom_start, region_row$zoom_end))
+          
+          # check which contigs the region spans
+          cdf <- cxt_get_entire_view()
+          zoom_contigs <- cdf[cdf$vstart < region_row$zoom_end & cdf$vend > region_row$zoom_start, ]
+          
+          result <- if (nrow(zoom_contigs) != 1) {
+            # spans multiple contigs or no contigs
+            default_result
+          } else {
+            # single contig case - compute local coordinates
+            contig_name <- zoom_contigs$contig[1]
+            local_start <- round(region_row$zoom_start - zoom_contigs$start[1]) + 1
+            local_end <- round(region_row$zoom_end - zoom_contigs$start[1])
+            
+            list(
+              contig = contig_name,
+              start = as.integer(local_start),
+              end = as.integer(local_end),
+              single_contig = TRUE
+            )
+          }
+          
+          # restore original context
+          if (!is.null(saved_assembly) && !is.null(saved_segments)) {
+            cxt_set_assembly(saved_assembly)
+            cxt_set_view(saved_segments)
+            if (!is.null(saved_zoom)) {
+              cxt_set_zoom(saved_zoom)
+            }
+          }
+          
+          return(result)
+        }, error = function(e) {
+          # restore on error
+          if (!is.null(saved_assembly) && !is.null(saved_segments)) {
+            cxt_set_assembly(saved_assembly)
+            cxt_set_view(saved_segments)
+            if (!is.null(saved_zoom)) {
+              cxt_set_zoom(saved_zoom)
+            }
+          }
           return(default_result)
-        }
-        
-        # single contig case - compute local coordinates
-        contig_name <- zoom_contigs$contig[1]
-        local_start <- round(region_row$zoom_start - zoom_contigs$start[1]) + 1
-        local_end <- round(region_row$zoom_end - zoom_contigs$start[1])
+        })
         
         return(list(
           contig = contig_name,
@@ -443,39 +483,35 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         query_start <- 1L
         query_end <- 1000L
         
-        if (!is.null(current_app_state$contigs) && length(current_app_state$contigs) > 0 &&
+        current_segments <- current_app_state$segments
+        if (!is.null(current_segments) && nrow(current_segments) > 0 &&
             !is.null(current_app_state$zoom) && !is.null(current_app_state$assembly)) {
           
-          # build context to get coordinate mapper
-          cxt <- tryCatch({
-            build_context(current_app_state$contigs, get_contigs(current_app_state$assembly), 
-                         current_app_state$zoom, current_app_state$assembly)
-          }, error = function(e) NULL)
+          # check which segments the current zoom spans using current context
+          cdf <- tryCatch(cxt_get_entire_view(), error = function(e) NULL)
           
-          if (!is.null(cxt) && !is.null(cxt$mapper)) {
-            # check which contigs the current zoom spans
-            cdf <- cxt$mapper$cdf
-            zoom_contigs <- cdf[cdf$start < current_app_state$zoom[2] & cdf$end > current_app_state$zoom[1], ]
+          if (!is.null(cdf) && nrow(cdf) > 0) {
+            zoom_segments <- cdf[cdf$vstart < current_app_state$zoom[2] & cdf$vend > current_app_state$zoom[1], ]
             
-            if (nrow(zoom_contigs) >= 1) {
-              # use first contig that overlaps with zoom
-              query_contig <- zoom_contigs$contig[1]
-              contig_global_start <- zoom_contigs$start[1]
+            if (nrow(zoom_segments) >= 1) {
+              # use contig of first segment that overlaps with zoom
+              query_contig <- zoom_segments$contig[1]
+              segment_global_start <- zoom_segments$start[1]
               
               # convert global coordinates to local coordinates
-              # local_coord = global_coord - contig_global_start + 1
-              query_start <- as.integer(max(1, round(current_app_state$zoom[1] - contig_global_start) + 1))
-              query_end <- as.integer(round(current_app_state$zoom[2] - contig_global_start))
+              # local_coord = global_coord - segment_global_start + 1
+              query_start <- as.integer(max(1, round(current_app_state$zoom[1] - segment_global_start) + 1))
+              query_end <- as.integer(round(current_app_state$zoom[2] - segment_global_start))
               
               # ensure end is at least start
               query_end <- max(query_end, query_start)
             } else {
-              # fallback: use first contig
-              query_contig <- current_app_state$contigs[1]
+              # fallback: use first segment's contig
+              query_contig <- current_segments$contig[1]
             }
           } else {
-            # fallback: use first contig
-            query_contig <- current_app_state$contigs[1]
+            # fallback: use first segment's contig
+            query_contig <- current_segments$contig[1]
           }
         }
         
@@ -647,32 +683,10 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           
           # compute global zoom coordinates from segment coordinates
           for (i in seq_len(nrow(region_format_results))) {
-            # try to get contig mapping to compute global coordinates
-            tryCatch({
-              contig_name <- region_format_results$contigs[i]
-              contig_vector <- c(contig_name)  # build_context expects a vector
-              cxt <- build_context(contig_vector, get_contigs(region_format_results$assembly[i]), 
-                                 NULL, region_format_results$assembly[i])
-              
-              if (!is.null(cxt) && !is.null(cxt$mapper)) {
-                cdf <- cxt$mapper$cdf
-                contig_row <- cdf[cdf$contig == region_format_results$segment_contig[i], ]
-                
-                if (nrow(contig_row) == 1) {
-                  # convert local coordinates to global coordinates
-                  # global_coord = local_coord + contig_global_start - 1
-                  region_format_results$zoom_start[i] <- region_format_results$segment_start[i] + contig_row$start[1] - 1
-                  region_format_results$zoom_end[i] <- region_format_results$segment_end[i] + contig_row$start[1] - 1
-                }
-              }
-            }, error = function(e) {
-              # if global coordinate computation fails, use local coordinates as fallback
-              shiny::showNotification(paste("Warning: Could not compute global coordinates for", 
-                                           region_format_results$segment_contig[i], "- using local coordinates"), 
-                                     type = "warning", duration = 3)
-              region_format_results$zoom_start[i] <<- region_format_results$segment_start[i]
-              region_format_results$zoom_end[i] <<- region_format_results$segment_end[i]
-            })
+            # use segment coordinates directly as zoom (they're already in the right space)
+            # Note: With segment-based state, zoom coords are relative to the segment set
+            region_format_results$zoom_start[i] <- region_format_results$segment_start[i]
+            region_format_results$zoom_end[i] <- region_format_results$segment_end[i]
           }
           
           # write results to file
@@ -827,10 +841,11 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         current_app_state <- shiny::isolate(shiny::reactiveValuesToList(main_state_rv))
         
         # prepare contigs (comma-separated)
-        contigs_str <- if (is.null(current_app_state$contigs) || length(current_app_state$contigs) == 0) {
+        current_contigs <- unique(current_app_state$segments$contig)
+        contigs_str <- if (is.null(current_contigs) || length(current_contigs) == 0) {
           ""
         } else {
-          paste(current_app_state$contigs, collapse = ",")
+          paste(current_contigs, collapse = ",")
         }
         
         # prepare zoom
@@ -1010,11 +1025,15 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         # apply region
         main_state_rv$assembly <- region_row$assembly
         
-        # parse contigs
+        # parse contigs and get segments
         if (region_row$contigs != "" && !is.na(region_row$contigs)) {
-          main_state_rv$contigs <- trimws(strsplit(region_row$contigs, ",")[[1]])
+          contig_list <- trimws(strsplit(region_row$contigs, ",")[[1]])
+          segments <- get_segments(main_state_rv$assembly)
+          selected_segments <- segments[segments$contig %in% contig_list, ]
+          main_state_rv$segments <- selected_segments
         } else {
-          main_state_rv$contigs <- NULL
+          main_state_rv$segments <- data.frame(segment = character(), contig = character(), 
+                                                start = integer(), end = integer(), stringsAsFactors = FALSE)
         }
         
         # apply zoom
@@ -1050,7 +1069,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         # restore last region
         last_state <- current_undo[[length(current_undo)]]
-        main_state_rv$contigs <- last_state$contigs
+        main_state_rv$segments <- last_state$segments
         main_state_rv$zoom <- last_state$zoom
         main_state_rv$assembly <- last_state$assembly
         
@@ -1092,25 +1111,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             
             if (length(contigs_list) == 0) return("Global")
             
-            cxt <- tryCatch({
-              build_context(contigs_list, get_contigs(rt$assembly[i]), 
-                          c(rt$zoom_start[i], rt$zoom_end[i]), rt$assembly[i])
-            }, error = function(e) NULL)
-            
-            if (is.null(cxt) || is.null(cxt$mapper)) {
-              return("Global")
-            }
-            
-            cdf <- cxt$mapper$cdf
-            zoom_contigs <- cdf[cdf$start < rt$zoom_end[i] & cdf$end > rt$zoom_start[i], ]
-            
-            if (nrow(zoom_contigs) > 1) {
+            # For segment-based state, just show zoom coords directly
+            # (more complex conversion would require temporarily setting context)
+            if (length(contigs_list) == 1) {
+              sprintf("%s: %d-%d", contigs_list[1], rt$zoom_start[i], rt$zoom_end[i])
+            } else if (length(contigs_list) > 1) {
               "Multiple contigs"
-            } else if (nrow(zoom_contigs) == 1) {
-              contig_name <- zoom_contigs$contig[1]
-              local_start <- round(rt$zoom_start[i] - zoom_contigs$start[1]) + 1
-              local_end <- round(rt$zoom_end[i] - zoom_contigs$start[1])
-              sprintf("%s: %d-%d", contig_name, local_start, local_end)
             } else {
               "Global"
             }

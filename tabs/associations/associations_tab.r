@@ -838,22 +838,9 @@ observeEvent(input$associationsGotoSegmentTrigger, {
   seg_start <- as.numeric(selected_segment$start)
   seg_end <- as.numeric(selected_segment$end)
   
-  # build context to convert to global coordinates
-  contigs_table <- get_contigs(state$assembly)
-  if (is.null(contigs_table)) {
-    showNotification("Cannot get contig information", type = "error")
-    return()
-  }
-  
-  cxt <- build_context(c(contig_name), contigs_table, NULL, state$assembly)
-  if (is.null(cxt)) {
-    showNotification("Cannot build context for navigation", type = "error")
-    return()
-  }
-  
-  # convert to global coordinates
-  gstart <- cxt$mapper$l2g(contig_name, seg_start)
-  gend <- cxt$mapper$l2g(contig_name, seg_end)
+  # convert to global coordinates using context services
+  gstart <- cxt_contig2global(contig_name, seg_start)
+  gend <- cxt_contig2global(contig_name, seg_end)
   
   # calculate zoom with margin
   span <- gend - gstart
@@ -864,8 +851,10 @@ observeEvent(input$associationsGotoSegmentTrigger, {
   # push current region to undo before changing
   regions_module_output$push_undo_state()
   
-  # set zoom to calculated range
-  state$contigs <- c(contig_name)
+  # set segments to selected contig's segments
+  segments <- get_segments(state$assembly)
+  selected_segments <- segments[segments$contig == contig_name, ]
+  state$segments <- selected_segments
   state$zoom <- c(zoom_start, zoom_end)
   
   showNotification(sprintf("Navigated to segment %s", selected_segment$segment[1]), type = "message")

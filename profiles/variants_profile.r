@@ -11,7 +11,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
                             params = default_variants_params,
                             auto_register = TRUE) {
 
-  plot_f <- function(profile, cxt, gg) {
+  plot_f <- function(profile, gg) {
     # get variants data from cache
     variants <- NULL
     if (cache_exists("variants.current")) {
@@ -23,7 +23,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     }
     
     # filter variants using context coordinates (similar to filter_coords)
-    filtered_variants <- filter_coords(variants, cxt, cxt$mapper$xlim)
+    filtered_variants <- cxt_filter_coords(variants)
     if (is.null(filtered_variants) || nrow(filtered_variants) == 0) {
       return(list(plot = gg, legends = list()))
     }
@@ -115,6 +115,9 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     gg <- gg + ggplot2::scale_color_identity()
     
     # add variant ID labels to the right of lines
+    xlim <- cxt_get_xlim()
+    label_offset <- (xlim[2] - xlim[1]) * 0.017
+    
     # non-selected labels
     if (nrow(non_selected) > 0) {
       non_selected_hover <- hover_text[!filtered_variants$is_selected]
@@ -123,7 +126,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
         ggplot2::geom_text(
           data = non_selected,
           ggplot2::aes(
-            x = gcoord + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
+            x = gcoord + label_offset,
             y = -0.05,
             label = variant_id,
             text = non_selected_hover
@@ -143,7 +146,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
         ggplot2::geom_text(
           data = selected,
           ggplot2::aes(
-            x = gcoord + (cxt$mapper$xlim[2] - cxt$mapper$xlim[1]) * 0.017,
+            x = gcoord + label_offset,
             y = -0.05,
             label = variant_id,
             text = selected_hover

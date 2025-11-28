@@ -45,27 +45,27 @@ get_current_synteny_binsize <- function(xlim, binsize, target_bins = 200,
 }
 
 # load synteny matrices using user's simple data function
-load_synteny_matrices <- function(synteny_f, cxt, binsize, hide_self) {
+load_synteny_matrices <- function(synteny_f, binsize, hide_self) {
   if (is.null(synteny_f)) {
     stop("synteny_f function not provided")
   }
   
-  cache_key <- paste0("synteny_data_", cxt$assembly, "_", binsize, "_hideself_", hide_self)
+  cache_key <- paste0("synteny_data_", cxt_get_assembly(), "_", binsize, "_hideself_", hide_self)
   
   cache(cache_key, {
     # load both matrices using user's function (which handles hide_self)
-    sequenced_bp_data <- synteny_f(cxt$assembly, "sequenced_bp", binsize, hide_self)
-    mutation_data <- synteny_f(cxt$assembly, "median_mutation_density", binsize, hide_self)
+    sequenced_bp_data <- synteny_f(cxt_get_assembly(), "sequenced_bp", binsize, hide_self)
+    mutation_data <- synteny_f(cxt_get_assembly(), "median_mutation_density", binsize, hide_self)
     
     # return NULL if either dataset is missing
     if (is.null(sequenced_bp_data) || is.null(mutation_data)) {
-      cat(sprintf("synteny data incomplete for %s, binsize %s - skipping\n", cxt$assembly, binsize))
+      cat(sprintf("synteny data incomplete for %s, binsize %s - skipping\n", cxt_get_assembly(), binsize))
       return(NULL)
     }
     
     # check if any libraries remain after user's filtering
     if (ncol(sequenced_bp_data) <= 3) {
-      cat(sprintf("no libraries found for %s - all libraries filtered out\n", cxt$assembly))
+      cat(sprintf("no libraries found for %s - all libraries filtered out\n", cxt_get_assembly()))
       return(NULL)
     }
     
@@ -77,29 +77,29 @@ load_synteny_matrices <- function(synteny_f, cxt, binsize, hide_self) {
 }
 
 # load consensus data using user's consensus function and create efficient key structure
-load_consensus_data <- function(consensus_f, cxt, current_binsize) {
+load_consensus_data <- function(consensus_f, current_binsize) {
   if (is.null(consensus_f)) {
     return(NULL)
   }
   
-  cache_key <- paste0("consensus_data_", cxt$assembly, "_binsize_", current_binsize)
+  cache_key <- paste0("consensus_data_", cxt_get_assembly(), "_binsize_", current_binsize)
   cache(cache_key, {
     # load consensus data using user's function
-    consensus_data <- consensus_f(cxt$assembly)
+    consensus_data <- consensus_f(cxt_get_assembly())
 
     if (is.null(consensus_data)) {
-      cat(sprintf("consensus data not available for %s\n", cxt$assembly))
+      cat(sprintf("consensus data not available for %s\n", cxt_get_assembly()))
       return(NULL)
     }
     
     # validate that it's a data frame (new structure)
     if (!is.data.frame(consensus_data)) {
-      cat(sprintf("consensus data for %s is not a data frame\n", cxt$assembly))
+      cat(sprintf("consensus data for %s is not a data frame\n", cxt_get_assembly()))
       return(NULL)
     }
     
     if (nrow(consensus_data) == 0) {
-      cat(sprintf("no consensus data found for %s\n", cxt$assembly))
+      cat(sprintf("no consensus data found for %s\n", cxt_get_assembly()))
       return(NULL)
     }
     
@@ -115,20 +115,20 @@ load_consensus_data <- function(consensus_f, cxt, current_binsize) {
     consensus_data$key <- paste(consensus_data$lib_id, consensus_data$contig, consensus_data$bin_start, sep = "_")
     
     cat(sprintf("loaded consensus data for %s (%d mutations)\n", 
-                cxt$assembly, nrow(consensus_data)))
+                cxt_get_assembly(), nrow(consensus_data)))
     return(consensus_data)
   })
 }
 
 # filter synteny matrix to current view (coordinates only, then subset full data)
-filter_synteny_matrix <- function(data_matrix, cxt) {
+filter_synteny_matrix <- function(data_matrix) {
   if (is.null(data_matrix) || nrow(data_matrix) == 0) {
     return(NULL)
   }
   
   # filter just the coordinate structure first
   coord_data <- data_matrix[, c("contig", "start", "end"), drop = FALSE]
-  filtered_coords <- filter_segments(coord_data, cxt, cxt$mapper$xlim)
+  filtered_coords <- cxt_filter_segments(coord_data)
   
   if (is.null(filtered_coords) || nrow(filtered_coords) == 0) {
     return(NULL)
@@ -150,7 +150,7 @@ filter_synteny_matrix <- function(data_matrix, cxt) {
 }
 
 # validate synteny data structure (no coordinate filtering)
-filter_synteny_data <- function(data_list, cxt, xlim) {
+filter_synteny_data <- function(data_list, xlim) {
   if (is.null(data_list) || is.null(data_list$sequenced_bp) || is.null(data_list$mutations)) {
     return(NULL)
   }
@@ -177,7 +177,8 @@ filter_synteny_data <- function(data_list, cxt, xlim) {
   
   # only filter to available contigs, no coordinate filtering
   # (coordinate filtering will be handled by filter_segments)
-  valid_rows <- sequenced_bp$contig %in% cxt$contigs
+  contigs <- cxt_get_contigs()
+  valid_rows <- sequenced_bp$contig %in% contigs
   
   if (!any(valid_rows)) {
     return(NULL)
@@ -282,36 +283,38 @@ synteny_profile <- function(id, name, is_fixed = FALSE,
                            params = default_synteny_params,
                            auto_register = TRUE) {
                            
-  plot_f <- function(profile, cxt, gg) {
+  plot_f <- function(profile, gg) {
     # check that intervals dataframe has at least one row
-    if (is.null(cxt$intervals) || nrow(cxt$intervals) == 0) {
+    intervals <- cxt_get_zoom_view()
+    if (is.null(intervals) || nrow(intervals) == 0) {
       warning("intervals dataframe is empty")
       return(list(plot = gg, legends = list()))
     }
 
     # get current binsize
-    current_binsize <- get_current_synteny_binsize(cxt$mapper$xlim, profile$binsize, profile$target_bins, profile$binsizes)
+    xlim <- cxt_get_xlim()
+    current_binsize <- get_current_synteny_binsize(xlim, profile$binsize, profile$target_bins, profile$binsizes)
     cat(sprintf("using synteny binsize: %d\n", current_binsize))
 
     # load synteny data
-    data_list <- load_synteny_matrices(profile$synteny_f, cxt, current_binsize, profile$hide_self)
+    data_list <- load_synteny_matrices(profile$synteny_f, current_binsize, profile$hide_self)
     if (is.null(data_list)) {
-      cat(sprintf("synteny data not available for %s at binsize %d\n", cxt$assembly, current_binsize))
+      cat(sprintf("synteny data not available for %s at binsize %d\n", cxt_get_assembly(), current_binsize))
       return(list(plot = gg, legends = list()))
     }
 
     # validate data structure (coordinate filtering handled by filter_segments in plot functions)
-    filtered_data <- filter_synteny_data(data_list, cxt, cxt$mapper$xlim)
+    filtered_data <- filter_synteny_data(data_list, xlim)
     if (is.null(filtered_data)) {
-      cat(sprintf("no synteny data available for %s\n", cxt$assembly))
+      cat(sprintf("no synteny data available for %s\n", cxt_get_assembly()))
       return(list(plot = gg, legends = list()))
     }
 
     # call mode-specific plot function
     if (profile$style == "detail") {
-      return(synteny_profile_detail(profile, cxt, filtered_data, gg, current_binsize))
+      return(synteny_profile_detail(profile, filtered_data, gg, current_binsize))
     } else { # style == "summary"
-      return(synteny_profile_summary(profile, cxt, filtered_data, gg, current_binsize))
+      return(synteny_profile_summary(profile, filtered_data, gg, current_binsize))
     }
   }
 
