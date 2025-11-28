@@ -241,8 +241,10 @@ std::vector<PointRow> Context::contig2view_point(const std::vector<PointRow>& in
   std::vector<PointRow> result;
   result.reserve(input.size());
   
-  for (const auto& row : input) {
+  for (size_t i = 0; i < input.size(); i++) {
+    const PointRow& row = input[i];
     PointRow out_row = row;
+    out_row.input_index = static_cast<int>(i + 1);  // 1-based
     
     // contig -> acoord -> segment -> vcoord
     int64_t acoord = contig2acoord(row.contig, row.coord);
@@ -260,8 +262,10 @@ std::vector<PointRow> Context::view2contig_point(const std::vector<PointRow>& in
   std::vector<PointRow> result;
   result.reserve(input.size());
   
-  for (const auto& row : input) {
+  for (size_t i = 0; i < input.size(); i++) {
+    const PointRow& row = input[i];
     PointRow out_row = row;
+    out_row.input_index = static_cast<int>(i + 1);  // 1-based
     int64_t vcoord = static_cast<int64_t>(row.vcoord);
     
     // vcoord -> segment -> acoord -> contig
@@ -283,6 +287,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
   
   for (size_t i = 0; i < input.size(); i++) {
     const IntervalRow& row = input[i];
+    int input_idx = static_cast<int>(i + 1);  // 1-based
     std::string contig = row.contig;
     int64_t start = row.start;
     int64_t end = row.end;
@@ -326,6 +331,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
         out_row.trim_left = trim_l;
         out_row.trim_right = trim_r;
         out_row.n_segments = 0;
+        out_row.input_index = input_idx;
         result.push_back(out_row);
       }
     } else {
@@ -349,6 +355,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
           out_row.trim_left = false;
           out_row.trim_right = false;
           out_row.n_segments = 0;
+          out_row.input_index = input_idx;
           result.push_back(out_row);
         } else {
           // Interval extends beyond segment boundaries, check trimming
@@ -370,6 +377,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
           out_row.trim_left = trim_l;
           out_row.trim_right = trim_r;
           out_row.n_segments = 0;
+          out_row.input_index = input_idx;
           result.push_back(out_row);
         }
       }
@@ -388,6 +396,7 @@ std::vector<IntervalRow> Context::view2contig_interval(const std::vector<Interva
     const IntervalRow& row = input[i];
     
     IntervalRow out_row = row;
+    out_row.input_index = static_cast<int>(i + 1);  // 1-based
     int64_t vstart = static_cast<int64_t>(row.vstart);
     int64_t vend = static_cast<int64_t>(row.vend);
     
@@ -504,7 +513,9 @@ std::vector<PointRow> Context::filter_coords(const std::vector<PointRow>& input,
   std::vector<PointRow> result;
   result.reserve(input.size());
   
-  for (const auto& row : input) {
+  for (size_t i = 0; i < input.size(); i++) {
+    const PointRow& row = input[i];
+    
     // Convert contig coord to acoord
     auto contig_it = contig_id_to_index_.find(row.contig);
     if (contig_it == contig_id_to_index_.end()) {
@@ -540,6 +551,7 @@ std::vector<PointRow> Context::filter_coords(const std::vector<PointRow>& input,
     }
     
     PointRow out_row = row;
+    out_row.input_index = static_cast<int>(i + 1);  // 1-based
     out_row.vcoord = static_cast<double>(vcoord);
     result.push_back(out_row);
   }

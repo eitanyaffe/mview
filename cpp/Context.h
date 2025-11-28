@@ -28,6 +28,7 @@ struct PointRow {
   std::string contig;
   int64_t coord;
   double vcoord;  // for contig2view results
+  int input_index;  // 1-based index of input row that produced this output
 };
 
 // Output structures for interval transformations
@@ -41,6 +42,7 @@ struct IntervalRow {
   bool trim_right;
   int n_segments;
   std::string segment_ids;  // comma-separated when merged
+  int input_index;  // 1-based index of input row that produced this output
 };
 
 // PlottedSegment structure (used in public interface)

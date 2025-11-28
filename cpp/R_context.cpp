@@ -173,6 +173,7 @@ DataFrame point_rows_to_dataframe(const std::vector<PointRow>& rows) {
       Named("contig") = CharacterVector(),
       Named("coord") = IntegerVector(),
       Named("vcoord") = NumericVector(),
+      Named("input_index") = IntegerVector(),
       Named("stringsAsFactors") = false
     );
   }
@@ -180,17 +181,20 @@ DataFrame point_rows_to_dataframe(const std::vector<PointRow>& rows) {
   CharacterVector contigs(n);
   IntegerVector coords(n);
   NumericVector vcoords(n);
+  IntegerVector input_indices(n);
   
   for (int i = 0; i < n; i++) {
     contigs[i] = rows[i].contig;
     coords[i] = static_cast<int>(rows[i].coord);
     vcoords[i] = rows[i].vcoord;
+    input_indices[i] = rows[i].input_index;
   }
   
   return DataFrame::create(
     Named("contig") = contigs,
     Named("coord") = coords,
     Named("vcoord") = vcoords,
+    Named("input_index") = input_indices,
     Named("stringsAsFactors") = false
   );
 }
@@ -207,6 +211,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
       Named("vend") = NumericVector(),
       Named("trim_left") = LogicalVector(),
       Named("trim_right") = LogicalVector(),
+      Named("input_index") = IntegerVector(),
       Named("stringsAsFactors") = false
     );
   }
@@ -218,6 +223,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
   NumericVector vends(n);
   LogicalVector trim_left(n);
   LogicalVector trim_right(n);
+  IntegerVector input_indices(n);
   
   for (int i = 0; i < n; i++) {
     contigs[i] = rows[i].contig;
@@ -227,6 +233,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
     vends[i] = rows[i].vend;
     trim_left[i] = rows[i].trim_left;
     trim_right[i] = rows[i].trim_right;
+    input_indices[i] = rows[i].input_index;
   }
   
   return DataFrame::create(
@@ -237,6 +244,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
     Named("vend") = vends,
     Named("trim_left") = trim_left,
     Named("trim_right") = trim_right,
+    Named("input_index") = input_indices,
     Named("stringsAsFactors") = false
   );
 }

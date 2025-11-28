@@ -13,8 +13,8 @@ if (!exists(".context_env")) {
   cat("[context.r] Reusing existing context environment\n")
 }
 
-# Merge C++ result back to input df using key columns (match pattern)
-merge_context_result <- function(df_input, df_result, key_cols) {
+# Merge C++ result back to input df using input_index field
+merge_context_result <- function(df_input, df_result) {
   if (is.null(df_input) || nrow(df_input) == 0) {
     return(df_result)
   }
@@ -23,35 +23,29 @@ merge_context_result <- function(df_input, df_result, key_cols) {
     return(df_input)
   }
   
-  # Create key columns in both data frames
-  df_input$..key.. <- do.call(paste, c(df_input[key_cols], sep = "|"))
-  df_result$..key.. <- do.call(paste, c(df_result[key_cols], sep = "|"))
-  
-  # Find matches: for each result row, find matching input row index
-  # This handles 1:many by allowing multiple result rows to match same input row
-  result_cols <- setdiff(names(df_result), c(key_cols, "..key.."))
-  
-  # Build output by matching each result row to input
-  # For 1:many mappings, we replicate input rows
-  input_ix <- match(df_result$..key.., df_input$..key..)
-  
-  if (any(is.na(input_ix))) {
-    # Result rows without input match should not happen
-    missing_keys <- unique(df_result$..key..[is.na(input_ix)])
-    stop(sprintf("internal: result rows have no input match for %d keys, e.g. %s",
-                 length(missing_keys), paste(head(missing_keys, 5), collapse = ", ")))
+  if (!"input_index" %in% names(df_result)) {
+    stop("merge_context_result: df_result missing required 'input_index' column")
   }
   
-  # Start with input rows (replicated for 1:many case)
+  input_ix <- df_result$input_index
+  
+  if (any(is.na(input_ix))) {
+    stop("merge_context_result: input_index contains NA values")
+  }
+  
+  if (any(input_ix < 1) || any(input_ix > nrow(df_input))) {
+    stop(sprintf("merge_context_result: input_index out of range [1, %d]", nrow(df_input)))
+  }
+  
+  # columns from result that should be added to merged output
+  result_cols <- setdiff(names(df_result), c(names(df_input), "input_index"))
+  
+  # index directly into input (input_index is 1-based)
   merged <- df_input[input_ix, , drop = FALSE]
   
-  # Add result columns
   for (col in result_cols) {
     merged[[col]] <- df_result[[col]]
   }
-  
-  # Remove temporary key column
-  merged$..key.. <- NULL
   
   return(merged)
 }
@@ -319,7 +313,7 @@ cxt_contig2global <- function(contigs, coords) {
   df <- data.frame(contig = contigs, coord = coords, stringsAsFactors = FALSE)
   df_minimal <- df[c("contig", "coord")]
   result_minimal <- context_contig2view_point(.context_env$current_context, df_minimal)
-  result <- merge_context_result(df, result_minimal, c("contig", "coord"))
+  result <- merge_context_result(df, result_minimal)
   result$vcoord
 }
 
@@ -333,7 +327,7 @@ cxt_global2contig <- function(gcoords) {
   df <- data.frame(vcoord = gcoords)
   df_minimal <- df[c("vcoord")]
   result_minimal <- context_view2contig_point(.context_env$current_context, df_minimal)
-  result <- merge_context_result(df, result_minimal, c("vcoord"))
+  result <- merge_context_result(df, result_minimal)
   data.frame(
     contig = result$contig,
     coord = result$coord,
@@ -359,7 +353,7 @@ cxt_contig2view_interval <- function(df, crossing_intervals = "drop") {
   
   df_minimal <- df[c("contig", "start", "end")]
   result_minimal <- context_contig2view_interval(.context_env$current_context, df_minimal, crossing_intervals)
-  merge_context_result(df, result_minimal, c("contig", "start", "end"))
+  merge_context_result(df, result_minimal)
 }
 
 # Filter point coords to current xlim and add vcoord
@@ -387,7 +381,7 @@ cxt_filter_coords <- function(df) {
     return(NULL)
   }
   
-  result <- merge_context_result(df, result_minimal, c("contig", "coord"))
+  result <- merge_context_result(df, result_minimal)
   
   # Add gcoord for backward compatibility
   if ("vcoord" %in% names(result)) {
@@ -415,14 +409,13 @@ cxt_filter_segments <- function(df) {
   
   df_minimal <- df[c("contig", "start", "end")]
   xlim <- cxt_get_xlim()
-  xlim_vec <- if (length(xlim) == 2) as.numeric(xlim) else numeric()
-  result_minimal <- context_filter_segments(.context_env$current_context, df_minimal, xlim_vec)
+  result_minimal <- context_filter_segments(.context_env$current_context, df_minimal, xlim)
   
   if (is.null(result_minimal) || nrow(result_minimal) == 0) {
     return(NULL)
   }
   
-  result <- merge_context_result(df, result_minimal, c("contig", "start", "end"))
+  result <- merge_context_result(df, result_minimal)
   
   # Add gstart/gend for backward compatibility
   if ("vstart" %in% names(result)) {

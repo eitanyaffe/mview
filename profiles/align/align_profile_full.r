@@ -115,7 +115,7 @@ min_indel_length = 3) {
     chunks$end <- chunks$span_end
     chunks <- cxt_filter_segments(chunks)
   }
-
+  
   return(list(alignments = alignments, mutations = mutations, reads = reads, chunks = chunks))
 }
 
