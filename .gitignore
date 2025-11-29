@@ -18,3 +18,4 @@ tabs/variants/variants_tab_old.r
 tabs/rearrangements/rearrangements_tab_old.r
 *.o
 /configs/c60/regions_old
+tools/alntools/alntools
