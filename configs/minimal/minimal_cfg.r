@@ -180,6 +180,73 @@ get_genes_f <- function(assembly) {
   genes
 }
 
+# mock seg_bins: segments with bin assignment (gid as bin)
+get_seg_bins_f <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  
+  segments <- get_segments_f(assembly)
+  if (is.null(segments)) return(NULL)
+  
+  seg_map <- get_segment_map_f(assembly)
+  if (is.null(seg_map)) return(NULL)
+  
+  # add bin column from segment map (gid as bin)
+  ix <- match(segments$segment, seg_map$segment)
+  segments$bin <- seg_map$gid[ix]
+  
+  segments
+}
+
+# mock seg_adj: consecutive segments within same genome are connected
+get_seg_adj_f <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  
+  seg_bins <- get_seg_bins_f(assembly)
+  if (is.null(seg_bins)) return(NULL)
+  
+  # build edges: connect consecutive segments within each genome
+  edges <- data.frame(
+    seg_src = character(),
+    seg_tgt = character(),
+    side_src = character(),
+    side_tgt = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  # group by bin (genome) and create edges between consecutive segments
+  for (gid in unique(seg_bins$bin)) {
+    bin_segs <- seg_bins[seg_bins$bin == gid, ]
+    # order by contig name
+    bin_segs <- bin_segs[order(bin_segs$contig), ]
+    
+    if (nrow(bin_segs) < 2) next
+    
+    for (i in seq_len(nrow(bin_segs) - 1)) {
+      edges <- rbind(edges, data.frame(
+        seg_src = bin_segs$segment[i],
+        seg_tgt = bin_segs$segment[i + 1],
+        side_src = "R",
+        side_tgt = "L",
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+  
+  if (nrow(edges) == 0) return(NULL)
+  
+  # add mock library column with fixed values
+  count_df <- edges
+  count_df$mock <- 10
+  
+  total_df <- edges
+  total_df$mock <- 100
+  
+  associated_df <- edges
+  associated_df$mock <- 50
+  
+  list(count = count_df, total = total_df, associated = associated_df)
+}
+
 ########################################################
 # register assemblies, genomes and contigs
 ########################################################
@@ -194,6 +261,8 @@ register_segments_f(get_segments_f)
 register_genomes_f(get_genomes_f)
 register_segment_map_f(get_segment_map_f)
 register_fasta_f(get_fasta_f)
+register_seg_bins_f(get_seg_bins_f)
+register_seg_adj_f(get_seg_adj_f)
 
 ########################################################
 # register views

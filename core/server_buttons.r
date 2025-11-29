@@ -1,14 +1,5 @@
 # ---- Button Event Observers ----
 
-selected_contigs_from_table <- function(
-    state_contigs,
-    full_contig_table,
-    selected_rows) {
-  visible_df <- full_contig_table[full_contig_table$contig %in% state_contigs, ]
-  visible_df <- visible_df[match(state_contigs, visible_df$contig), ]
-  visible_df$contig[selected_rows]
-}
-
 # helper to add segments for selected contigs
 add_segments_for_contigs <- function(contigs_to_add, assembly) {
   if (length(contigs_to_add) == 0) return(data.frame())
@@ -124,19 +115,6 @@ observeEvent(input$gotoGenomesBtn, {
       # reset zoom to see full range of new segments
       state$zoom <- NULL
     }
-  }
-})
-
-observeEvent(input$removeContigsBtn, {
-  rows <- input$selectedTable_rows_selected
-  contigs_data <- get_contigs(state$assembly)
-  removed_contigs <- selected_contigs_from_table(get_state_contigs(), contigs_data, rows)
-  if (length(removed_contigs) > 0) {
-    # push current state to undo before changing
-    regions_module_output$push_undo_state()
-    
-    # remove segments for contigs
-    state$segments <- remove_segments_for_contigs(removed_contigs)
   }
 })
 

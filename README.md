@@ -161,7 +161,6 @@ The bottom panel contains these tabs:
 - **Contigs**: Table for selecting individual contigs
 - **Genomes**: Table for selecting reconstructed genomes
 - **Contig Map**: Mapping between contigs and genomes
-- **Selected Contigs**: Displays currently selected contigs
 - **Options**: Display settings
 
 #### Read alignment tab

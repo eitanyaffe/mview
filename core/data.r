@@ -8,6 +8,8 @@
 .data_env$register_genomes_f <- NULL
 .data_env$register_segment_map_f <- NULL
 .data_env$register_fasta_f <- NULL
+.data_env$register_seg_bins_f <- NULL
+.data_env$register_seg_adj_f <- NULL
 .data_env$assemblies <- NULL
 .data_env$regions_dir <- NULL
 
@@ -150,6 +152,16 @@ register_fasta_f <- function(f) {
   .data_env$register_fasta_f <- f
 }
 
+register_seg_bins_f <- function(f) {
+  cat(sprintf("registering seg_bins function\n"))
+  .data_env$register_seg_bins_f <- f
+}
+
+register_seg_adj_f <- function(f) {
+  cat(sprintf("registering seg_adj function\n"))
+  .data_env$register_seg_adj_f <- f
+}
+
 # Get contigs using the registered function
 get_contigs <- function(assembly = NULL) {
   if (is.null(.data_env$register_contigs_f)) {
@@ -226,5 +238,27 @@ get_fasta <- function(assembly = NULL) {
   key <- sprintf("global.fasta.%s", if (is.null(assembly)) "default" else assembly)
   cache(key, {
     .data_env$register_fasta_f(assembly)
+  })
+}
+
+# get segment bins using the registered function (returns NULL if not registered)
+get_seg_bins <- function(assembly = NULL) {
+  if (is.null(.data_env$register_seg_bins_f)) {
+    return(NULL)
+  }
+  key <- sprintf("global.seg_bins.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_seg_bins_f(assembly)
+  })
+}
+
+# get segment adjacency using the registered function (returns NULL if not registered)
+get_seg_adj <- function(assembly = NULL) {
+  if (is.null(.data_env$register_seg_adj_f)) {
+    return(NULL)
+  }
+  key <- sprintf("global.seg_adj.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_seg_adj_f(assembly)
   })
 }

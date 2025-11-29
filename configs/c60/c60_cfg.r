@@ -103,6 +103,20 @@ get_fasta_f <- function(assembly = NULL) {
 # Register fasta function
 register_fasta_f(get_fasta_f)
 
+# Register seg_bins function (segment to bin mapping with coordinates)
+register_seg_bins_f(function(assembly) {
+  get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
+})
+
+# Register seg_adj function (segment adjacency matrices)
+register_seg_adj_f(function(assembly) {
+  list(
+    count = get_data("BINNING_SEG_ADJ_count", tag = assembly, null.on.missing = TRUE),
+    total = get_data("BINNING_SEG_ADJ_total_read_count", tag = assembly, null.on.missing = TRUE),
+    associated = get_data("BINNING_SEG_ADJ_associated_read_count", tag = assembly, null.on.missing = TRUE)
+  )
+})
+
 ########################################################
 # register views
 ########################################################
@@ -408,7 +422,7 @@ get_bin_segments_f <- function(assembly) {
   
   # format for interval_profile (needs: assembly, contig, start, end, desc, id)
   seg_table$assembly <- assembly
-  seg_table$desc <- paste0("Bin: ", seg_table$bin)
+  seg_table$desc <- paste0("Segment: ", seg_table$segment, "\nBin: ", seg_table$bin)
   seg_table$id <- seg_table$segment
   
   return(seg_table)

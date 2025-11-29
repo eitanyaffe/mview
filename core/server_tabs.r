@@ -35,11 +35,6 @@ output$mainTabsPanel <- renderUI({
       DTOutput("mapTable")
     ),
     tabPanel(
-      "Selected Contigs",
-      actionButton("removeContigsBtn", "Remove contigs"),
-      DTOutput("selectedTable")
-    ),
-    tabPanel(
       "Legends",
       uiOutput("legendsContent")
     ),
