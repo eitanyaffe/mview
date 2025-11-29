@@ -160,7 +160,7 @@ The bottom panel contains these tabs:
 - **Regions**: Manage saved visualization regions 
 - **Contigs**: Table for selecting individual contigs
 - **Genomes**: Table for selecting reconstructed genomes
-- **Contig Map**: Mapping between contigs and genomes
+- **Segment Map**: Mapping between segments and genomes
 - **Options**: Display settings
 
 #### Read alignment tab

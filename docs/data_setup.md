@@ -4,6 +4,23 @@
 
 > **Note:** The column names and file structures shown below are examples only. Your existing data can have different column names and structures. You can use your existing tables through configurable "get functions" that transform tables as needed. Read through the entire guide before creating new files to understand how the system works.
 
+## Segments: the core unit of visualization
+
+mview uses a **segment-based** coordinate system. A segment is a sub-contig interval defined by a contig name, start, and end coordinates. A genome (or bin) is a collection of segments. The current view is an ordered sequence of segments that determines what is displayed.
+
+You have two options for defining segments:
+
+**Option 1: Simple 1-to-1 mapping** (recommended for most users)  
+Define only a contig table. Your configuration will auto-generate segments where each segment spans an entire contig. This is the approach used in the minimal example.
+
+**Option 2: Custom segment table**  
+Provide your own segment table with sub-contig intervals. This is useful when you want to:
+- Display arbitrary sub-regions of contigs
+- Segment contigs based on alignment breakpoints
+- Reorder segments independently of genomic coordinates
+
+If you want to segment your contigs, alntools provides segmentation based on partially aligned reads (see [alntools documentation](https://github.com/eitanyaffe/alntools)).
+
 ## Step 1: Prepare your data tables
 
 You need to have several tab-delimited text files that describe your assemblies and genomic features. The examples below show the required information, but your actual files can have different column names and structures:
@@ -15,10 +32,9 @@ your_assembly_1
 your_assembly_2
 ```
 
-Each assembly requires an assembly table, a contig table and a contig mapping table.
+Each assembly requires an assembly table, a contig table, and a genome table. For simple 1-to-1 segments, add a contig mapping table. For custom segments, add a segment table and segment mapping table.
 
 **2. Contig Tables**
-
 
 ```
 contig	length	circular
@@ -36,7 +52,7 @@ genome_2	2100000
 ```
 Required information: genome identifier, total genome length
 
-**4. Contig Mapping Tables**
+**4. Contig Mapping Tables** (for simple 1-to-1 segments)
 ```
 contig	gid
 ctg001	genome_1
@@ -45,7 +61,27 @@ ctg003	genome_2
 ```
 Required information: contig identifier, genome identifier (links contigs to genomes)
 
-**5. Gene Tables**
+When using simple 1-to-1 mapping, your configuration will convert this to a segment map automatically.
+
+**5. Segment Tables** (optional, for custom segments)
+```
+segment	contig	start	end	length
+seg001	ctg001	1	25000	25000
+seg002	ctg001	25001	50000	24999
+seg003	ctg002	1	75000	75000
+```
+Required information: segment identifier, contig, start position, end position, length
+
+**6. Segment Mapping Tables** (required if using custom segments)
+```
+segment	gid
+seg001	genome_1
+seg002	genome_1
+seg003	genome_2
+```
+Required information: segment identifier, genome identifier (links segments to genomes)
+
+**7. Gene Tables**
 ```
 gene	assembly	contig	start	end	strand	prot_desc	tax	identity	coverage
 gene001	BAA	ctg001	100	1200	+	DNA polymerase	Bacteria	85.5	95.2
@@ -170,17 +206,62 @@ get_genomes_f <- function(assembly = NULL) {
 }
 ```
 
-**4. `get_contig_map_f(assembly)`** - Maps contigs to genomes
+**4. `get_segments_f(assembly)`** - Returns segments for an assembly
+
+For simple 1-to-1 mapping (auto-generate from contigs):
 ```r
-get_contig_map_f <- function(assembly = NULL) {
-  # Must return: contig, gid columns
-  read.delim(paste0("/your/path/mapping_", assembly, ".txt"))
+get_segments_f <- function(assembly = NULL) {
+  # Must return: segment, contig, start, end, length columns
+  contigs <- get_contigs_f(assembly)
+  if (is.null(contigs)) return(NULL)
+  data.frame(
+    segment = paste0("s", seq_len(nrow(contigs))),
+    contig = contigs$contig,
+    start = 1L,
+    end = contigs$length,
+    length = contigs$length,
+    stringsAsFactors = FALSE
+  )
+}
+```
+
+For custom segment tables:
+```r
+get_segments_f <- function(assembly = NULL) {
+  # Must return: segment, contig, start, end, length columns
+  read.delim(paste0("/your/path/segments_", assembly, ".txt"))
+}
+```
+
+**5. `get_segment_map_f(assembly)`** - Maps segments to genomes
+
+For simple 1-to-1 mapping (auto-generate from contig map):
+```r
+get_segment_map_f <- function(assembly = NULL) {
+  # Must return: segment, gid columns
+  segments <- get_segments_f(assembly)
+  if (is.null(segments)) return(NULL)
+  
+  # read contig->gid mapping
+  contig_map <- read.delim(paste0("/your/path/contig_map_", assembly, ".txt"))
+  
+  # convert to segment->gid mapping
+  ix <- match(contig_map$contig, segments$contig)
+  data.frame(segment = segments$segment[ix], gid = contig_map$gid, stringsAsFactors = FALSE)
+}
+```
+
+For custom segment tables:
+```r
+get_segment_map_f <- function(assembly = NULL) {
+  # Must return: segment, gid columns
+  read.delim(paste0("/your/path/segment_map_", assembly, ".txt"))
 }
 ```
 
 ### Optional get functions
 
-**5. `get_genes_f(cxt)`** - Returns gene annotations (for gene tab)
+**6. `get_genes_f(cxt)`** - Returns gene annotations (for gene tab)
 ```r
 get_genes_f <- function(cxt) {
   # Must return: gene, contig, start, end columns
@@ -198,7 +279,7 @@ get_genes_f <- function(cxt) {
 }
 ```
 
-**6. `get_aln_f(assembly)`** - Returns alignment data (for alignment profiles)
+**7. `get_aln_f(assembly)`** - Returns alignment data (for alignment profiles)
 ```r
 get_aln_f <- function(assembly = NULL) {
   # Returns alignment object for visualization
