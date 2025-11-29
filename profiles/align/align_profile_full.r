@@ -194,8 +194,8 @@ align_profile_full <- function(profile, aln, gg) {
     right_in_plot = alignments$gend < xlim[2]
 
     # check if read is soft-clipped (doesn't start at 0 or doesn't end at read_length)
-    clip_read_start = alignments$read_start > 0
-    clip_read_end = alignments$read_end < alignments$read_length
+    clip_read_start = alignments$read_start > profile$max_margin
+    clip_read_end = alignments$read_end < alignments$read_length - profile$max_margin
 
     alignments$clipped_left <- ifelse(!alignments$is_reverse, clip_read_start, clip_read_end) & left_in_plot
     alignments$clipped_right <- ifelse(!alignments$is_reverse, clip_read_end, clip_read_start) & right_in_plot
