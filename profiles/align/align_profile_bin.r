@@ -91,7 +91,7 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
   if (!is.null(df) && nrow(df) > 0) {
     df$start <- df$start + 1
     df$end <- df$end
-    return(cxt_filter_segments(df))
+    return(cxt_filter_intervals(df))
   }
 
   return(NULL)

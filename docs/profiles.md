@@ -13,20 +13,21 @@ Hover is available in all profiles to reveal information about the plotted eleme
 
 ---
 
-### segments profile
+### interval profile
 
-Display genomic segments as colored rectangles with customizable data sources. Designed for visualizing regions, annotations, or any segmented genomic features.
+Display genomic intervals as colored rectangles with customizable data sources. Designed for visualizing regions, annotations, or any interval-based genomic features.
 
 #### Main parameters
-- **segments_f**: data source, can be:
-  - Function: takes assembly as parameter and returns segment data (e.g., `function(assembly) get_data("CAV_REFINE_SEGMENT_TABLE", tag = assembly)`)
-  - Cache key (string): references cached segment data (e.g., `"segments.current_regions"`)
-  - Data frame: direct segment data with required columns (`assembly`, `contig`, `start`, `end`, `desc`, `id`)
-- **color**: fill color for segment rectangles (default: `"#2E86AB"`)
-- **height**: vertical size of the profile in pixels (default: 40)
+- **intervals_f**: data source, can be:
+  - Function: takes assembly as parameter and returns interval data (e.g., `function(assembly) get_data("CAV_REFINE_SEGMENT_TABLE", tag = assembly)`)
+  - Cache key (string): references cached interval data (e.g., `"segments.current_regions"`)
+  - Data frame: direct interval data with required columns (`assembly`, `contig`, `start`, `end`, `desc`, `id`)
+- **color**: fill color for interval rectangles (default: `"#2E86AB"`)
+- **merge_adjacent**: whether to merge adjacent intervals on the same contig (default: `TRUE`)
+- **height**: vertical size of the profile in pixels (default: 60)
 
 #### Data format
-Segment data requires these columns:
+Interval data requires these columns:
 - **assembly**: assembly identifier (e.g., "EBC", "BAA")  
 - **contig**: contig name within the assembly
 - **start**: start coordinate within contig (local coordinates)
@@ -35,35 +36,36 @@ Segment data requires these columns:
 - **id**: unique identifier displayed as label
 
 #### Display behavior
-- **Assembly filtering**: only shows segments matching current assembly context
-- **Context filtering**: automatically filters segments to current view and contigs
-- **Rectangle display**: segments shown as filled rectangles with black borders
-- **ID labels**: segment IDs displayed to the right of each rectangle in black text
+- **Assembly filtering**: only shows intervals matching current assembly context
+- **Context filtering**: automatically filters intervals to current view and contigs
+- **Merging**: when `merge_adjacent = TRUE`, adjacent intervals on the same contig are merged
+- **Rectangle display**: intervals shown as filled rectangles with black borders
+- **ID labels**: interval IDs displayed to the right of each rectangle in black text
 - **Hover information**: shows contig coordinates and description when hovering over ID labels
 
 #### Usage examples
 ```r
-# Assembly segments with function
-segments_profile(
-  id = "assembly_segments",
-  name = "Assembly Segments",
-  segments_f = function(assembly) {
-    get_data("CAV_REFINE_SEGMENT_TABLE", tag = assembly)
-  }
-)
-
-# Basic segments profile with cache data
-segments_profile(
+# Regions with merging (default)
+interval_profile(
   id = "regions",
   name = "Regions", 
-  segments_f = "segments.current_regions"
+  intervals_f = "segments.current_regions",
+  merge_adjacent = TRUE
 )
 
-# Custom segments with direct data and styling
-segments_profile(
+# Bin segments without merging
+interval_profile(
+  id = "bin_segments",
+  name = "Segments",
+  intervals_f = get_bin_segments_f,
+  merge_adjacent = FALSE
+)
+
+# Custom intervals with direct data and styling
+interval_profile(
   id = "annotations",
   name = "Annotations",
-  segments_f = my_segments_df,
+  intervals_f = my_intervals_df,
   color = "#FF6B6B",
   height = 30
 )
@@ -71,7 +73,8 @@ segments_profile(
 
 **Notes**:
 - Supports string-based IDs for flexible labeling (e.g., "A1", "control", "REG_001")
-- Automatically filters to show only segments relevant to the current assembly and view
+- Automatically filters to show only intervals relevant to the current assembly and view
+- Use `merge_adjacent = FALSE` when you want to preserve individual interval boundaries
 
 ---
 

@@ -1015,7 +1015,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       goto_region <- function(region_row) {
         # push current region to undo stack
         current_state <- list(
-          contigs = main_state_rv$contigs,
+          segments = main_state_rv$segments,
           zoom = main_state_rv$zoom,
           assembly = main_state_rv$assembly
         )
@@ -1051,7 +1051,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       # push current region to undo stack (for external use)
       push_undo_state <- function() {
         current_state <- list(
-          contigs = main_state_rv$contigs,
+          segments = main_state_rv$segments,
           zoom = main_state_rv$zoom,
           assembly = main_state_rv$assembly
         )
@@ -1116,7 +1116,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             # For segment-based state, just show zoom coords directly
             # (more complex conversion would require temporarily setting context)
             if (length(contigs_list) == 1) {
-              sprintf("%s: %d-%d", contigs_list[1], rt$zoom_start[i], rt$zoom_end[i])
+              sprintf("%s: %d-%d", contigs_list[1], as.integer(rt$zoom_start[i]), as.integer(rt$zoom_end[i]))
             } else if (length(contigs_list) > 1) {
               "Multiple contigs"
             } else {

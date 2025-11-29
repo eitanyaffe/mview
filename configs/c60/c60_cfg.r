@@ -406,7 +406,7 @@ get_bin_segments_f <- function(assembly) {
   # add color column
   seg_table$bin_color <- bin_colors[seg_table$bin]
   
-  # format for segments_profile (needs: assembly, contig, start, end, desc, id)
+  # format for interval_profile (needs: assembly, contig, start, end, desc, id)
   seg_table$assembly <- assembly
   seg_table$desc <- paste0("Bin: ", seg_table$bin)
   seg_table$id <- seg_table$segment

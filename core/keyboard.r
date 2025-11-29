@@ -20,13 +20,13 @@ zoom_to_power_of_ten <- function(n, regions_module_output, main_state_rv) {
   }
   
   if (is.null(current_center)) {
-    # fallback: try to get center from contig data if available
-    if (length(main_state_rv$contigs) > 0) {
-      # attempt to get center from first contig - this is a fallback
+    # fallback: try to get center from segment data if available
+    if (!is.null(main_state_rv$segments) && nrow(main_state_rv$segments) > 0) {
+      # attempt to get center from first segment - this is a fallback
       cat(sprintf("alt+%d: no current zoom, cannot determine center\n", n))
       return()
     } else {
-      cat(sprintf("alt+%d: no contigs selected, cannot determine center\n", n))
+      cat(sprintf("alt+%d: no segments selected, cannot determine center\n", n))
       return()
     }
   }
@@ -79,7 +79,9 @@ change_contig_action <- function(regions_module_output, main_state_rv, input, di
     regions_module_output$push_undo_state()
     contig_proxy <- DT::dataTableProxy("contigTable")
     DT::selectRows(contig_proxy, 1)
-    main_state_rv$contigs <- contigs_data$contig[input$contigTable_rows_all[1]]
+    selected_contig <- contigs_data$contig[input$contigTable_rows_all[1]]
+    segments <- get_segments(main_state_rv$assembly)
+    main_state_rv$segments <- segments[segments$contig == selected_contig, ]
     main_state_rv$zoom <- NULL
     cat("selected first contig in table\n")
     return()
@@ -121,7 +123,8 @@ change_contig_action <- function(regions_module_output, main_state_rv, input, di
   # update selection and contig
   contig_proxy <- DT::dataTableProxy("contigTable")
   DT::selectRows(contig_proxy, new_row_index)
-  main_state_rv$contigs <- new_contig
+  segments <- get_segments(main_state_rv$assembly)
+  main_state_rv$segments <- segments[segments$contig == new_contig, ]
   main_state_rv$zoom <- NULL
   
   cat(sprintf("navigated to %s contig: %s\n", 
@@ -239,7 +242,7 @@ change_region_action <- function(regions_module_output, main_state_rv, direction
   
   # determine current region by matching current state
   current_assembly <- main_state_rv$assembly
-  current_contigs <- main_state_rv$contigs
+  current_contigs <- unique(main_state_rv$segments$contig)
   current_zoom <- main_state_rv$zoom
   
   # find matching region or get first one if none match
@@ -400,12 +403,14 @@ keyboard_shortcuts <- list(
     }
   ),
   "Alt+C" = list(
-    description = "Clear selected contigs",
+    description = "Clear selected segments",
     type = "zoom",
     action = function(regions_module_output, main_state_rv) {
       regions_module_output$push_undo_state()
-      main_state_rv$contigs <- character()
-      cat("cleared selected contigs by Alt+C\n")
+      main_state_rv$segments <- data.frame(
+        segment = character(), contig = character(),
+        start = integer(), end = integer(), stringsAsFactors = FALSE)
+      cat("cleared selected segments by Alt+C\n")
     }
   ),
   "Alt+2" = list(

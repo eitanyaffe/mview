@@ -23,8 +23,16 @@ set_tab_panel_f(function() {
     fluidRow(
       column(12,
         div(
-          style = "background-color: #f5f5f5; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd;",
+          style = "background-color: #f5f5f5; padding: 10px; margin-bottom: 5px; border-radius: 4px; border: 1px solid #ddd;",
           uiOutput("alignmentReadInfo")
+        )
+      )
+    ),
+    fluidRow(
+      column(12,
+        div(
+          style = "padding-left: 10px; margin-bottom: 10px;",
+          checkboxInput("alignment_show_index", "show alignment index on plot", value = TRUE)
         )
       )
     ),
@@ -33,7 +41,7 @@ set_tab_panel_f(function() {
         shinyjqui::jqui_resizable(
           div(
             id = "alignment_plot_container",
-            style = "height: 120px; padding: 5px;",
+            style = "height: 200px; padding: 5px;",
             plotly::plotlyOutput("alignmentPlot", height = "100%")
           ),
           options = list(handles = "s", minHeight = 80)
@@ -53,6 +61,7 @@ set_tab_panel_f(function() {
 
 output$alignmentReadInfo <- renderUI({
   result <- state$clicked_read_data
+  profile_id <- state$clicked_profile_id
   
   if (is.null(result) || is.null(result$alignments) || nrow(result$alignments) == 0) {
     return(div(
@@ -78,6 +87,9 @@ output$alignmentReadInfo <- renderUI({
     ),
     tags$span(style = "margin-left: 20px; color: #555;",
       sprintf("Contigs: %d", num_contigs)
+    ),
+    tags$span(style = "margin-left: 20px; color: #888;",
+      sprintf("Profile: %s", profile_id)
     )
   )
 })
@@ -90,14 +102,29 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
   req(event_data)
   req(event_data$key)
   
-  read_id <- event_data$key[[1]]
-  aln <- cache_get("aln_obj")
+  # parse composite key: "profile_id:read_id"
+  click_key <- event_data$key[[1]]
+  key_parts <- strsplit(click_key, ":", fixed = TRUE)[[1]]
+  if (length(key_parts) < 2) {
+    cat(sprintf("invalid click key format: %s\n", click_key))
+    return()
+  }
+  profile_id <- key_parts[1]
+  read_id <- paste(key_parts[-1], collapse = ":")  # handle read_ids with colons
   
-  if (is.null(aln)) {
+  # get alignment list and look up by profile id
+  aln_list <- cache_get("aln_obj")
+  if (is.null(aln_list) || !is.list(aln_list)) {
     return()
   }
   
-  cat(sprintf("clicked read_id: %s\n", read_id))
+  aln <- aln_list[[profile_id]]
+  if (is.null(aln)) {
+    cat(sprintf("alignment not found for profile: %s\n", profile_id))
+    return()
+  }
+  
+  cat(sprintf("clicked profile: %s, read_id: %s\n", profile_id, read_id))
   
   result <- tryCatch({
     aln_alignments_from_read_id(aln, read_id)
@@ -108,10 +135,18 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
   
   if (!is.null(result) && !is.null(result$alignments) && nrow(result$alignments) > 0) {
     state$clicked_read_data <- result
-    state$selected_alignment_index <- NULL
+    state$clicked_profile_id <- profile_id
+    cache_set("selected_read_id", read_id)
+    # trigger profile refresh to show selected read highlighting
+    current_val <- refresh_trigger()
+    refresh_trigger(current_val + 1)
   } else {
     state$clicked_read_data <- NULL
-    state$selected_alignment_index <- NULL
+    state$clicked_profile_id <- NULL
+    cache_set("selected_read_id", NULL)
+    # trigger profile refresh to clear highlighting
+    current_val <- refresh_trigger()
+    refresh_trigger(current_val + 1)
   }
 })
 
@@ -119,7 +154,7 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
 
 output$alignmentPlot <- plotly::renderPlotly({
   result <- state$clicked_read_data
-  selected_idx <- state$selected_alignment_index
+  show_index <- input$alignment_show_index
   
   if (is.null(result) || is.null(result$alignments) || nrow(result$alignments) == 0) {
     # empty plot with message
@@ -136,18 +171,22 @@ output$alignmentPlot <- plotly::renderPlotly({
   mutations <- result$mutations
   read_length <- result$read_length
   
+  # assign heights based on contig ordering
+  contig_order <- unique(alignments$contig_id[order(
+    alignments$read_start,
+    alignments$read_end,
+    -alignments$num_mutations
+  )])
+  contig_heights <- setNames(seq_along(contig_order) - 1, contig_order)
+  alignments$height <- contig_heights[alignments$contig_id]
+  
+  # sort alignments and add running index
+  alignments <- alignments[order(alignments$height, alignments$read_start), ]
+  alignments$index <- seq_len(nrow(alignments))
+  
   # prepare alignment rectangles
   alignments$ymin <- alignments$height
   alignments$ymax <- alignments$height + 0.9
-  
-  # determine if alignment is selected
-  alignments$is_selected <- FALSE
-  if (!is.null(selected_idx)) {
-    alignments$is_selected <- alignments$alignment_index == selected_idx
-  }
-  
-  # always use lightgray for alignments (show_mutations style)
-  alignments$fill_color <- "lightgray"
   
   # hover text
   alignments$hover_text <- paste0(
@@ -161,42 +200,50 @@ output$alignmentPlot <- plotly::renderPlotly({
   # create base plot
   gg <- ggplot2::ggplot()
   
-  # draw unselected alignments first
-  unselected <- alignments[!alignments$is_selected, ]
-  if (nrow(unselected) > 0) {
-    gg <- gg + ggplot2::geom_rect(
-      data = unselected,
-      ggplot2::aes(
-        xmin = read_start, xmax = read_end,
-        ymin = ymin, ymax = ymax,
-        text = hover_text,
-        key = alignment_index
-      ),
-      fill = "lightgray",
-      color = "gray50",
-      size = 0.2
-    )
-  }
+  # draw strand indicator dots first (bottom layer)
+  alignments$strand_x_filled <- ifelse(alignments$is_reverse, alignments$read_end, alignments$read_start)
+  alignments$strand_x_open <- ifelse(alignments$is_reverse, alignments$read_start, alignments$read_end)
+  alignments$strand_y <- (alignments$ymin + alignments$ymax) / 2
   
-  # draw selected alignment on top with thicker black border
-  selected <- alignments[alignments$is_selected, ]
-  if (nrow(selected) > 0) {
-    gg <- gg + ggplot2::geom_rect(
-      data = selected,
-      ggplot2::aes(
-        xmin = read_start, xmax = read_end,
-        ymin = ymin, ymax = ymax,
-        text = hover_text,
-        key = alignment_index
-      ),
-      fill = "lightgray",
-      color = "black",
-      size = 1.0
-    )
-  }
+  # filled circle on one side
+  gg <- gg + ggplot2::geom_point(
+    data = alignments,
+    ggplot2::aes(x = strand_x_filled, y = strand_y),
+    color = "black",
+    fill = "black",
+    shape = 21,
+    size = 2
+  )
+  
+  # open circle on opposite side
+  gg <- gg + ggplot2::geom_point(
+    data = alignments,
+    ggplot2::aes(x = strand_x_open, y = strand_y),
+    color = "black",
+    fill = "white",
+    shape = 21,
+    size = 2
+  )
+  
+  # draw alignment rectangles
+  gg <- gg + ggplot2::geom_rect(
+    data = alignments,
+    ggplot2::aes(
+      xmin = read_start, xmax = read_end,
+      ymin = ymin, ymax = ymax,
+      text = hover_text
+    ),
+    fill = "lightgray",
+    color = "gray50",
+    size = 0.2
+  )
   
   # plot mutations if available
   if (!is.null(mutations) && nrow(mutations) > 0) {
+    # map alignment heights to mutations
+    height_map <- setNames(alignments$height, alignments$alignment_index)
+    mutations$height <- height_map[as.character(mutations$alignment_index)]
+    
     mutations$ymin <- mutations$height
     mutations$ymax <- mutations$height + 0.9
     
@@ -219,6 +266,19 @@ output$alignmentPlot <- plotly::renderPlotly({
       ),
       color = mutations$fill_color,
       size = 0.8
+    )
+  }
+  
+  # add index labels in the middle of each alignment rectangle (if enabled)
+  if (!is.null(show_index) && show_index) {
+    alignments$label_x <- (alignments$read_start + alignments$read_end) / 2
+    alignments$label_y <- (alignments$ymin + alignments$ymax) / 2
+    gg <- gg + ggplot2::geom_text(
+      data = alignments,
+      ggplot2::aes(x = label_x, y = label_y, label = index),
+      color = "white",
+      size = 3.5,
+      fontface = "bold"
     )
   }
   
@@ -252,52 +312,34 @@ output$alignmentPlot <- plotly::renderPlotly({
   p
 })
 
-# ---- Handle clicks on the alignment plot ----
-
-observeEvent(plotly::event_data("plotly_click", source = "alignmentPlotSource"), {
-  event_data <- plotly::event_data("plotly_click", source = "alignmentPlotSource")
-  req(event_data)
-  req(event_data$key)
-  
-  clicked_idx <- as.numeric(event_data$key[[1]])
-  cat(sprintf("clicked alignment index: %s\n", clicked_idx))
-  
-  # toggle selection
-  if (!is.null(state$selected_alignment_index) && state$selected_alignment_index == clicked_idx) {
-    state$selected_alignment_index <- NULL
-  } else {
-    state$selected_alignment_index <- clicked_idx
-  }
-})
-
 # ---- DataTable Renderer ----
 
 output$alignmentDetailsTable <- renderDT({
   result <- state$clicked_read_data
-  selected_idx <- state$selected_alignment_index
   
   if (is.null(result) || is.null(result$alignments) || nrow(result$alignments) == 0) {
     return(datatable(
       data.frame(Message = "Click on a read in the main plot to see details here."), 
-      rownames = FALSE
+      rownames = FALSE,
+      selection = "none"
     ))
   }
   
   align_data <- result$alignments
-  align_data$row_id <- seq_len(nrow(align_data))
   
-  # add select button column
-  align_data$Select <- sapply(seq_len(nrow(align_data)), function(i) {
-    idx <- align_data$alignment_index[i]
-    is_selected <- !is.null(selected_idx) && selected_idx == idx
-    btn_label <- if (is_selected) "Selected" else "Select"
-    btn_class <- if (is_selected) "btn-primary" else "btn-default"
-    as.character(actionButton(
-      paste0("select_aln_btn_", i), btn_label,
-      class = btn_class,
-      onclick = sprintf("Shiny.setInputValue('select_alignment_trigger', {idx: %s, nonce: Math.random()}, {priority: 'event'})", idx)
-    ))
-  })
+  # assign heights based on contig ordering (same as in plot)
+  contig_order <- unique(align_data$contig_id[order(
+    align_data$read_start,
+    align_data$read_end,
+    -align_data$num_mutations
+  )])
+  contig_heights <- setNames(seq_along(contig_order) - 1, contig_order)
+  align_data$height <- contig_heights[align_data$contig_id]
+  
+  # sort and add index
+  align_data <- align_data[order(align_data$height, align_data$read_start), ]
+  align_data$index <- seq_len(nrow(align_data))
+  align_data$row_id <- align_data$index
   
   # add go to button column
   align_data$`Go to` <- sapply(align_data$row_id, function(id) {
@@ -308,35 +350,21 @@ output$alignmentDetailsTable <- renderDT({
   })
   
   # columns to display
-  display_cols <- c("contig_id", "read_start", "read_end", "contig_start", "contig_end", 
-                    "is_reverse", "num_mutations", "height", "Select", "Go to")
+  display_cols <- c("index", "contig_id", "read_start", "read_end", "contig_start", "contig_end", 
+                    "is_reverse", "num_mutations", "height", "Go to")
   
   datatable(
     align_data[, display_cols],
     escape = FALSE,
     rownames = FALSE,
     options = list(
-      pageLength = 10,
+      pageLength = 20,
       scrollX = TRUE,
-      lengthMenu = c(5, 10, 25),
+      lengthMenu = c(10, 20, 50),
       dom = "lftip"
     ),
     selection = "none"
   )
-})
-
-# ---- Selection Button Observer ----
-
-observeEvent(input$select_alignment_trigger, {
-  req(input$select_alignment_trigger)
-  clicked_idx <- as.numeric(input$select_alignment_trigger$idx)
-  
-  # toggle selection
-  if (!is.null(state$selected_alignment_index) && state$selected_alignment_index == clicked_idx) {
-    state$selected_alignment_index <- NULL
-  } else {
-    state$selected_alignment_index <- clicked_idx
-  }
 })
 
 # ---- Go To Button Observer ----
@@ -347,9 +375,21 @@ observeEvent(input$goto_alignment_location_trigger, {
   
   result <- state$clicked_read_data
   req(result, result$alignments)
-  req(row_idx > 0, row_idx <= nrow(result$alignments))
   
-  selected_alignment <- result$alignments[row_idx, ]
+  # assign heights and sort the same way as the table
+  align_data <- result$alignments
+  contig_order <- unique(align_data$contig_id[order(
+    align_data$read_start,
+    align_data$read_end,
+    -align_data$num_mutations
+  )])
+  contig_heights <- setNames(seq_along(contig_order) - 1, contig_order)
+  align_data$height <- contig_heights[align_data$contig_id]
+  align_data <- align_data[order(align_data$height, align_data$read_start), ]
+  
+  req(row_idx > 0, row_idx <= nrow(align_data))
+  
+  selected_alignment <- align_data[row_idx, ]
   req("contig_id" %in% colnames(selected_alignment))
   req("contig_start" %in% colnames(selected_alignment))
   req("contig_end" %in% colnames(selected_alignment))

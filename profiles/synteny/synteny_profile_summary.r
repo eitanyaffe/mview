@@ -34,7 +34,7 @@ synteny_profile_summary <- function(profile, data_list, gg, current_binsize) {
   }
   
   # add global coordinates to summary data
-  summary_data <- cxt_filter_segments(summary_data)
+  summary_data <- cxt_filter_intervals(summary_data)
   
   if (is.null(summary_data) || nrow(summary_data) == 0) {
     warning("no summary data after coordinate mapping")
@@ -156,7 +156,7 @@ prepare_summary_data <- function(sequenced_bp, mutations, lib_cols, profile, cur
   return(summary_data)
 }
 
-# note: genomic coordinates are now added by filter_segments function
+# note: genomic coordinates are now added by filter_intervals function
 
 # plot summary mode with gray coloring
 plot_summary_gray <- function(gg, summary_data, profile) {

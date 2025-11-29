@@ -69,7 +69,7 @@ synteny_profile_detail <- function(profile, data_list, gg, current_binsize) {
   }
   
   # add global coordinates to plot data
-  plot_data <- cxt_filter_segments(plot_data)
+  plot_data <- cxt_filter_intervals(plot_data)
   
   if (is.null(plot_data) || nrow(plot_data) == 0) {
     warning("no plot data after coordinate mapping")
@@ -214,7 +214,7 @@ prepare_detail_plot_data <- function(sequenced_bp, mutations, lib_cols, profile,
   return(plot_data)
 }
 
-# note: genomic coordinates are now added by filter_segments function
+# note: genomic coordinates are now added by filter_intervals function
 
 # unified function to plot detail bins with configurable gap
 plot_detail_bins <- function(gg, plot_data, profile, color_mode = "gray", bin_gap = 0.1) {

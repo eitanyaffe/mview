@@ -128,7 +128,7 @@ filter_synteny_matrix <- function(data_matrix) {
   
   # filter just the coordinate structure first
   coord_data <- data_matrix[, c("contig", "start", "end"), drop = FALSE]
-  filtered_coords <- cxt_filter_segments(coord_data)
+  filtered_coords <- cxt_filter_intervals(coord_data)
   
   if (is.null(filtered_coords) || nrow(filtered_coords) == 0) {
     return(NULL)
@@ -176,7 +176,7 @@ filter_synteny_data <- function(data_list, xlim) {
   }
   
   # only filter to available contigs, no coordinate filtering
-  # (coordinate filtering will be handled by filter_segments)
+  # (coordinate filtering will be handled by filter_intervals)
   contigs <- cxt_get_contigs()
   valid_rows <- sequenced_bp$contig %in% contigs
   
@@ -303,7 +303,7 @@ synteny_profile <- function(id, name, is_fixed = FALSE,
       return(list(plot = gg, legends = list()))
     }
 
-    # validate data structure (coordinate filtering handled by filter_segments in plot functions)
+    # validate data structure (coordinate filtering handled by filter_intervals in plot functions)
     filtered_data <- filter_synteny_data(data_list, xlim)
     if (is.null(filtered_data)) {
       cat(sprintf("no synteny data available for %s\n", cxt_get_assembly()))

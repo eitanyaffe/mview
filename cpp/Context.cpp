@@ -559,8 +559,9 @@ std::vector<PointRow> Context::filter_coords(const std::vector<PointRow>& input,
   return result;
 }
 
-std::vector<IntervalRow> Context::filter_segments(const std::vector<IntervalRow>& input, 
-                                                    const std::vector<double>& xlim) {
+std::vector<IntervalRow> Context::filter_intervals(const std::vector<IntervalRow>& input, 
+                                                    const std::vector<double>& xlim,
+                                                    bool merge_adjacent) {
   if (input.empty()) {
     return std::vector<IntervalRow>();
   }
@@ -573,8 +574,8 @@ std::vector<IntervalRow> Context::filter_segments(const std::vector<IntervalRow>
   }
   
   // Filter by xlim if provided
-  std::vector<IntervalRow> result;
-  result.reserve(with_vcoord.size());
+  std::vector<IntervalRow> filtered;
+  filtered.reserve(with_vcoord.size());
   
   // Also filter to only contigs in plotted segments
   std::unordered_set<std::string> valid_contigs;
@@ -598,11 +599,37 @@ std::vector<IntervalRow> Context::filter_segments(const std::vector<IntervalRow>
     }
     
     if (keep) {
-      result.push_back(row);
+      filtered.push_back(row);
     }
   }
   
-  return result;
+  if (!merge_adjacent || filtered.empty()) {
+    return filtered;
+  }
+  
+  // Merge adjacent intervals (adjacent in vcoord space)
+  std::vector<IntervalRow> merged;
+  IntervalRow current = filtered[0];
+  
+  for (size_t i = 1; i < filtered.size(); i++) {
+    const IntervalRow& next = filtered[i];
+    
+    // Check if adjacent in vcoord space
+    int64_t current_vend = static_cast<int64_t>(current.vend);
+    int64_t next_vstart = static_cast<int64_t>(next.vstart);
+    if (next_vstart == current_vend + 1) {
+      current.end = next.end;
+      current.vend = next.vend;
+      current.trim_right = next.trim_right;
+      current.n_segments += next.n_segments;
+    } else {
+      merged.push_back(current);
+      current = next;
+    }
+  }
+  merged.push_back(current);
+  
+  return merged;
 }
 
 std::vector<PlottedSegment> Context::get_plotted_segments() {

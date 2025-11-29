@@ -450,16 +450,17 @@ DataFrame context_filter_coords(ContextPtr ctx, DataFrame df,
 }
 
 // [[Rcpp::export]]
-DataFrame context_filter_segments(ContextPtr ctx, DataFrame df, 
-                                   NumericVector xlim = NumericVector()) {
+DataFrame context_filter_intervals(ContextPtr ctx, DataFrame df, 
+                                    NumericVector xlim = NumericVector(),
+                                    bool merge_adjacent = false) {
   try {
-    Context* ptr = require_context(ctx, "context_filter_segments");
+    Context* ptr = require_context(ctx, "context_filter_intervals");
     std::vector<IntervalRow> input = dataframe_to_interval_rows(df, false);
     std::vector<double> xlim_vec = to_std_vector(xlim);
-    std::vector<IntervalRow> result = ptr->filter_segments(input, xlim_vec);
+    std::vector<IntervalRow> result = ptr->filter_intervals(input, xlim_vec, merge_adjacent);
     return interval_rows_to_dataframe(result);
   } catch (const std::exception& e) {
-    Rcpp::stop("Error in context_filter_segments: %s", e.what());
+    Rcpp::stop("Error in context_filter_intervals: %s", e.what());
   }
 }
 

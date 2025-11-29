@@ -1,8 +1,8 @@
 # Load shared alignment API
 source("profiles/align/align_profile_api.r")
 
-# Load segments profile
-source("profiles/segments_profile.r")
+# Load interval profile
+source("profiles/interval_profile.r")
 
 # Load variants profile
 source("profiles/variants_profile.r")
@@ -163,13 +163,13 @@ rrna_profile(
 )
 
 ########################################################
-# assembly segments profile
+# assembly interval profile
 ########################################################
 
-## segments_profile(
+## interval_profile(
 ##   id = "assembly_segments",
 ##   name = "Assembly Segments",
-##   segments_f = function(assembly) {
+##   intervals_f = function(assembly) {
 ##     data <- get_data("CAV_REFINE_SEGMENT_TABLE", 
 ##                      tag = assembly,
 ##                      null.on.missing = TRUE)
@@ -180,25 +180,27 @@ rrna_profile(
 ## )
 
 ########################################################
-# regions segments profile
+# regions interval profile
 ########################################################
 
-segments_profile(
+interval_profile(
   id = "regions",
   name = "Regions",
-  segments_f = "segments.current_regions",
+  intervals_f = "segments.current_regions",
+  merge_adjacent = TRUE,
   height = 60
 )
 
 ########################################################
-# bin segments profile
+# bin segments interval profile
 ########################################################
 
-segments_profile(
+interval_profile(
   id = "bin_segments",
   name = "Segments",
-  segments_f = get_bin_segments_f,
+  intervals_f = get_bin_segments_f,
   color_field = "bin",
+  merge_adjacent = FALSE,
   height = 60
 )
 

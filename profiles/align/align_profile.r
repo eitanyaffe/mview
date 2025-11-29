@@ -242,8 +242,13 @@ align_profile <- function(id, name, is_fixed = FALSE,
 
     aln <- if (is.function(aln_f)) aln_f() else aln_f
 
-    # !!! we have multiple alignments, we need to get the correct one
-    cache_set("aln_obj", aln)
+    # add alignment to named list for alignment tab lookup by profile id
+    aln_list <- cache_get_if_exists("aln_obj", list())
+    if (!is.list(aln_list)) {
+      aln_list <- list()
+    }
+    aln_list[[profile$id]] <- aln
+    cache_set("aln_obj", aln_list)
     
     contigs <- cxt_get_contigs()
     if (any(!is.element(contigs, aln_get_contigs(aln)$contig_id))) {

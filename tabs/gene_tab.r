@@ -47,7 +47,7 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
   genes$end <- as.numeric(genes$end)
 
   # filter to visible range using the context
-  filtered_genes <- cxt_filter_segments(genes)
+  filtered_genes <- cxt_filter_intervals(genes)
 
   # verify we have the expected columns after filtering
   if (!is.null(filtered_genes)) {

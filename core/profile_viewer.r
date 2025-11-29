@@ -368,6 +368,9 @@ plot_profiles <- function() {
   heights <- numeric()
   legends <- list()
 
+  # clear alignment object list before processing profiles
+  cache_set("aln_obj", list())
+
   for (id in names(profiles)) {
     cat(sprintf("plotting profile: %s\n", id))
     profile <- profiles[[id]]

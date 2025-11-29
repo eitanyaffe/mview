@@ -17,3 +17,4 @@ core/export_dialogs_bu.r
 tabs/variants/variants_tab_old.r
 tabs/rearrangements/rearrangements_tab_old.r
 *.o
+/configs/c60/regions_old

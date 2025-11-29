@@ -9,8 +9,8 @@
 # Load shared alignment API
 source("profiles/align/align_profile_api.r")
 
-# Load segments profile
-source("profiles/segments_profile.r")
+# Load interval profile
+source("profiles/interval_profile.r")
 
 # Initialize alntools
 init_alntools(verbose = FALSE)
@@ -45,13 +45,14 @@ gene_profile(
 )
 
 ########################################################
-# regions segments profile
+# regions interval profile
 ########################################################
 
-segments_profile(
+interval_profile(
   id = "regions",
   name = "Regions",
-  segments_f = "segments.current_regions"
+  intervals_f = "segments.current_regions",
+  merge_adjacent = TRUE
 )
 
 ########################################################

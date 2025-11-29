@@ -166,7 +166,7 @@ The bottom panel contains these tabs:
 
 #### Read alignment tab
 
-The Alignments tab shows all alignment of a selected read. A read can be selected by clicking on it in the alignment profile (if multiple alignment profiles are shown only the bottom profile can be clicked). The table shows all alignments for the selected read. Each alignment entry includes a "Go" button that navigates the view to the specific genomic location of that alignment, automatically setting the zoom and contig selection.
+The Alignments tab shows all alignment of a selected read. A read can be selected by clicking on it in the alignment profile. The selected read is highlighted in red in the relevant alignment profile. The table and plot shows all alignments for the selected read, organized by read coordinates. Each alignment entry includes a "Go" button that navigates the view to the specific genomic location of that alignment, automatically setting the zoom and contig selection.
 
 #### Gene tab
 

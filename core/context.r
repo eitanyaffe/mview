@@ -391,10 +391,10 @@ cxt_filter_coords <- function(df) {
   result
 }
 
-# Filter interval segments to current xlim and add vstart/vend
-cxt_filter_segments <- function(df) {
+# Filter intervals to current xlim and add vstart/vend
+cxt_filter_intervals <- function(df, merge_adjacent = FALSE) {
   if (is.null(.context_env$current_context)) {
-    warning("cxt_filter_segments: no current context")
+    warning("cxt_filter_intervals: no current context")
     return(NULL)
   }
   
@@ -403,13 +403,13 @@ cxt_filter_segments <- function(df) {
   }
   
   if (!all(c("contig", "start", "end") %in% names(df))) {
-    warning("cxt_filter_segments: df must have columns: contig, start, end")
+    warning("cxt_filter_intervals: df must have columns: contig, start, end")
     return(NULL)
   }
   
   df_minimal <- df[c("contig", "start", "end")]
   xlim <- cxt_get_xlim()
-  result_minimal <- context_filter_segments(.context_env$current_context, df_minimal, xlim)
+  result_minimal <- context_filter_intervals(.context_env$current_context, df_minimal, xlim, merge_adjacent)
   
   if (is.null(result_minimal) || nrow(result_minimal) == 0) {
     return(NULL)

@@ -83,8 +83,9 @@ public:
   // Filtering methods
   std::vector<PointRow> filter_coords(const std::vector<PointRow>& input, 
                                       const std::vector<double>& xlim = std::vector<double>());
-  std::vector<IntervalRow> filter_segments(const std::vector<IntervalRow>& input, 
-                                            const std::vector<double>& xlim = std::vector<double>());
+  std::vector<IntervalRow> filter_intervals(const std::vector<IntervalRow>& input, 
+                                             const std::vector<double>& xlim = std::vector<double>(),
+                                             bool merge_adjacent = false);
   
   // Accessor methods
   std::vector<PlottedSegment> get_plotted_segments();

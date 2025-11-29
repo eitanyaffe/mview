@@ -81,7 +81,7 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates  
     alns$start <- alns$contig_start
     alns$end <- alns$contig_end
-    alignments <- cxt_filter_segments(alns)
+    alignments <- cxt_filter_intervals(alns)
   }
 
   # Process mutations
@@ -102,7 +102,7 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates
     reads$start <- reads$span_start
     reads$end <- reads$span_end
-    reads <- cxt_filter_segments(reads)
+    reads <- cxt_filter_intervals(reads)
   }
 
   # Process chunks
@@ -113,7 +113,7 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates
     chunks$start <- chunks$span_start
     chunks$end <- chunks$span_end
-    chunks <- cxt_filter_segments(chunks)
+    chunks <- cxt_filter_intervals(chunks)
   }
   
   return(list(alignments = alignments, mutations = mutations, reads = reads, chunks = chunks))
@@ -146,6 +146,9 @@ align_profile_full <- function(profile, aln, gg) {
     cat(sprintf("plotting %d chunks\n", nrow(df$chunks)))
     chunks <- df$chunks
 
+    # create composite key with profile id for alignment tab lookup
+    chunks$click_key <- paste0(profile$id, ":", chunks$read_id)
+
     # create hover text only if enabled
     if (profile$show_hover) {
       chunks$hover_text <- paste0(
@@ -164,7 +167,7 @@ align_profile_full <- function(profile, aln, gg) {
         x = gstart, xend = gend,
         y = height + 0.5, yend = height + 0.5,
         text = hover_text,
-        key = read_id
+        key = click_key
       ),
       color = "gray50", size = 0.3
     )
@@ -178,6 +181,9 @@ align_profile_full <- function(profile, aln, gg) {
     alignments = alignments[is.element(alignments$chunk_id, chunks$chunk_id), ]
     alignments$rect_ymin <- alignments$height
     alignments$rect_ymax <- alignments$height + 1
+
+    # create composite key with profile id for alignment tab lookup
+    alignments$click_key <- paste0(profile$id, ":", alignments$read_id)
 
     # determine clipped status
     xlim <- cxt_get_xlim()
@@ -221,10 +227,28 @@ align_profile_full <- function(profile, aln, gg) {
         xmin = gstart, xmax = gend,
         ymin = rect_ymin, ymax = rect_ymax,
         text = hover_text,
-        key = read_id
+        key = click_key
       ),
       fill = alignments$color, color = border_color, size = 0.2
     )
+    
+    # draw red rectangles for selected read
+    selected_read_id <- cache_get_if_exists("selected_read_id", NULL)
+    if (!is.null(selected_read_id) && length(selected_read_id) > 0) {
+      selected_alignments <- alignments[alignments$read_id == selected_read_id, ]
+      if (nrow(selected_alignments) > 0) {
+        gg <- gg + ggplot2::geom_rect(
+          data = selected_alignments,
+          ggplot2::aes(
+            xmin = gstart, xmax = gend,
+            ymin = rect_ymin, ymax = rect_ymax,
+            text = hover_text,
+            key = click_key
+          ),
+          fill = "red", color = NA
+        )
+      }
+    }
 
     # draw left clipping indicators
     if (any(alignments$clipped_left)) {
@@ -235,7 +259,7 @@ align_profile_full <- function(profile, aln, gg) {
           x = gstart, xend = gstart,
           y = rect_ymin, yend = rect_ymax,
           text = hover_text,
-          key = read_id
+          key = click_key
         ),
         color = "black", size = 0.5
       )
@@ -250,7 +274,7 @@ align_profile_full <- function(profile, aln, gg) {
           x = gend, xend = gend,
           y = rect_ymin, yend = rect_ymax,
           text = hover_text,
-          key = read_id
+          key = click_key
         ),
         color = "black", size = 0.5
       )
