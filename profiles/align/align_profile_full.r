@@ -79,7 +79,6 @@ min_indel_length = 3) {
   # Process alignments
   alignments <- NULL
   if (!is.null(df$alignments) && nrow(df$alignments) > 0) {
-    cat(sprintf("filtering alignments (%d rows)\n", nrow(df$alignments)))
     alns <- df$alignments
     alns$contig <- alns$contig_id
     # alntools full mode outputs 1-based coordinates  
@@ -91,7 +90,6 @@ min_indel_length = 3) {
   # Process mutations
   mutations <- NULL
   if (!is.null(df$mutations) && nrow(df$mutations) > 0) {
-    cat(sprintf("filtering mutations (%d rows)\n", nrow(df$mutations)))
     muts <- df$mutations
     muts$contig <- muts$contig_id
     # alntools full mode outputs 1-based coordinates
@@ -102,7 +100,6 @@ min_indel_length = 3) {
   # Process reads
   reads <- NULL
   if (!is.null(df$reads) && nrow(df$reads) > 0) {
-    cat(sprintf("filtering reads (%d rows)\n", nrow(df$reads)))
     reads <- df$reads
     reads$contig <- reads$contig_id
     # alntools full mode outputs 1-based coordinates
@@ -114,7 +111,6 @@ min_indel_length = 3) {
   # Process chunks
   chunks <- NULL
   if (!is.null(df$chunks) && nrow(df$chunks) > 0) {
-    cat(sprintf("filtering chunks (%d rows)\n", nrow(df$chunks)))
     chunks <- df$chunks
     chunks$contig <- chunks$contig_id
     # alntools full mode outputs 1-based coordinates
