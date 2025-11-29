@@ -69,13 +69,17 @@ min_indel_length = 3) {
   
   # Use cache for the full query
   df <- cache(cache_key, {
-    aln_query_full(aln, intervals, height_style_str, max_reads, clip_mode, clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_margin), chunk_type, as.integer(min_indel_length))
+    aln_query_full(aln, intervals, height_style_str, max_reads, clip_mode, 
+    clip_margin, as.numeric(min_mutations_percent), as.numeric(max_mutations_percent), 
+    as.integer(min_alignment_length), as.integer(max_alignment_length), as.integer(max_margin), 
+    chunk_type, as.integer(min_indel_length))
   })
   cat(sprintf("done with aln_query_full\n"))
   
   # Process alignments
   alignments <- NULL
   if (!is.null(df$alignments) && nrow(df$alignments) > 0) {
+    cat(sprintf("filtering alignments (%d rows)\n", nrow(df$alignments)))
     alns <- df$alignments
     alns$contig <- alns$contig_id
     # alntools full mode outputs 1-based coordinates  
@@ -87,6 +91,7 @@ min_indel_length = 3) {
   # Process mutations
   mutations <- NULL
   if (!is.null(df$mutations) && nrow(df$mutations) > 0) {
+    cat(sprintf("filtering mutations (%d rows)\n", nrow(df$mutations)))
     muts <- df$mutations
     muts$contig <- muts$contig_id
     # alntools full mode outputs 1-based coordinates
@@ -97,6 +102,7 @@ min_indel_length = 3) {
   # Process reads
   reads <- NULL
   if (!is.null(df$reads) && nrow(df$reads) > 0) {
+    cat(sprintf("filtering reads (%d rows)\n", nrow(df$reads)))
     reads <- df$reads
     reads$contig <- reads$contig_id
     # alntools full mode outputs 1-based coordinates
@@ -108,6 +114,7 @@ min_indel_length = 3) {
   # Process chunks
   chunks <- NULL
   if (!is.null(df$chunks) && nrow(df$chunks) > 0) {
+    cat(sprintf("filtering chunks (%d rows)\n", nrow(df$chunks)))
     chunks <- df$chunks
     chunks$contig <- chunks$contig_id
     # alntools full mode outputs 1-based coordinates
@@ -172,7 +179,7 @@ align_profile_full <- function(profile, aln, gg) {
       color = "gray50", size = 0.3
     )
   }
-
+  
   # Plot alignments
   if (!is.null(df$alignments) && nrow(df$alignments) > 0) {
     cat(sprintf("plotting %d alignments\n", nrow(df$alignments)))
@@ -190,12 +197,12 @@ align_profile_full <- function(profile, aln, gg) {
     left_in_plot = alignments$gstart > xlim[1]
     right_in_plot = alignments$gend < xlim[2]
 
+    # check if read is soft-clipped (doesn't start at 0 or doesn't end at read_length)
     clip_read_start = alignments$read_start > 0
     clip_read_end = alignments$read_end < alignments$read_length
 
     alignments$clipped_left <- ifelse(!alignments$is_reverse, clip_read_start, clip_read_end) & left_in_plot
     alignments$clipped_right <- ifelse(!alignments$is_reverse, clip_read_end, clip_read_start) & right_in_plot
-    
 
     # set colors based on color mode
     alignments$color <- get_alignment_colors(alignments, chunks, profile$full_style)
