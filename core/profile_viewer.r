@@ -72,7 +72,6 @@ post_plot <- function(gg, profile) {
 #' @param profile_plotly_objects Reactive value to store results
 update_gg_objects <- function(profile_plotly_objects) {
   profiles <- profiles_get_all()
-  cat(sprintf("[update_gg_objects] Starting with %d profiles\n", length(profiles)))
   
   if (length(profiles) == 0) {
     profile_plotly_objects(NULL)
@@ -84,7 +83,6 @@ update_gg_objects <- function(profile_plotly_objects) {
 
   for (id in names(profiles)) {
     profile <- profiles[[id]]
-    cat(sprintf("[update_gg_objects] Processing profile: %s\n", id))
 
     # apply default height fields if missing
     if (is.null(profile$is_fixed)) profile$is_fixed <- FALSE
@@ -120,7 +118,6 @@ update_gg_objects <- function(profile_plotly_objects) {
     # profiles must return list(plot = gg, legends = list_of_legends)
     if (is.list(pf_result)) {
       gg_plot <- pf_result$plot
-      cat(sprintf("[update_gg_objects] %s: is.null(plot) = %s\n", id, is.null(gg_plot)))
       profile_legends <- pf_result$legends
       if (!is.null(profile_legends) && length(profile_legends) > 0) {
         legends[[id]] <- profile_legends
