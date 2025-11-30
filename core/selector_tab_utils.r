@@ -35,28 +35,6 @@ load_seg_adj_associated <- function(assembly) {
   adj$associated
 }
 
-load_bin_segments <- function(bin_id) {
-  if (is.null(bin_id) || bin_id == "" || is.null(state$assembly)) {
-    return(NULL)
-  }
-  
-  seg_table <- load_bin_segment_table(state$assembly)
-  if (is.null(seg_table)) {
-    return(NULL)
-  }
-  
-  if (!"bin" %in% names(seg_table) || !"segment" %in% names(seg_table)) {
-    return(NULL)
-  }
-  
-  bin_segments <- seg_table[seg_table$bin == bin_id, ]
-  if (nrow(bin_segments) == 0) {
-    return(NULL)
-  }
-  
-  return(bin_segments$segment)
-}
-
 #########################################################################
 # neighbor lookup
 #########################################################################
@@ -171,7 +149,7 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
     result$support[i] <- support_sum
     result$total[i] <- total_sum
     result$total_associated[i] <- associated_sum
-    result$percent[i] <- if (associated_sum > 0) (support_sum / associated_sum) * 100 else 0
+    result$percent[i] <- if (!is.na(associated_sum) && associated_sum > 0) (support_sum / associated_sum) * 100 else 0
   }
   
   return(result)
@@ -189,6 +167,7 @@ build_graph_nodes <- function(segment_ids) {
   nodes <- data.frame(
     id = segment_ids,
     label = segment_ids,
+    title = segment_ids,
     stringsAsFactors = FALSE
   )
   
@@ -245,25 +224,14 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
   
   # build edges data frame
   edges <- data.frame(
+    id = paste0(edge_metrics$seg_src, "_", edge_metrics$seg_tgt),
     from = edge_metrics$seg_src,
     to = edge_metrics$seg_tgt,
     stringsAsFactors = FALSE
   )
   
-  # add title for tooltip
-  edges$title <- sprintf(
-    "%s -> %s\nBin: %s -> %s\nSide: %s -> %s\nSupport: %.0f\nTotal: %.0f\nTotal Associated: %.0f\nPercent: %.2f%%",
-    edge_metrics$seg_src,
-    edge_metrics$seg_tgt,
-    edge_metrics$bin_src,
-    edge_metrics$bin_tgt,
-    edge_metrics$side_src,
-    edge_metrics$side_tgt,
-    edge_metrics$support,
-    edge_metrics$total,
-    edge_metrics$total_associated,
-    edge_metrics$percent
-  )
+  # simple tooltip - just segment IDs
+  edges$title <- paste0(edge_metrics$seg_src, " - ", edge_metrics$seg_tgt)
   
   # store metrics in edge data for table
   edges$..support.. <- edge_metrics$support

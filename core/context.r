@@ -290,13 +290,13 @@ cxt_get_contigs <- function() {
 }
 
 # Get segment IDs in current view
-cxt_get_segments <- function() {
-  if (is.null(.context_env$current_segments)) {
-    warning("cxt_get_segments: no current segments")
+cxt_get_segments <- function(limit_to_zoom = FALSE) {
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_get_segments: no current context")
     return(character())
   }
   
-  .context_env$current_segments$segment
+  context_get_segment_ids(.context_env$current_context, limit_to_zoom)
 }
 
 ################################################################################
@@ -334,6 +334,23 @@ cxt_global2contig <- function(gcoords) {
     gcoord = gcoords,
     stringsAsFactors = FALSE
   )
+}
+
+# Check if coords are in view (in a plotted segment, optionally within xlim)
+# returns logical vector same length as input
+cxt_coords_in_view <- function(contigs, coords, limit_to_zoom = FALSE) {
+  n <- length(contigs)
+  if (is.null(.context_env$current_context)) {
+    warning("cxt_coord_in_view: no current context")
+    return(rep(FALSE, n))
+  }
+  
+  if (n == 0) {
+    return(logical(0))
+  }
+  
+  df <- data.frame(contig = contigs, coord = coords, stringsAsFactors = FALSE)
+  context_coords_in_view(.context_env$current_context, df, limit_to_zoom)
 }
 
 ################################################################################

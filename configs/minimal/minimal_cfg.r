@@ -180,7 +180,7 @@ get_genes_f <- function(assembly) {
   genes
 }
 
-# mock seg_bins: segments with bin assignment (gid as bin)
+# mock seg_bins: segments with bin assignment (gid as bin) and colors
 get_seg_bins_f <- function(assembly) {
   if (is.null(assembly)) return(NULL)
   
@@ -193,6 +193,11 @@ get_seg_bins_f <- function(assembly) {
   # add bin column from segment map (gid as bin)
   ix <- match(segments$segment, seg_map$segment)
   segments$bin <- seg_map$gid[ix]
+  
+  # assign colors to bins (centrally)
+  unique_bins <- sort(unique(segments$bin))
+  bin_colors <- setNames(rainbow(length(unique_bins), s = 0.5, v = 0.9), unique_bins)
+  segments$bin_color <- bin_colors[segments$bin]
   
   segments
 }

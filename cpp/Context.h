@@ -87,9 +87,13 @@ public:
                                              const std::vector<double>& xlim = std::vector<double>(),
                                              bool merge_adjacent = false);
   
+  // Check if coords are in view (returns boolean for each input)
+  std::vector<bool> coords_in_view(const std::vector<PointRow>& input, bool limit_to_zoom = false);
+  
   // Accessor methods
   std::vector<PlottedSegment> get_plotted_segments();
   std::vector<double> get_xlim();
+  std::vector<std::string> get_segment_ids(bool limit_to_zoom = false);
   
 private:
   // Internal data structures

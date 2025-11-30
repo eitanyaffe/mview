@@ -559,6 +559,47 @@ std::vector<PointRow> Context::filter_coords(const std::vector<PointRow>& input,
   return result;
 }
 
+std::vector<bool> Context::coords_in_view(const std::vector<PointRow>& input, bool limit_to_zoom) {
+  std::vector<bool> result(input.size(), false);
+  
+  for (size_t i = 0; i < input.size(); i++) {
+    const PointRow& row = input[i];
+    
+    auto contig_it = contig_id_to_index_.find(row.contig);
+    if (contig_it == contig_id_to_index_.end()) {
+      continue;
+    }
+    
+    int64_t acoord = contig2acoord(row.contig, row.coord);
+    
+    if (all_segment_cs.empty() || acoord < 0 || acoord >= all_segment_cs.back()) {
+      continue;
+    }
+    
+    auto seg_it = std::upper_bound(all_segment_cs.begin(), all_segment_cs.end(), acoord);
+    size_t seg_idx = seg_it - all_segment_cs.begin();
+    const Segment& seg = full_segments_[seg_idx];
+    
+    auto plotted_it = plotted_segment_id_to_index_.find(seg.segment_id);
+    if (plotted_it == plotted_segment_id_to_index_.end()) {
+      continue;
+    }
+    
+    if (limit_to_zoom && xlim_.size() == 2) {
+      const PlottedSegment& pseg = plotted_segments_[plotted_it->second];
+      int64_t segment_local = acoord - seg.acoord_start;
+      int64_t vcoord = pseg.vcoord_start + segment_local;
+      if (vcoord < static_cast<int64_t>(xlim_[0]) || vcoord > static_cast<int64_t>(xlim_[1])) {
+        continue;
+      }
+    }
+    
+    result[i] = true;
+  }
+  
+  return result;
+}
+
 std::vector<IntervalRow> Context::filter_intervals(const std::vector<IntervalRow>& input, 
                                                     const std::vector<double>& xlim,
                                                     bool merge_adjacent) {
@@ -638,6 +679,39 @@ std::vector<PlottedSegment> Context::get_plotted_segments() {
 
 std::vector<double> Context::get_xlim() {
   return xlim_;
+}
+
+std::vector<std::string> Context::get_segment_ids(bool limit_to_zoom) {
+  std::vector<std::string> result;
+  
+  if (!limit_to_zoom) {
+    // return all plotted segment IDs
+    for (const auto& seg : plotted_segments_) {
+      result.push_back(seg.segment_id);
+    }
+    return result;
+  }
+  
+  // limit to segments visible in current zoom
+  if (xlim_.size() != 2) {
+    // no zoom set, return all
+    for (const auto& seg : plotted_segments_) {
+      result.push_back(seg.segment_id);
+    }
+    return result;
+  }
+  
+  double zoom_start = xlim_[0];
+  double zoom_end = xlim_[1];
+  
+  for (const auto& seg : plotted_segments_) {
+    // check if segment overlaps with zoom range
+    if (seg.vcoord_end >= zoom_start && seg.vcoord_start <= zoom_end) {
+      result.push_back(seg.segment_id);
+    }
+  }
+  
+  return result;
 }
 
 

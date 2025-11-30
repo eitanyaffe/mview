@@ -64,6 +64,20 @@ output$genomeTable <- renderDT({
     datatable(get_genomes(state$assembly), selection = list(mode = selection_mode, target = "row"))
 })
 
+output$segmentTable <- renderDT({
+    dat <- get_segments(state$assembly)
+    index <- which(names(dat) == "segment")
+    enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
+    current_segments <- get_state_segments()$segment
+    selection_mode <- if (!is.null(input$allowMultipleSegmentsChk) && !input$allowMultipleSegmentsChk) "single" else "multiple"
+    datatable(
+        dat,
+        rownames = FALSE,
+        selection = list(mode = selection_mode, target = "row"),
+        options = get.highlight.options(current_segments, index, enable_highlighting)
+    )
+})
+
 output$mapTable <- renderDT({
     dat <- get_segment_map(state$assembly)
     index <- which(names(dat) == "segment")

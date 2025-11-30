@@ -6,7 +6,7 @@ output$navigationPanelUI <- renderUI({
   div(
     class = "navigation-panel",
     
-    # refresh button (moved from left panel)
+    # refresh button (first on left)
     div(
       class = "nav-button-group",
       uiOutput("navRefreshBtnUI")

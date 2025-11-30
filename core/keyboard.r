@@ -497,7 +497,7 @@ keyboard_shortcuts <- list(
 create_and_add_tab_shortcuts <- function() {
   # Fixed vector of tab titles as they appear in the UI
   tabs <- c(
-    "Regions", "Contigs", "Genomes", "Contig Map",
+    "Regions", "Contigs", "Segments", "Genomes", "Contig Map",
     "Legends", "Options", "Parameters"
   )
 

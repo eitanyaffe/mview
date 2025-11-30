@@ -465,6 +465,18 @@ DataFrame context_filter_intervals(ContextPtr ctx, DataFrame df,
 }
 
 // [[Rcpp::export]]
+LogicalVector context_coords_in_view(ContextPtr ctx, DataFrame df, bool limit_to_zoom = false) {
+  try {
+    Context* ptr = require_context(ctx, "context_coords_in_view");
+    std::vector<PointRow> input = dataframe_to_point_rows(df, false);
+    std::vector<bool> result = ptr->coords_in_view(input, limit_to_zoom);
+    return Rcpp::wrap(result);
+  } catch (const std::exception& e) {
+    Rcpp::stop("Error in context_coords_in_view: %s", e.what());
+  }
+}
+
+// [[Rcpp::export]]
 DataFrame context_get_plotted_segments(ContextPtr ctx) {
   try {
     Context* ptr = require_context(ctx, "context_get_plotted_segments");
@@ -491,6 +503,17 @@ NumericVector context_get_xlim(ContextPtr ctx) {
     return result;
   } catch (const std::exception& e) {
     Rcpp::stop("Error in context_get_xlim: %s", e.what());
+  }
+}
+
+// [[Rcpp::export]]
+CharacterVector context_get_segment_ids(ContextPtr ctx, bool limit_to_zoom = false) {
+  try {
+    Context* ptr = require_context(ctx, "context_get_segment_ids");
+    std::vector<std::string> result = ptr->get_segment_ids(limit_to_zoom);
+    return wrap(result);
+  } catch (const std::exception& e) {
+    Rcpp::stop("Error in context_get_segment_ids: %s", e.what());
   }
 }
 

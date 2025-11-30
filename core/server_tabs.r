@@ -21,6 +21,16 @@ output$mainTabsPanel <- renderUI({
       DTOutput("contigTable")
     ),
     tabPanel(
+      "Segments",
+      checkboxInput("allowMultipleSegmentsChk", "allow multiple", 
+                    value = cache_get_if_exists("allow_multiple_segments", FALSE)),
+      actionButton("gotoSegmentsBtn", "goto"),
+      actionButton("addSegmentsBtn", "add"),
+      actionButton("removeSegmentsFromListBtn", "remove"),
+      actionButton("clearSegmentSelectionBtn", "clear selection"),
+      DTOutput("segmentTable")
+    ),
+    tabPanel(
       "Genomes",
       checkboxInput("allowMultipleGenomesChk", "allow multiple", 
                     value = cache_get_if_exists("allow_multiple_genomes", FALSE)),
@@ -31,7 +41,7 @@ output$mainTabsPanel <- renderUI({
       DTOutput("genomeTable")
     ),
     tabPanel(
-      "Contig Map",
+      "Segment Map",
       DTOutput("mapTable")
     ),
     tabPanel(

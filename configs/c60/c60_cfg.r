@@ -103,9 +103,17 @@ get_fasta_f <- function(assembly = NULL) {
 # Register fasta function
 register_fasta_f(get_fasta_f)
 
-# Register seg_bins function (segment to bin mapping with coordinates)
+# Register seg_bins function (segment to bin mapping with coordinates and colors)
 register_seg_bins_f(function(assembly) {
-  get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
+  seg_table <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
+  if (is.null(seg_table)) return(NULL)
+  
+  # assign colors to bins (once, centrally)
+  unique_bins <- sort(unique(seg_table$bin))
+  bin_colors <- setNames(rainbow(length(unique_bins), s = 0.5, v = 0.9), unique_bins)
+  seg_table$bin_color <- bin_colors[seg_table$bin]
+  
+  return(seg_table)
 })
 
 # Register seg_adj function (segment adjacency matrices)
@@ -407,18 +415,10 @@ register_tab(
 
 # function to get segments with bin colors for segments profile
 get_bin_segments_f <- function(assembly) {
-  seg_table <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
+  seg_table <- get_seg_bins(assembly)  # now includes bin_color
   if (is.null(seg_table)) {
     return(NULL)
   }
-  
-  # generate colors for each unique bin
-  unique_bins <- sort(unique(seg_table$bin))
-  bin_colors <- rainbow(length(unique_bins))
-  names(bin_colors) <- unique_bins
-  
-  # add color column
-  seg_table$bin_color <- bin_colors[seg_table$bin]
   
   # format for interval_profile (needs: assembly, contig, start, end, desc, id)
   seg_table$assembly <- assembly
