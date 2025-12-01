@@ -164,6 +164,7 @@ cxt_set_view <- function(selected_segments) {
       contig = character(),
       start = integer(),
       end = integer(),
+      strand = character(),
       stringsAsFactors = FALSE
     )
     context_update_selected_segments(.context_env$current_context, 
@@ -181,6 +182,11 @@ cxt_set_view <- function(selected_segments) {
   # Filter to valid contigs
   contig_table <- get_contigs(.context_env$current_assembly)
   plotted_segments <- selected_segments[selected_segments$contig %in% contig_table$contig, ]
+  
+  # ensure strand column exists (default to '+')
+  if (!"strand" %in% names(plotted_segments)) {
+    plotted_segments$strand <- "+"
+  }
   
   cat(sprintf("[cxt_set_view] Setting view with %d segments (from %d input segments)\n", 
               nrow(plotted_segments), nrow(selected_segments)))

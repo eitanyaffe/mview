@@ -32,6 +32,13 @@ std::vector<SegmentRow> dataframe_to_segment_rows(DataFrame df) {
   IntegerVector starts = df["start"];
   IntegerVector ends = df["end"];
   
+  // strand is optional, default to '+'
+  bool has_strand = df.containsElementNamed("strand");
+  CharacterVector strands;
+  if (has_strand) {
+    strands = df["strand"];
+  }
+  
   int n = df.nrows();
   std::vector<SegmentRow> result;
   result.reserve(n);
@@ -42,6 +49,12 @@ std::vector<SegmentRow> dataframe_to_segment_rows(DataFrame df) {
     row.contig = as<std::string>(contigs[i]);
     row.start = starts[i];
     row.end = ends[i];
+    if (has_strand) {
+      std::string strand_str = as<std::string>(strands[i]);
+      row.strand = (strand_str.length() > 0 && strand_str[0] == '-') ? '-' : '+';
+    } else {
+      row.strand = '+';
+    }
     result.push_back(row);
   }
   
@@ -212,6 +225,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
       Named("trim_left") = LogicalVector(),
       Named("trim_right") = LogicalVector(),
       Named("input_index") = IntegerVector(),
+      Named("segment_strand") = CharacterVector(),
       Named("stringsAsFactors") = false
     );
   }
@@ -224,6 +238,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
   LogicalVector trim_left(n);
   LogicalVector trim_right(n);
   IntegerVector input_indices(n);
+  CharacterVector segment_strands(n);
   
   for (int i = 0; i < n; i++) {
     contigs[i] = rows[i].contig;
@@ -234,6 +249,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
     trim_left[i] = rows[i].trim_left;
     trim_right[i] = rows[i].trim_right;
     input_indices[i] = rows[i].input_index;
+    segment_strands[i] = std::string(1, rows[i].segment_strand);
   }
   
   return DataFrame::create(
@@ -245,6 +261,7 @@ DataFrame interval_rows_to_dataframe(const std::vector<IntervalRow>& rows) {
     Named("trim_left") = trim_left,
     Named("trim_right") = trim_right,
     Named("input_index") = input_indices,
+    Named("segment_strand") = segment_strands,
     Named("stringsAsFactors") = false
   );
 }
@@ -263,6 +280,7 @@ DataFrame plotted_segments_to_dataframe(const std::vector<PlottedSegment>& segme
       Named("vend") = NumericVector(),
       Named("contig_start") = IntegerVector(),
       Named("contig_end") = IntegerVector(),
+      Named("strand") = CharacterVector(),
       Named("stringsAsFactors") = false
     );
   }
@@ -273,6 +291,7 @@ DataFrame plotted_segments_to_dataframe(const std::vector<PlottedSegment>& segme
   NumericVector vends(n);
   IntegerVector contig_starts(n);
   IntegerVector contig_ends(n);
+  CharacterVector strands(n);
   
   for (int i = 0; i < n; i++) {
     segment_ids[i] = segments[i].segment_id;
@@ -281,6 +300,7 @@ DataFrame plotted_segments_to_dataframe(const std::vector<PlottedSegment>& segme
     vends[i] = static_cast<double>(segments[i].vcoord_end);
     contig_starts[i] = static_cast<int>(segments[i].contig_start);
     contig_ends[i] = static_cast<int>(segments[i].contig_end);
+    strands[i] = std::string(1, segments[i].strand);
   }
   
   return DataFrame::create(
@@ -292,6 +312,7 @@ DataFrame plotted_segments_to_dataframe(const std::vector<PlottedSegment>& segme
     Named("vend") = vends,
     Named("contig_start") = contig_starts,
     Named("contig_end") = contig_ends,
+    Named("strand") = strands,
     Named("stringsAsFactors") = false
   );
 }

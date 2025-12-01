@@ -48,6 +48,7 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
   intervals <- cxt_get_zoom_view()
   xlim <- cxt_get_xlim()
   bin_size <- get_current_bin_size(xlim, bin_type, target_bins = target_bins, binsizes = binsizes)
+  plotted_segs <- cxt_get_plotted_segments()
 
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
@@ -57,10 +58,17 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
     digest::digest(aln, algo = "md5")
   }
   
+  # include plotted segments with strands for cache invalidation when segments flip
+  seg_key <- if (nrow(plotted_segs) > 0) {
+    paste(plotted_segs$segment, plotted_segs$strand, collapse = ",")
+  } else {
+    ""
+  }
+  
   cache_key <- paste0("bin_query_",
                      digest::digest(list(
                        aln_id = aln_id,
-                       xlim = xlim,
+                       seg_key = seg_key,
                        bin_size = bin_size,
                        seg_threshold = seg_threshold,
                        non_ref_threshold = non_ref_threshold,

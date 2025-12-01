@@ -1,16 +1,18 @@
-# selector tab implementation
-# Core tab for selecting and ordering segments via interactive graph
+# selector tab
+# minimal entry point that sources components and defines UI
 
 # source component files
-source("core/selector_tab_state.r", local = TRUE)
-source("core/selector_tab_utils.r", local = TRUE)
-source("core/selector_tab_server.r", local = TRUE)
+source("core/organizer_state.r", local = TRUE)
+source("core/organizer_server.r", local = TRUE)
+source("core/graph_state.r", local = TRUE)
+source("core/graph_utils.r", local = TRUE)
+source("core/graph_server.r", local = TRUE)
 
-# UI function (will be called from server_tabs.r)
+# UI function
 selector_tab_ui <- function() {
   tabPanel(
     "Selector",
-    # load sortable.js scripts (using unpkg for better MIME type handling)
+    # load sortable.js scripts
     singleton(tags$script(src = "https://unpkg.com/sortablejs@1.15.0/Sortable.min.js")),
     tags$style(HTML("
       #selectorSegmentList { padding: 0; margin: 0; max-height: 800px; overflow-y: auto; }
@@ -42,7 +44,7 @@ selector_tab_ui <- function() {
     ")),
     fluidRow(
       # left column: segment organizer
-      column(3,
+            column(3,
         h4("Segments in view"),
         p("Click to select, Alt/Cmd+click for multi-select, drag to reorder", style = "color: #666; font-size: 11px; margin-bottom: 8px;"),
         uiOutput("selectorSegmentListUI"),

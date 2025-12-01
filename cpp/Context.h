@@ -16,6 +16,9 @@ struct SegmentRow {
   std::string contig;
   int64_t start;
   int64_t end;
+  char strand;  // '+' or '-', default '+'
+  
+  SegmentRow() : start(0), end(0), strand('+') {}
 };
 
 struct ContigRow {
@@ -43,6 +46,10 @@ struct IntervalRow {
   int n_segments;
   std::string segment_ids;  // comma-separated when merged
   int input_index;  // 1-based index of input row that produced this output
+  char segment_strand;  // strand of segment containing this interval ('+' or '-')
+  
+  IntervalRow() : start(0), end(0), vstart(0), vend(0), trim_left(false), 
+                  trim_right(false), n_segments(0), input_index(0), segment_strand('+') {}
 };
 
 // PlottedSegment structure (used in public interface)
@@ -53,6 +60,9 @@ struct PlottedSegment {
   int64_t contig_end;    // original end on contig
   int64_t vcoord_start;  // cumulative start in vcoord space
   int64_t vcoord_end;    // cumulative end in vcoord space
+  char strand;           // '+' or '-'
+  
+  PlottedSegment() : contig_start(0), contig_end(0), vcoord_start(0), vcoord_end(0), strand('+') {}
 };
 
 class Context {
@@ -142,6 +152,11 @@ private:
   int64_t segment2acoord(const std::string& segment, int64_t coord);
   int64_t segment2vcoord(const std::string& segment, int64_t coord);
   std::pair<std::string, int64_t> vcoord2segment(int64_t vcoord);
+  
+  // strand-aware coordinate helpers
+  // local_coord is 0-based offset within segment (0 to length-1)
+  int64_t segment_local_to_vcoord(const PlottedSegment& pseg, int64_t local_coord);
+  int64_t vcoord_to_segment_local(const PlottedSegment& pseg, int64_t vcoord);
   
   void build_full_segments(const std::vector<SegmentRow>& segment_table);
   void build_contigs(const std::vector<ContigRow>& contig_table);

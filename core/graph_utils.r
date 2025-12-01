@@ -1,4 +1,4 @@
-# selector tab utilities
+# graph utilities
 # data loading and graph building functions (pure functions, no Shiny dependencies)
 
 #########################################################################
@@ -283,3 +283,4 @@ build_edge_table <- function(edges) {
   
   return(table_data)
 }
+

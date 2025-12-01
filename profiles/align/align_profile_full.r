@@ -40,7 +40,7 @@ chunk_type = "break_on_overlap",
 min_indel_length = 3) {
   
   intervals <- cxt_get_zoom_view()
-  xlim <- cxt_get_xlim()
+  plotted_segs <- cxt_get_plotted_segments()
   
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
@@ -50,10 +50,17 @@ min_indel_length = 3) {
     digest::digest(aln, algo = "md5")
   }
   
+  # include plotted segments with strands for cache invalidation when segments flip
+  seg_key <- if (nrow(plotted_segs) > 0) {
+    paste(plotted_segs$segment, plotted_segs$strand, collapse = ",")
+  } else {
+    ""
+  }
+  
   cache_key <- paste0("full_query_",
                      digest::digest(list(
                        aln_id = aln_id,
-                       xlim = xlim,
+                       seg_key = seg_key,
                        height_style_str = height_style_str,
                        max_reads = max_reads,
                        clip_mode = clip_mode,

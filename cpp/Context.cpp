@@ -103,6 +103,7 @@ void Context::update_plotted_segments(const std::vector<SegmentRow>& selected_se
     pseg.contig = row.contig;
     pseg.contig_start = row.start;
     pseg.contig_end = row.end;
+    pseg.strand = row.strand;
     
     int64_t length = pseg.contig_end - pseg.contig_start + 1;
     pseg.vcoord_start = vcoord_cumsum;
@@ -215,8 +216,8 @@ int64_t Context::segment2vcoord(const std::string& segment, int64_t coord) {
   }
   
   const PlottedSegment& pseg = plotted_segments_[it->second];
-  int64_t segment_offset = coord - 1; // convert to 0-based
-  return pseg.vcoord_start + segment_offset;
+  int64_t local_coord = coord - 1; // convert to 0-based
+  return segment_local_to_vcoord(pseg, local_coord);
 }
 
 std::pair<std::string, int64_t> Context::vcoord2segment(int64_t vcoord) {
@@ -231,10 +232,29 @@ std::pair<std::string, int64_t> Context::vcoord2segment(int64_t vcoord) {
   size_t idx = it - plotted_segment_cs.begin();
   
   const PlottedSegment& pseg = plotted_segments_[idx];
-  int64_t local_vcoord = vcoord - pseg.vcoord_start; // 0-based within segment
-  int64_t coord = local_vcoord + 1; // convert to 1-based
+  int64_t local_coord = vcoord_to_segment_local(pseg, vcoord);
+  int64_t coord = local_coord + 1; // convert to 1-based
   
   return std::make_pair(pseg.segment_id, coord);
+}
+
+int64_t Context::segment_local_to_vcoord(const PlottedSegment& pseg, int64_t local_coord) {
+  // local_coord is 0-based offset within segment (0 to length-1)
+  // for '+' strand: vcoord = vcoord_start + local_coord
+  // for '-' strand: vcoord = vcoord_end - local_coord (reversed)
+  if (pseg.strand == '-') {
+    return pseg.vcoord_end - local_coord;
+  }
+  return pseg.vcoord_start + local_coord;
+}
+
+int64_t Context::vcoord_to_segment_local(const PlottedSegment& pseg, int64_t vcoord) {
+  // reverse of segment_local_to_vcoord
+  // returns 0-based local coordinate within segment
+  if (pseg.strand == '-') {
+    return pseg.vcoord_end - vcoord;
+  }
+  return vcoord - pseg.vcoord_start;
 }
 
 std::vector<PointRow> Context::contig2view_point(const std::vector<PointRow>& input) {
@@ -314,13 +334,19 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
         int64_t intersect_start = std::max(start, pseg->contig_start);
         int64_t intersect_end = std::min(end, pseg->contig_end);
         
-        // Transform intersection to vcoord
-        int64_t vstart = pseg->vcoord_start + (intersect_start - pseg->contig_start);
-        int64_t vend = pseg->vcoord_start + (intersect_end - pseg->contig_start);
+        // Transform intersection to vcoord using strand-aware helper
+        int64_t local_start = intersect_start - pseg->contig_start;
+        int64_t local_end = intersect_end - pseg->contig_start;
+        int64_t v1 = segment_local_to_vcoord(*pseg, local_start);
+        int64_t v2 = segment_local_to_vcoord(*pseg, local_end);
+        int64_t vstart = std::min(v1, v2);
+        int64_t vend = std::max(v1, v2);
         
-        // Check for trimming
-        bool trim_l = (intersect_start > start);
-        bool trim_r = (intersect_end < end);
+        // Check for trimming (swap for reversed strand)
+        bool trim_contig_left = (intersect_start > start);
+        bool trim_contig_right = (intersect_end < end);
+        bool trim_l = (pseg->strand == '-') ? trim_contig_right : trim_contig_left;
+        bool trim_r = (pseg->strand == '-') ? trim_contig_left : trim_contig_right;
         
         IntervalRow out_row;
         out_row.contig = contig;
@@ -332,6 +358,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
         out_row.trim_right = trim_r;
         out_row.n_segments = 0;
         out_row.input_index = input_idx;
+        out_row.segment_strand = pseg->strand;
         result.push_back(out_row);
       }
     } else {
@@ -341,9 +368,13 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
         
         // Check if entire interval is within this segment
         if (start >= pseg->contig_start && end <= pseg->contig_end) {
-          // Transform to vcoord
-          int64_t vstart = pseg->vcoord_start + (start - pseg->contig_start);
-          int64_t vend = pseg->vcoord_start + (end - pseg->contig_start);
+          // Transform to vcoord using strand-aware helper
+          int64_t local_start = start - pseg->contig_start;
+          int64_t local_end = end - pseg->contig_start;
+          int64_t v1 = segment_local_to_vcoord(*pseg, local_start);
+          int64_t v2 = segment_local_to_vcoord(*pseg, local_end);
+          int64_t vstart = std::min(v1, v2);
+          int64_t vend = std::max(v1, v2);
           
           // No trimming since interval is fully within segment
           IntervalRow out_row;
@@ -356,17 +387,24 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
           out_row.trim_right = false;
           out_row.n_segments = 0;
           out_row.input_index = input_idx;
+          out_row.segment_strand = pseg->strand;
           result.push_back(out_row);
         } else {
           // Interval extends beyond segment boundaries, check trimming
           int64_t intersect_start = std::max(start, pseg->contig_start);
           int64_t intersect_end = std::min(end, pseg->contig_end);
           
-          int64_t vstart = pseg->vcoord_start + (intersect_start - pseg->contig_start);
-          int64_t vend = pseg->vcoord_start + (intersect_end - pseg->contig_start);
+          int64_t local_start = intersect_start - pseg->contig_start;
+          int64_t local_end = intersect_end - pseg->contig_start;
+          int64_t v1 = segment_local_to_vcoord(*pseg, local_start);
+          int64_t v2 = segment_local_to_vcoord(*pseg, local_end);
+          int64_t vstart = std::min(v1, v2);
+          int64_t vend = std::max(v1, v2);
           
-          bool trim_l = (intersect_start > start);
-          bool trim_r = (intersect_end < end);
+          bool trim_contig_left = (intersect_start > start);
+          bool trim_contig_right = (intersect_end < end);
+          bool trim_l = (pseg->strand == '-') ? trim_contig_right : trim_contig_left;
+          bool trim_r = (pseg->strand == '-') ? trim_contig_left : trim_contig_right;
           
           IntervalRow out_row;
           out_row.contig = contig;
@@ -378,6 +416,7 @@ std::vector<IntervalRow> Context::contig2view_interval(const std::vector<Interva
           out_row.trim_right = trim_r;
           out_row.n_segments = 0;
           out_row.input_index = input_idx;
+          out_row.segment_strand = pseg->strand;
           result.push_back(out_row);
         }
       }
@@ -448,11 +487,18 @@ std::vector<IntervalRow> Context::get_view_intervals(bool limit_to_zoom, bool me
       int64_t new_vstart = std::max(vstart, xlim_start);
       int64_t new_vend = std::min(vend, xlim_end);
       
-      // Adjust contig coords proportionally (1:1 correspondence within segment)
+      // Adjust contig coords based on strand
       int64_t offset_start = new_vstart - vstart;
       int64_t offset_end = vend - new_vend;
-      int64_t new_cstart = cstart + offset_start;
-      int64_t new_cend = cend - offset_end;
+      int64_t new_cstart, new_cend;
+      if (pseg.strand == '-') {
+        // reversed: vcoord increases as contig coord decreases
+        new_cstart = cstart + offset_end;
+        new_cend = cend - offset_start;
+      } else {
+        new_cstart = cstart + offset_start;
+        new_cend = cend - offset_end;
+      }
       
       vstart = new_vstart;
       vend = new_vend;
@@ -538,10 +584,10 @@ std::vector<PointRow> Context::filter_coords(const std::vector<PointRow>& input,
       continue; // skip if segment not plotted
     }
     
-    // Convert to vcoord
+    // Convert to vcoord using strand-aware helper
     const PlottedSegment& pseg = plotted_segments_[plotted_it->second];
     int64_t segment_local = acoord - seg.acoord_start; // 0-based within segment
-    int64_t vcoord = pseg.vcoord_start + segment_local;
+    int64_t vcoord = segment_local_to_vcoord(pseg, segment_local);
     
     // Check xlim
     if (xlim.size() == 2) {
@@ -588,7 +634,7 @@ std::vector<bool> Context::coords_in_view(const std::vector<PointRow>& input, bo
     if (limit_to_zoom && xlim_.size() == 2) {
       const PlottedSegment& pseg = plotted_segments_[plotted_it->second];
       int64_t segment_local = acoord - seg.acoord_start;
-      int64_t vcoord = pseg.vcoord_start + segment_local;
+      int64_t vcoord = segment_local_to_vcoord(pseg, segment_local);
       if (vcoord < static_cast<int64_t>(xlim_[0]) || vcoord > static_cast<int64_t>(xlim_[1])) {
         continue;
       }

@@ -117,6 +117,12 @@ plot_gene_profile <- function(profile, genes, gg, mode) {
     df$hover_text <- ""
   }
 
+  # Compute TSS position accounting for segment strand
+  # TSS is at gstart if gene_strand and segment_strand are effectively the same orientation
+  seg_strand <- if ("segment_strand" %in% names(df)) df$segment_strand else "+"
+  tss_at_gstart <- (df$strand == "+") != (seg_strand == "-")
+  df$tss_pos <- ifelse(tss_at_gstart, df$gstart, df$gend)
+  
   if (mode == "simple") {
     # Simple mode - efficient rendering for large ranges
 
@@ -127,12 +133,11 @@ plot_gene_profile <- function(profile, genes, gg, mode) {
       cat("sampled to 5000 genes for efficiency\n")
     }
   
-    # Plot genes as simple horizontal lines without strand indicators
-    # draw genes as vertical segments with color based on grouping variable
+    # Plot genes as simple vertical segments at TSS position
     gg <- gg + ggplot2::geom_segment(
       data = df,
       ggplot2::aes(
-        x = gstart, xend = gstart,
+        x = tss_pos, xend = tss_pos,
         y = 0.45, yend = 0.55,
         text = hover_text
       ),
@@ -159,20 +164,11 @@ plot_gene_profile <- function(profile, genes, gg, mode) {
     ) +
       ggplot2::theme(legend.position = "none")
 
-    # Create data for promoter indicators
-    promoter_df <- df
-
-    # For + strand, promoter is at start; for - strand, promoter is at end
-    promoter_df$x_pos <- ifelse(promoter_df$strand == "+",
-      promoter_df$gstart,
-      promoter_df$gend
-    )
-
-    # Add vertical segments at promoters to indicate strand
+    # Add vertical segments at TSS to indicate strand
     gg <- gg + ggplot2::geom_segment(
-      data = promoter_df,
+      data = df,
       ggplot2::aes(
-        x = x_pos, xend = x_pos,
+        x = tss_pos, xend = tss_pos,
         y = rect_ymin, yend = rect_ymax,
         text = hover_text
       ),
