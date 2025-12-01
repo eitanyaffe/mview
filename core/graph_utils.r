@@ -222,9 +222,9 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
     return(data.frame(from = character(), to = character(), stringsAsFactors = FALSE))
   }
   
-  # build edges data frame
+  # build edges data frame (include sides in id to ensure uniqueness)
   edges <- data.frame(
-    id = paste0(edge_metrics$seg_src, "_", edge_metrics$seg_tgt),
+    id = paste0(edge_metrics$seg_src, "_", edge_metrics$side_src, "_", edge_metrics$seg_tgt, "_", edge_metrics$side_tgt),
     from = edge_metrics$seg_src,
     to = edge_metrics$seg_tgt,
     stringsAsFactors = FALSE

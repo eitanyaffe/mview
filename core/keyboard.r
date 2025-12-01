@@ -521,6 +521,39 @@ create_and_add_tab_shortcuts <- function() {
 # Call this function once to populate the shortcuts when the script is sourced
 create_and_add_tab_shortcuts()
 
+# letter-based tab shortcuts
+keyboard_shortcuts[["Alt+G"]] <- list(
+  description = "Switch to Genomes tab",
+  type = "tab_switch",
+  action = function(session_obj) {
+    updateTabsetPanel(session_obj, "mainTabs", selected = "Genomes (G)")
+  }
+)
+
+keyboard_shortcuts[["Alt+R"]] <- list(
+  description = "Switch to Regions tab",
+  type = "tab_switch",
+  action = function(session_obj) {
+    updateTabsetPanel(session_obj, "mainTabs", selected = "Regions (R)")
+  }
+)
+
+keyboard_shortcuts[["Alt+O"]] <- list(
+  description = "Switch to Organizer tab",
+  type = "tab_switch",
+  action = function(session_obj) {
+    updateTabsetPanel(session_obj, "mainTabs", selected = "Organizer (O)")
+  }
+)
+
+keyboard_shortcuts[["Alt+T"]] <- list(
+  description = "Switch to Tables tab",
+  type = "tab_switch",
+  action = function(session_obj) {
+    updateTabsetPanel(session_obj, "mainTabs", selected = "Tables (T)")
+  }
+)
+
 # Initialize keyboard shortcuts
 keyboard_initialize <- function() {
   keyboard_js <- HTML("
@@ -723,6 +756,16 @@ keyboard_summary <- function() {
   if (length(state_save_shortcuts) > 0) {
     html_content <- paste0(html_content, 
       "<li><strong>Ctrl+Alt+N (N=1-9):</strong> save state N</li>")
+  }
+  
+  # add tab switching shortcuts
+  if (length(tab_shortcuts) > 0) {
+    html_content <- paste0(html_content, 
+      "</ul><h5>Tab Navigation</h5><ul>",
+      "<li><strong>Alt+G:</strong> Genomes tab</li>",
+      "<li><strong>Alt+R:</strong> Regions tab</li>",
+      "<li><strong>Alt+O:</strong> Organizer tab</li>",
+      "<li><strong>Alt+T:</strong> Tables tab</li>")
   }
   
   html_content <- paste0(html_content, "</ul>")

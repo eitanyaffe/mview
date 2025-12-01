@@ -153,15 +153,18 @@ Application layout:
 5. **Pan view**: Use Option+Left/Right Arrow to move zoom area horizontally
 6. **Region navigation**: Use Ctrl+Alt+Arrow Up/Down to navigate between saved regions
 7. **Navigation**: Use Alt+Backspace for undo, press Help button for all shortcuts
+8. **Tab shortcuts**: Alt+G (Genomes), Alt+R (Regions), Alt+O (Organizer), Alt+T (Tables)
 
-#### Tables
+#### Tabs
 
-The bottom panel contains these tabs:
-- **Regions**: Manage saved visualization regions 
-- **Contigs**: Table for selecting individual contigs
-- **Genomes**: Table for selecting reconstructed genomes
-- **Segment Map**: Mapping between segments and genomes
-- **Options**: Display settings
+The bottom panel contains these tabs (left to right):
+
+- **Genomes (G)**: Table for selecting reconstructed genomes
+- **Regions (R)**: Manage saved visualization regions
+- **Organizer (O)**: Segment list (left) with drag-to-reorder and strand flipping, plus interactive association graph (right) for exploring segment relationships. Filter by support/percent thresholds and expand to neighbors.
+- **Tables (T)**: Contains sub-tabs for Contigs and Segments selection
+- **Registered tabs**: Configuration-defined tabs (genes, alignments, variants, etc.)
+- **Options**: Display settings (last)
 
 #### Read alignment tab
 
@@ -262,6 +265,7 @@ See [data_setup.md](docs/data_setup.md) for detailed instructions on preparing d
 
 ### Under development (v1.02)
 
+- Organizer tab: segment list with drag-to-reorder and strand flipping, plus interactive association graph for exploring segment relationships.
 - Legends tab added
 - Short indel filtering: Added `min_indel_length` parameter to alignment profiles to filter out short indels from mutation density calculations, reducing noise from sequencing artifacts while preserving longer, more meaningful indels.
 - Chunk-based height calculation: Enhanced alignment visualization with flexible chunk definition strategies. Instead of calculating heights per read, alignments are now grouped into chunks based on configurable criteria:

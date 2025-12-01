@@ -8,14 +8,14 @@ source("core/graph_state.r", local = TRUE)
 source("core/graph_utils.r", local = TRUE)
 source("core/graph_server.r", local = TRUE)
 
-# UI function
-selector_tab_ui <- function() {
+# Organizer tab UI (merged with graph)
+organizer_tab_ui <- function() {
   tabPanel(
-    "Selector",
+    "Organizer (O)",
     # load sortable.js scripts
     singleton(tags$script(src = "https://unpkg.com/sortablejs@1.15.0/Sortable.min.js")),
     tags$style(HTML("
-      #selectorSegmentList { padding: 0; margin: 0; max-height: 800px; overflow-y: auto; }
+      #selectorSegmentList { padding: 0; margin: 0; max-height: 800px; overflow-y: auto; width: 100%; }
       #selectorSegmentList li {
         list-style: none;
         margin: 3px 0;
@@ -54,8 +54,7 @@ selector_tab_ui <- function() {
       column(9,
         # graph parameters box
         wellPanel(style = "padding: 10px;",
-          tags$strong("Graph parameters"),
-          fluidRow(style = "margin-top: 8px;",
+          fluidRow(
             column(3,
               numericInput("selectorMinSupport", "Min Support:", 
                          value = cache_get_if_exists("selector.min_support", 0),
@@ -77,47 +76,46 @@ selector_tab_ui <- function() {
             )
           )
         ),
-        # tracking box
-        wellPanel(style = "padding: 10px;",
-          tags$strong("Tracking"),
-          div(style = "margin-top: 8px; display: flex; align-items: center; gap: 10px;",
-            actionButton("selectorUpdateToView", "To View", class = "btn btn-sm btn-primary"),
-            actionButton("selectorUpdateToZoom", "To Zoom", class = "btn btn-sm btn-default"),
-            radioButtons("selectorAutoUpdate", "Automatic update:",
-                        choices = c("Off" = "off", "Track View" = "view", "Track Zoom" = "zoom"),
-                        selected = "off", inline = TRUE)
-          )
-        ),
-        # segment selection box
-        wellPanel(style = "padding: 10px;",
-          tags$strong("Segment selection"),
-          div(style = "margin-top: 8px;",
-            tags$strong("Selected segments: "),
-            textOutput("selectorSelectedSegmentText", inline = TRUE)
+        # controls split: left half (update graph + selection), right half (hover info)
+        div(style = "display: flex; margin-top: 10px; gap: 15px;",
+          div(style = "flex: 2;",
+            wellPanel(style = "padding: 10px; height: 100%; margin: 0;",
+              tags$strong("Update graph"),
+              div(style = "margin-top: 8px; display: flex; align-items: center; gap: 10px;",
+                actionButton("selectorUpdateToView", "Current view", class = "btn btn-sm btn-primary"),
+                actionButton("selectorUpdateToZoom", "Current zoom", class = "btn btn-sm btn-default"),
+                radioButtons("selectorAutoUpdate", "Automatic:",
+                            choices = c("Off" = "off", "Track View" = "view", "Track Zoom" = "zoom"),
+                            selected = "off", inline = TRUE)
+              ),
+              div(style = "margin-top: 10px;",
+                tags$strong("Selected: "),
+                textOutput("selectorSelectedSegmentText", inline = TRUE)
+              ),
+              div(style = "margin-top: 10px;",
+                actionButton("selectorGotoBtn", "Goto", class = "btn btn-sm btn-primary"),
+                actionButton("selectorAddBtn", "Add", class = "btn btn-sm btn-default"),
+                actionButton("selectorRemoveBtn", "Remove", class = "btn btn-sm btn-default"),
+                actionButton("selectorClearSelectionBtn", "Clear Selection", class = "btn btn-sm btn-default")
+              )
+            )
           ),
-          div(style = "margin-top: 10px;",
-            actionButton("selectorGotoBtn", "Goto", class = "btn btn-sm btn-primary"),
-            actionButton("selectorAddBtn", "Add", class = "btn btn-sm btn-default"),
-            actionButton("selectorRemoveBtn", "Remove", class = "btn btn-sm btn-default"),
-            actionButton("selectorClearSelectionBtn", "Clear Selection", class = "btn btn-sm btn-default")
+          div(style = "flex: 1;",
+            wellPanel(style = "padding: 10px; height: 100%; margin: 0;",
+              uiOutput("selectorHoverInfo")
+            )
           )
         ),
         # graph zoom controls
-        div(style = "display: flex; align-items: center; margin-bottom: 5px; gap: 5px;",
+        div(style = "display: flex; align-items: center; margin-top: 10px; margin-bottom: 5px; gap: 5px;",
           actionButton("selectorGraphReset", "Reset", class = "btn btn-sm btn-default"),
           actionButton("selectorGraphZoomIn", "+", class = "btn btn-sm btn-default"),
           actionButton("selectorGraphZoomOut", "−", class = "btn btn-sm btn-default")
         ),
+        # graph at bottom
         div(
           style = "border: 1px solid #ccc; border-radius: 4px; padding: 5px;",
-          visNetwork::visNetworkOutput("selectorGraph", height = "400px")
-        ),
-        # hover info panel
-        wellPanel(style = "padding: 10px; margin-top: 10px; min-height: 150px;",
-          tags$strong("Hover info"),
-          div(style = "margin-top: 8px;",
-            uiOutput("selectorHoverInfo")
-          )
+          visNetwork::visNetworkOutput("selectorGraph", height = "600px")
         )
       )
     )

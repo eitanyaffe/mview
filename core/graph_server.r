@@ -108,8 +108,11 @@ observeEvent(input$selectorGotoBtn, {
   seg_table <- get_segments(state$assembly)
   if (is.null(seg_table)) return()
   
-  selected_segments <- seg_table[seg_table$segment %in% seg_ids, ]
-  if (nrow(selected_segments) == 0) return()
+  # use match to preserve order of seg_ids
+  idx <- match(seg_ids, seg_table$segment)
+  idx <- idx[!is.na(idx)]
+  if (length(idx) == 0) return()
+  selected_segments <- seg_table[idx, ]
   
   regions_module_output$push_undo_state()
   state$segments <- selected_segments
@@ -322,11 +325,15 @@ observeEvent(input$selectorGraphEdgeSelect, {
 
 observeEvent(input$selectorGraphNodeHover, {
   hovered_node(input$selectorGraphNodeHover)
-})
+  # clear edge hover when hovering a node
+  if (!is.null(input$selectorGraphNodeHover)) hovered_edge(NULL)
+}, ignoreNULL = FALSE)
 
 observeEvent(input$selectorGraphEdgeHover, {
   hovered_edge(input$selectorGraphEdgeHover)
-})
+  # clear node hover when hovering an edge
+  if (!is.null(input$selectorGraphEdgeHover)) hovered_node(NULL)
+}, ignoreNULL = FALSE)
 
 #########################################################################
 # graph zoom controls
