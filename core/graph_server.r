@@ -159,6 +159,12 @@ observeEvent(input$selectorRemoveBtn, {
   state$segments <- new_segs
 })
 
+# select all graph nodes
+observeEvent(input$selectorSelectAllBtn, {
+  all_segs <- computed_graph_segments()
+  selected_graph_segments(all_segs)
+})
+
 # clear graph selection
 observeEvent(input$selectorClearSelectionBtn, {
   selected_graph_segments(character())
@@ -174,6 +180,7 @@ current_graph_edges <- reactiveVal(NULL)
 current_bin_segment_table <- reactiveVal(NULL)
 
 output$selectorGraph <- visNetwork::renderVisNetwork({
+  # only re-render when graph structure changes (color/label/font use proxy updates)
   seg_ids <- computed_graph_segments()
   if (length(seg_ids) == 0) {
     current_graph_nodes(NULL)
@@ -181,7 +188,7 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
     return(visNetwork::visNetwork(
       data.frame(id = character(), label = character()),
       data.frame(from = character(), to = character())
-    ) %>% visNetwork::visNodes(color = list(background = "#DDE5FF")))
+    ))
   }
   
   # load data
@@ -197,18 +204,22 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat, bin_segment_table,
                             min_support(), min_percent())
   
-  # color nodes by selected style
-  color_by <- if (is.null(input$selectorColorBy)) "bin" else input$selectorColorBy
-  if (color_by == "bin" && !is.null(bin_segment_table) && "bin_color" %in% names(bin_segment_table)) {
-    seg_to_color <- setNames(bin_segment_table$bin_color, bin_segment_table$segment)
-    nodes$color.background <- ifelse(nodes$id %in% names(seg_to_color), 
-                                     seg_to_color[nodes$id], "#CCCCCC")
-    nodes$color.border <- "#666666"
-  } else {
-    nodes$color.background <- "#DDE5FF"
-    nodes$color.border <- "#4A90E2"
-  }
-  nodes$borderWidth <- 1
+  # color nodes using central color system
+  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
+  seg_colors <- get_segment_colors(seg_ids, state$assembly, ordered_segs)
+  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
+                                   seg_colors[nodes$id], "#E0E0E0")
+  nodes$color.border <- "#666666"
+  
+  # set node labels: index only for segments in view, id for all segments
+  label_type <- if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index"
+  nodes$label <- sapply(nodes$id, function(seg_id) {
+    if (label_type == "id") {
+      return(seg_id)
+    }
+    if (!seg_id %in% ordered_segs) return("")
+    return(as.character(which(ordered_segs == seg_id)))
+  })
   
   if (nrow(edges) > 0) {
     edges$color.color <- "#848484"
@@ -218,12 +229,15 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   current_graph_edges(edges)
   current_bin_segment_table(bin_segment_table)
   
+  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 28
   network <- visNetwork::visNetwork(nodes, edges) %>%
+    visNetwork::visNodes(
+      font = list(size = font_size, color = "black")
+    ) %>%
     visNetwork::visEdges(arrows = "to") %>%
     visNetwork::visLayout(randomSeed = 42) %>%
     visNetwork::visPhysics(
-      stabilization = list(enabled = TRUE, iterations = 200),
-      solver = "forceAtlas2Based"
+      stabilization = list(enabled = TRUE, iterations = 200)
     ) %>%
     visNetwork::visInteraction(
       zoomView = FALSE,
@@ -270,6 +284,9 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   network <- htmlwidgets::onRender(network, "
     function(el, x) {
       var network = this.network;
+      network.once('stabilized', function() {
+        network.fit();
+      });
       Shiny.addCustomMessageHandler('selectorGraphZoom', function(data) {
         var scale = network.getScale() * data.factor;
         scale = Math.max(0.1, Math.min(scale, 10));
@@ -287,19 +304,15 @@ observeEvent(selected_graph_segments(), {
   if (is.null(nodes) || nrow(nodes) == 0) return()
   
   selected_nodes <- selected_graph_segments()
-  bin_segment_table <- current_bin_segment_table()
   
-  color_by <- if (is.null(input$selectorColorBy)) "bin" else input$selectorColorBy
-  if (color_by == "bin" && !is.null(bin_segment_table) && "bin_color" %in% names(bin_segment_table)) {
-    seg_to_color <- setNames(bin_segment_table$bin_color, bin_segment_table$segment)
-    nodes$color.background <- ifelse(nodes$id %in% names(seg_to_color), 
-                                     seg_to_color[nodes$id], "#CCCCCC")
-    nodes$color.border <- "#666666"
-  } else {
-    nodes$color.background <- "#DDE5FF"
-    nodes$color.border <- "#4A90E2"
-  }
+  # color nodes using central color system
+  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
+  seg_colors <- get_segment_colors(nodes$id, state$assembly, ordered_segs)
+  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
+                                   seg_colors[nodes$id], "#CCCCCC")
+  nodes$color.border <- "#666666"
   nodes$borderWidth <- 1
+  nodes$font.color <- get_text_color_for_background(nodes$color.background)
   
   if (length(selected_nodes) > 0) {
     nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
@@ -309,6 +322,53 @@ observeEvent(selected_graph_segments(), {
   visNetwork::visNetworkProxy("selectorGraph") %>%
     visNetwork::visUpdateNodes(nodes)
 }, ignoreNULL = FALSE)
+
+# update node colors via proxy when color scheme changes
+observeEvent(input$segmentColorScheme, {
+  nodes <- current_graph_nodes()
+  if (is.null(nodes) || nrow(nodes) == 0) return()
+  
+  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
+  seg_colors <- get_segment_colors(nodes$id, state$assembly, ordered_segs)
+  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
+                                   seg_colors[nodes$id], "#E0E0E0")
+  nodes$color.border <- "#666666"
+  
+  selected_nodes <- selected_graph_segments()
+  if (length(selected_nodes) > 0) {
+    nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
+    nodes$borderWidth <- ifelse(nodes$id %in% selected_nodes, 3, 1)
+  }
+  
+  current_graph_nodes(nodes)
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visUpdateNodes(nodes)
+}, ignoreInit = TRUE)
+
+# update node labels via proxy when label type changes
+observeEvent(input$graphNodeLabel, {
+  nodes <- current_graph_nodes()
+  if (is.null(nodes) || nrow(nodes) == 0) return()
+  
+  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
+  label_type <- input$graphNodeLabel
+  nodes$label <- sapply(nodes$id, function(seg_id) {
+    if (label_type == "id") return(seg_id)
+    if (!seg_id %in% ordered_segs) return("")
+    return(as.character(which(ordered_segs == seg_id)))
+  })
+  
+  current_graph_nodes(nodes)
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visUpdateNodes(nodes)
+}, ignoreInit = TRUE)
+
+# update font size via proxy when font size changes
+observeEvent(input$graphFontSize, {
+  font_size <- as.numeric(input$graphFontSize)
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visSetOptions(options = list(nodes = list(font = list(size = font_size, color = "black"))))
+}, ignoreInit = TRUE)
 
 observeEvent(input$selectorGraphNodeSelect, {
   nodes <- input$selectorGraphNodeSelect
@@ -345,11 +405,11 @@ observeEvent(input$selectorGraphReset, {
 })
 
 observeEvent(input$selectorGraphZoomIn, {
-  session$sendCustomMessage("selectorGraphZoom", list(factor = 2))
+  session$sendCustomMessage("selectorGraphZoom", list(factor = 1.5))
 })
 
 observeEvent(input$selectorGraphZoomOut, {
-  session$sendCustomMessage("selectorGraphZoom", list(factor = 0.5))
+  session$sendCustomMessage("selectorGraphZoom", list(factor = 0.67))
 })
 
 #########################################################################
@@ -373,6 +433,13 @@ output$selectorHoverInfo <- renderUI({
     seg_id <- node_hover
     seg_table <- get_segments(state$assembly)
     bin_segment_table <- load_bin_segment_table(state$assembly)
+    edges <- current_graph_edges()
+    
+    # compute degree from edges
+    degree <- 0
+    if (!is.null(edges) && nrow(edges) > 0) {
+      degree <- sum(edges$from == seg_id) + sum(edges$to == seg_id)
+    }
     
     if (!is.null(seg_table) && seg_id %in% seg_table$segment) {
       seg_row <- seg_table[seg_table$segment == seg_id, ]
@@ -391,10 +458,11 @@ output$selectorHoverInfo <- renderUI({
         tags$strong("Contig: "), contig, tags$br(),
         tags$strong("Coords: "), format(start, big.mark = ","), " - ", format(end, big.mark = ","), tags$br(),
         tags$strong("Length: "), length_kb, " kb", tags$br(),
-        tags$strong("Bin: "), bin
+        tags$strong("Bin: "), bin, tags$br(),
+        tags$strong("Degree: "), degree
       ))
     }
-    return(tags$p(tags$strong("Segment: "), seg_id))
+    return(tags$p(tags$strong("Segment: "), seg_id, tags$br(), tags$strong("Degree: "), degree))
   }
   
   # show hovered edge details

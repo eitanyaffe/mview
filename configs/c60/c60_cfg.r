@@ -108,13 +108,45 @@ register_seg_bins_f(function(assembly) {
   seg_table <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE)
   if (is.null(seg_table)) return(NULL)
   
-  # assign colors to bins (once, centrally)
-  unique_bins <- sort(unique(seg_table$bin))
-  bin_colors <- setNames(rainbow(length(unique_bins), s = 0.5, v = 0.9), unique_bins)
+  # load host table to determine which bins are hosts
+  host_table <- get_data("BINNING_HOST_TABLE", tag = assembly, null.on.missing = TRUE)
+  
+  if (is.null(host_table)) {
+    # fallback: simple rainbow over all bins
+    unique_bins <- sort(unique(seg_table$bin))
+    bin_colors <- setNames(rainbow(length(unique_bins), s = 0.5, v = 0.9), unique_bins)
+    seg_table$bin_color <- bin_colors[seg_table$bin]
+    return(seg_table)
+  }
+  
+  # hosts: bins in host_table, sorted by taxonomy
+  host_bins <- host_table$bin
+  
+  # sort hosts by taxonomy: phylum, class, order, family, genus, species
+  tax_cols <- c("phylum", "class", "order", "family", "genus", "species")
+  available_cols <- tax_cols[tax_cols %in% names(host_table)]
+  if (length(available_cols) > 0) {
+    host_table <- host_table[do.call(order, host_table[available_cols]), ]
+    host_bins <- host_table$bin
+  }
+  
+  # assign rainbow colors to hosts
+  host_colors <- setNames(rainbow(length(host_bins), s = 0.6, v = 0.85), host_bins)
+  
+  # non-hosts get light gray
+  all_bins <- unique(seg_table$bin)
+  non_host_bins <- all_bins[!all_bins %in% host_bins]
+  non_host_colors <- setNames(rep("#CCCCCC", length(non_host_bins)), non_host_bins)
+  
+  # combine colors
+  bin_colors <- c(host_colors, non_host_colors)
   seg_table$bin_color <- bin_colors[seg_table$bin]
   
   return(seg_table)
 })
+
+# Register segment color schemes
+register_segment_colors(list(bin = "bin_color"))
 
 # Register seg_adj function (segment adjacency matrices)
 register_seg_adj_f(function(assembly) {

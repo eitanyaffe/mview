@@ -15,6 +15,9 @@ get_server <- function() {
         # selector tab (UI function and server code - must be before server_tabs.r)
         source("core/selector_tab.r", local = TRUE)
         
+        # segment colors (server-side, after selector_tab)
+        source("core/server_segment_colors.r", local = TRUE)
+        
         source("core/server_tabs.r", local = TRUE)
         source("core/server_legend.r", local = TRUE)
         
@@ -98,6 +101,9 @@ rl_core <- function(project_id) {
 
     # states
     source("core/states.r", local = FALSE)
+
+    # segment colors registry (before config loads)
+    source("core/segment_colors.r", local = FALSE)
 
     # profiles
     source("core/profile_manager.r", local = FALSE)

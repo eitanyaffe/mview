@@ -2,6 +2,28 @@
 # data loading and graph building functions (pure functions, no Shiny dependencies)
 
 #########################################################################
+# color utilities
+#########################################################################
+
+# returns black or white text color based on background luminance
+get_text_color_for_background <- function(bg_colors) {
+  result <- rep("#000000", length(bg_colors))
+  for (i in seq_along(bg_colors)) {
+    col <- bg_colors[i]
+    if (is.na(col) || col == "") {
+      next
+    }
+    rgb_vals <- tryCatch(col2rgb(col), error = function(e) NULL)
+    if (is.null(rgb_vals)) {
+      next
+    }
+    luminance <- (0.299 * rgb_vals[1] + 0.587 * rgb_vals[2] + 0.114 * rgb_vals[3]) / 255
+    result[i] <- if (luminance < 0.5) "#FFFFFF" else "#000000"
+  }
+  result
+}
+
+#########################################################################
 # data loading (uses registered functions from data.r)
 #########################################################################
 
@@ -76,81 +98,31 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
     return(NULL)
   }
   
-  # get library columns (exclude metadata columns)
   metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
                      "contig_src", "start_src", "end_src", 
                      "contig_tgt", "start_tgt", "end_tgt")
-  
-  # find library columns in count_mat
   lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
+  key_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt")
   
-  # aggregate metrics for each edge
-  result <- data.frame(
-    seg_src = edge_rows$seg_src,
-    seg_tgt = edge_rows$seg_tgt,
-    side_src = edge_rows$side_src,
-    side_tgt = edge_rows$side_tgt,
-    support = numeric(nrow(edge_rows)),
-    total = numeric(nrow(edge_rows)),
-    total_associated = numeric(nrow(edge_rows)),
-    percent = numeric(nrow(edge_rows)),
-    stringsAsFactors = FALSE
-  )
+  # row sums per matrix limited to library columns
+  count_sums <- data.frame(count_mat[, key_cols], 
+                           support = rowSums(count_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+  total_sums <- data.frame(total_mat[, key_cols], 
+                           total = rowSums(total_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+  associated_sums <- data.frame(associated_mat[, key_cols], 
+                                total_associated = rowSums(associated_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
   
-  for (i in seq_len(nrow(edge_rows))) {
-    seg_src <- edge_rows$seg_src[i]
-    seg_tgt <- edge_rows$seg_tgt[i]
-    side_src <- edge_rows$side_src[i]
-    side_tgt <- edge_rows$side_tgt[i]
-    
-    # find matching rows in all three matrices
-    count_row <- count_mat[count_mat$seg_src == seg_src & 
-                          count_mat$seg_tgt == seg_tgt &
-                          count_mat$side_src == side_src &
-                          count_mat$side_tgt == side_tgt, ]
-    total_row <- total_mat[total_mat$seg_src == seg_src & 
-                          total_mat$seg_tgt == seg_tgt &
-                          total_mat$side_src == side_src &
-                          total_mat$side_tgt == side_tgt, ]
-    associated_row <- associated_mat[associated_mat$seg_src == seg_src & 
-                                    associated_mat$seg_tgt == seg_tgt &
-                                    associated_mat$side_src == side_src &
-                                    associated_mat$side_tgt == side_tgt, ]
-    
-    # aggregate across libraries
-    support_sum <- 0
-    total_sum <- 0
-    associated_sum <- 0
-    
-    if (nrow(count_row) > 0) {
-      for (col in lib_cols) {
-        if (col %in% names(count_row)) {
-          support_sum <- support_sum + as.numeric(count_row[[col]][1])
-        }
-      }
-    }
-    
-    if (nrow(total_row) > 0) {
-      for (col in lib_cols) {
-        if (col %in% names(total_row)) {
-          total_sum <- total_sum + as.numeric(total_row[[col]][1])
-        }
-      }
-    }
-    
-    if (nrow(associated_row) > 0) {
-      for (col in lib_cols) {
-        if (col %in% names(associated_row)) {
-          associated_sum <- associated_sum + as.numeric(associated_row[[col]][1])
-        }
-      }
-    }
-    
-    result$support[i] <- support_sum
-    result$total[i] <- total_sum
-    result$total_associated[i] <- associated_sum
-    result$percent[i] <- if (!is.na(associated_sum) && associated_sum > 0) (support_sum / associated_sum) * 100 else 0
-  }
+  # merge with edge_rows
+  result <- edge_rows[, key_cols]
+  result <- merge(result, count_sums, by = key_cols, all.x = TRUE)
+  result <- merge(result, total_sums, by = key_cols, all.x = TRUE)
+  result <- merge(result, associated_sums, by = key_cols, all.x = TRUE)
+  
+  result$support[is.na(result$support)] <- 0
+  result$total[is.na(result$total)] <- 0
+  result$total_associated[is.na(result$total_associated)] <- 0
+  result$percent <- ifelse(result$total_associated > 0, 
+                           (result$support / result$total_associated) * 100, 0)
   
   return(result)
 }

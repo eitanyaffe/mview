@@ -199,7 +199,7 @@ interval_profile(
   id = "bin_segments",
   name = "Segments",
   intervals_f = get_bin_segments_f,
-  color_field = "bin",
+  color_f = function(ids) { get_current_color_map()(ids) },
   merge_adjacent = FALSE,
   height = 60
 )

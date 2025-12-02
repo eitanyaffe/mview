@@ -144,9 +144,6 @@ cxt_set_assembly <- function(assembly_id) {
   # Reset segments when assembly changes
   .context_env$current_segments <- NULL
   
-  # Reset zoom to full range of the new assembly
-  cxt_set_zoom(NULL)
-  
   invisible(TRUE)
 }
 

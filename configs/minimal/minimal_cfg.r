@@ -269,6 +269,9 @@ register_fasta_f(get_fasta_f)
 register_seg_bins_f(get_seg_bins_f)
 register_seg_adj_f(get_seg_adj_f)
 
+# register segment color schemes (genome = rainbow by genome)
+register_segment_colors(list(genome = "bin_color"))
+
 ########################################################
 # register views
 ########################################################

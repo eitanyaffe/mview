@@ -2,6 +2,7 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
                          intervals_f = NULL,
                            color = "#2E86AB",
                            color_field = NULL,
+                           color_f = NULL,
                            merge_adjacent = TRUE,
                            auto_register = TRUE) {
 
@@ -39,20 +40,31 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
       return(list(plot = gg, legends = list()))
     }
     
-    # determine color field name if color_field is provided
-    color_field_name <- NULL
-    if (!is.null(profile$color_field)) {
+    # determine fill colors - priority: color_f > color_field > color
+    fill_colors <- NULL
+    
+    # try color_f first (function(id) -> color)
+    if (!is.null(profile$color_f) && is.function(profile$color_f)) {
+      if ("id" %in% names(filtered_intervals)) {
+        fill_colors <- sapply(filtered_intervals$id, profile$color_f)
+        fill_colors[is.na(fill_colors)] <- profile$color
+      }
+    }
+    
+    # fallback to color_field
+    if (is.null(fill_colors) && !is.null(profile$color_field)) {
       color_field_name <- profile$color_field
       if (!grepl("_color$", color_field_name)) {
         color_field_name <- paste0(color_field_name, "_color")
       }
+      if (color_field_name %in% names(filtered_intervals)) {
+        fill_colors <- filtered_intervals[[color_field_name]]
+        fill_colors[is.na(fill_colors) | fill_colors == ""] <- profile$color
+      }
     }
     
-    # determine fill colors
-    if (!is.null(color_field_name) && color_field_name %in% names(filtered_intervals)) {
-      fill_colors <- filtered_intervals[[color_field_name]]
-      fill_colors[is.na(fill_colors) | fill_colors == ""] <- profile$color
-    } else {
+    # fallback to default color
+    if (is.null(fill_colors)) {
       fill_colors <- profile$color
     }
     
@@ -64,21 +76,6 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
     )
     
     # add intervals layer as rectangles
-    if (!is.null(color_field_name) && color_field_name %in% names(filtered_intervals)) {
-      gg <- gg + 
-        ggplot2::geom_rect(
-          data = filtered_intervals,
-          ggplot2::aes(
-            xmin = gstart, xmax = gend,
-            ymin = -0.15, ymax = 0.15,
-            text = hover_text,
-            fill = .data[[color_field_name]]
-          ),
-          color = "black",
-          size = 0.5
-        ) +
-        ggplot2::scale_fill_identity()
-    } else {
     gg <- gg + 
       ggplot2::geom_rect(
         data = filtered_intervals,
@@ -87,11 +84,10 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
           ymin = -0.15, ymax = 0.15,
           text = hover_text
         ),
-          fill = fill_colors,
+        fill = fill_colors,
         color = "black",
         size = 0.5
-        )
-    }
+      )
     xlim <- cxt_get_xlim()
     gg <- gg +
       ggplot2::geom_text(
@@ -119,6 +115,7 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
     intervals_f = intervals_f,
     color = color,
     color_field = color_field,
+    color_f = color_f,
     merge_adjacent = merge_adjacent,
     auto_register = auto_register
   )

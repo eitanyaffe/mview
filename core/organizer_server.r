@@ -51,6 +51,18 @@ window.initSelectorSortable = function() {
   });
 };
 
+window.selectorFlipSegment = function(segId) {
+  if (typeof Shiny !== 'undefined') {
+    Shiny.setInputValue('selectorFlipSegment', {id: segId, time: Date.now()}, {priority: 'event'});
+  }
+};
+
+window.selectorRemoveSegment = function(segId) {
+  if (typeof Shiny !== 'undefined') {
+    Shiny.setInputValue('selectorRemoveSegment', {id: segId, time: Date.now()}, {priority: 'event'});
+  }
+};
+
 window.selectorRemoveSelected = function() {
   if (window.selectorSelectedItems.size === 0) return;
   
@@ -106,10 +118,10 @@ get_text_color <- function(hex_color) {
 }
 
 # build segment list item
-build_selector_item <- function(seg_id, strand, seg_table, bin_segment_table) {
+build_selector_item <- function(seg_id, strand, seg_table, bin_segment_table, seg_color = NULL) {
   seg_with_strand <- paste0(seg_id, strand)
   label_text <- seg_with_strand
-  bg_color <- "#888888"
+  bg_color <- if (!is.null(seg_color) && !is.na(seg_color)) seg_color else "#888888"
   
   if (!is.null(seg_table) && seg_id %in% seg_table$segment) {
     seg_row <- seg_table[seg_table$segment == seg_id, ]
@@ -121,12 +133,9 @@ build_selector_item <- function(seg_id, strand, seg_table, bin_segment_table) {
     if (!is.null(bin_segment_table) && seg_id %in% bin_segment_table$segment) {
       bin_row <- bin_segment_table[bin_segment_table$segment == seg_id, ]
       bin <- bin_row$bin[1]
-      if ("bin_color" %in% names(bin_row)) {
-        bg_color <- bin_row$bin_color[1]
-      }
     }
     
-    label_parts <- c(seg_with_strand, paste0(length_kb, "kb"), contig)
+    label_parts <- c(seg_with_strand, paste0(length_kb, "kb"))
     if (!is.na(bin)) {
       label_parts <- c(label_parts, bin)
     }
@@ -135,11 +144,24 @@ build_selector_item <- function(seg_id, strand, seg_table, bin_segment_table) {
   
   text_color <- get_text_color(bg_color)
   
+  strand_label <- if (strand == "+") "F" else "R"
   tags$li(
-    label_text,
-    style = sprintf("background:%s; color:%s;", bg_color, text_color),
+    style = sprintf("background:%s; color:%s; display:flex; align-items:center; gap:8px;", bg_color, text_color),
     `data-id` = seg_id,
-    `data-strand` = strand
+    `data-strand` = strand,
+    tags$button(
+      class = "flip-btn",
+      onclick = sprintf("window.selectorFlipSegment('%s'); event.stopPropagation();", seg_id),
+      style = "background:transparent; border:1px solid; border-radius:3px; padding:0 5px; cursor:pointer; font-size:14px; line-height:1.2; min-width:20px;",
+      strand_label
+    ),
+    tags$span(label_text, style = "flex:1; margin-right:8px;"),
+    tags$button(
+      class = "remove-btn",
+      onclick = sprintf("window.selectorRemoveSegment('%s'); event.stopPropagation();", seg_id),
+      style = "background:transparent; border:none; padding:2px 4px; cursor:pointer; font-size:12px; opacity:0.6;",
+      "\u2715"
+    )
   )
 }
 
@@ -207,6 +229,43 @@ observeEvent(input$selectorApplyBtn, {
   state$segments <- selected_segments
 })
 
+# flip segment strand (immediate, with undo)
+observeEvent(input$selectorFlipSegment, {
+  flip_data <- input$selectorFlipSegment
+  if (is.null(flip_data) || is.null(flip_data$id)) return()
+  
+  seg_id <- flip_data$id
+  current_segs <- state$segments
+  if (is.null(current_segs) || nrow(current_segs) == 0) return()
+  
+  idx <- which(current_segs$segment == seg_id)
+  if (length(idx) == 0) return()
+  
+  if (!"strand" %in% names(current_segs)) {
+    current_segs$strand <- "+"
+  }
+  
+  regions_module_output$push_undo_state()
+  current_segs$strand[idx] <- if (current_segs$strand[idx] == "+") "-" else "+"
+  state$segments <- current_segs
+})
+
+# remove single segment (immediate, with undo)
+observeEvent(input$selectorRemoveSegment, {
+  remove_data <- input$selectorRemoveSegment
+  if (is.null(remove_data) || is.null(remove_data$id)) return()
+  
+  seg_id <- remove_data$id
+  current_segs <- state$segments
+  if (is.null(current_segs) || nrow(current_segs) == 0) return()
+  
+  idx <- which(current_segs$segment == seg_id)
+  if (length(idx) == 0) return()
+  
+  regions_module_output$push_undo_state()
+  state$segments <- current_segs[-idx, , drop = FALSE]
+})
+
 # reset button - revert to state$segments
 observeEvent(input$selectorResetBtn, {
   state_segs <- state$segments
@@ -221,8 +280,13 @@ observeEvent(input$selectorResetBtn, {
   bin_segment_table <- load_bin_segment_table(state$assembly)
   seq_df <- get_sequence_segments()
   
+  # get colors for all segments
+  seg_colors <- get_segment_colors(seq_df$segment, state$assembly, seq_df$segment)
+  
   list_items <- lapply(seq_len(nrow(seq_df)), function(i) {
-    build_selector_item(seq_df$segment[i], seq_df$strand[i], seg_table, bin_segment_table)
+    seg_id <- seq_df$segment[i]
+    seg_color <- if (seg_id %in% names(seg_colors)) seg_colors[seg_id] else NULL
+    build_selector_item(seg_id, seq_df$strand[i], seg_table, bin_segment_table, seg_color)
   })
   
   session$sendCustomMessage("selectorResetList", list(
@@ -257,8 +321,13 @@ observeEvent(input$selectorRemoveSegments, {
   seg_table <- get_segments(state$assembly)
   bin_segment_table <- load_bin_segment_table(state$assembly)
   
+  # get colors for all segments
+  seg_colors <- get_segment_colors(new_df$segment, state$assembly, new_df$segment)
+  
   list_items <- lapply(seq_len(nrow(new_df)), function(i) {
-    build_selector_item(new_df$segment[i], new_df$strand[i], seg_table, bin_segment_table)
+    seg_id <- new_df$segment[i]
+    seg_color <- if (seg_id %in% names(seg_colors)) seg_colors[seg_id] else NULL
+    build_selector_item(seg_id, new_df$strand[i], seg_table, bin_segment_table, seg_color)
   })
   
   session$sendCustomMessage("selectorResetList", list(
@@ -274,8 +343,13 @@ observeEvent(input$selectorFlipBtn, {
   bin_segment_table <- load_bin_segment_table(state$assembly)
   seq_df <- get_sequence_segments()
   
+  # get colors for all segments
+  seg_colors <- get_segment_colors(seq_df$segment, state$assembly, seq_df$segment)
+  
   list_items <- lapply(seq_len(nrow(seq_df)), function(i) {
-    build_selector_item(seq_df$segment[i], seq_df$strand[i], seg_table, bin_segment_table)
+    seg_id <- seq_df$segment[i]
+    seg_color <- if (seg_id %in% names(seg_colors)) seg_colors[seg_id] else NULL
+    build_selector_item(seg_id, seq_df$strand[i], seg_table, bin_segment_table, seg_color)
   })
   
   session$sendCustomMessage("selectorResetList", list(
@@ -288,32 +362,26 @@ observeEvent(input$selectorFlipBtn, {
 #########################################################################
 
 output$selectorOrganizerButtons <- renderUI({
-  has_changes <- has_pending_changes()
   seq_df <- get_sequence_segments()
   has_segments <- nrow(seq_df) > 0
   
-  apply_class <- if (has_changes) "" else "faded"
-  reset_class <- if (has_changes) "" else "faded"
   remove_class <- if (has_segments) "" else "faded"
-  flip_class <- if (has_segments) "" else "faded"
   
   tags$div(
     class = "selector-buttons",
     tags$button("Remove", type = "button", 
                 class = paste("btn btn-default btn-sm", remove_class),
                 onclick = "window.selectorRemoveSelected();"),
-    tags$button("Flip", type = "button", 
-                class = paste("btn btn-default btn-sm", flip_class),
-                onclick = "window.selectorFlipSelected();"),
-    actionButton("selectorResetBtn", "Reset", 
-                 class = paste("btn btn-default btn-sm", reset_class)),
-    actionButton("selectorApplyBtn", "Apply", 
-                 class = paste("btn btn-primary btn-sm", apply_class))
+    tags$button("Clear", type = "button", 
+                class = paste("btn btn-default btn-sm", remove_class),
+                onclick = "window.selectorClearSelection();")
   )
 })
 
 output$selectorSegmentListUI <- renderUI({
   seq_df <- get_sequence_segments()
+  # trigger re-render when color scheme changes
+  input$segmentColorScheme
   
   if (nrow(seq_df) == 0) {
     return(tags$div(
@@ -325,8 +393,13 @@ output$selectorSegmentListUI <- renderUI({
   seg_table <- get_segments(state$assembly)
   bin_segment_table <- load_bin_segment_table(state$assembly)
   
+  # get colors for all segments
+  seg_colors <- get_segment_colors(seq_df$segment, state$assembly, seq_df$segment)
+  
   list_items <- lapply(seq_len(nrow(seq_df)), function(i) {
-    build_selector_item(seq_df$segment[i], seq_df$strand[i], seg_table, bin_segment_table)
+    seg_id <- seq_df$segment[i]
+    seg_color <- if (seg_id %in% names(seg_colors)) seg_colors[seg_id] else NULL
+    build_selector_item(seg_id, seq_df$strand[i], seg_table, bin_segment_table, seg_color)
   })
   
   tags$div(

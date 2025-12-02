@@ -41,17 +41,77 @@ organizer_tab_ui <- function() {
         opacity: 0.4;
         pointer-events: none;
       }
+      .organizer-container {
+        display: flex;
+        width: 100%;
+        gap: 0;
+      }
+      .organizer-left {
+        width: 250px;
+        min-width: 150px;
+        max-width: 400px;
+        padding-right: 10px;
+      }
+      .organizer-splitter {
+        width: 8px;
+        background: #e9ecef;
+        cursor: ew-resize;
+        flex-shrink: 0;
+        border-left: 1px solid #d0d7de;
+        border-right: 1px solid #d0d7de;
+      }
+      .organizer-splitter:hover {
+        background: #dee2e6;
+      }
+      .organizer-right {
+        flex: 1;
+        padding-left: 10px;
+        min-width: 400px;
+      }
     ")),
-    fluidRow(
+    tags$script(HTML("
+      $(document).ready(function() {
+        var splitter = document.querySelector('.organizer-splitter');
+        var left = document.querySelector('.organizer-left');
+        if (!splitter || !left) return;
+        
+        var dragging = false;
+        splitter.addEventListener('mousedown', function(e) {
+          dragging = true;
+          document.body.style.cursor = 'ew-resize';
+          document.body.style.userSelect = 'none';
+        });
+        document.addEventListener('mousemove', function(e) {
+          if (!dragging) return;
+          var container = document.querySelector('.organizer-container');
+          var rect = container.getBoundingClientRect();
+          var newWidth = e.clientX - rect.left;
+          newWidth = Math.max(150, Math.min(400, newWidth));
+          left.style.width = newWidth + 'px';
+        });
+        document.addEventListener('mouseup', function() {
+          dragging = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        });
+      });
+    ")),
+    div(class = "organizer-container",
       # left column: segment organizer
-            column(3,
+      div(class = "organizer-left",
         h4("Segments in view"),
+        selectInput("segmentColorScheme", "Color by:",
+                   choices = c("order"),
+                   selected = "order",
+                   width = "100%"),
         p("Click to select, Alt/Cmd+click for multi-select, drag to reorder", style = "color: #666; font-size: 11px; margin-bottom: 8px;"),
         uiOutput("selectorSegmentListUI"),
         uiOutput("selectorOrganizerButtons")
       ),
+      # splitter
+      div(class = "organizer-splitter"),
       # right column: graph with controls
-      column(9,
+      div(class = "organizer-right",
         # graph parameters box
         wellPanel(style = "padding: 10px;",
           fluidRow(
@@ -66,13 +126,8 @@ organizer_tab_ui <- function() {
                          min = 0, max = 100, step = 0.1)
             ),
             column(3,
-              selectInput("selectorColorBy", "Color by:",
-                         choices = c("bin" = "bin"),
-                         selected = "bin")
-            ),
-            column(3,
               numericInput("selectorNeighborDepth", "Neighbor depth:", 
-                         value = 0, min = 0, max = 3, step = 1)
+                         value = 1, min = 0, max = 3, step = 1)
             )
           )
         ),
@@ -96,7 +151,8 @@ organizer_tab_ui <- function() {
                 actionButton("selectorGotoBtn", "Goto", class = "btn btn-sm btn-primary"),
                 actionButton("selectorAddBtn", "Add", class = "btn btn-sm btn-default"),
                 actionButton("selectorRemoveBtn", "Remove", class = "btn btn-sm btn-default"),
-                actionButton("selectorClearSelectionBtn", "Clear Selection", class = "btn btn-sm btn-default")
+                actionButton("selectorSelectAllBtn", "Select All", class = "btn btn-sm btn-default"),
+                actionButton("selectorClearSelectionBtn", "Clear", class = "btn btn-sm btn-default")
               )
             )
           ),
@@ -106,11 +162,15 @@ organizer_tab_ui <- function() {
             )
           )
         ),
-        # graph zoom controls
-        div(style = "display: flex; align-items: center; margin-top: 10px; margin-bottom: 5px; gap: 5px;",
-          actionButton("selectorGraphReset", "Reset", class = "btn btn-sm btn-default"),
+        # graph controls
+        div(style = "display: flex; align-items: center; margin-top: 10px; margin-bottom: 5px; gap: 10px;",
+          actionButton("selectorGraphReset", "Fit", class = "btn btn-sm btn-default"),
           actionButton("selectorGraphZoomIn", "+", class = "btn btn-sm btn-default"),
-          actionButton("selectorGraphZoomOut", "−", class = "btn btn-sm btn-default")
+          actionButton("selectorGraphZoomOut", "−", class = "btn btn-sm btn-default"),
+          tags$span("Label:", style = "margin-left: 10px;"),
+          selectInput("graphNodeLabel", "", choices = c("index" = "index", "id" = "id"), selected = "index", width = "80px"),
+          tags$span("Font:", style = "margin-left: 10px;"),
+          selectInput("graphFontSize", "", choices = c("S" = "28", "M" = "38", "L" = "48", "XL" = "56"), selected = "28", width = "70px")
         ),
         # graph at bottom
         div(
