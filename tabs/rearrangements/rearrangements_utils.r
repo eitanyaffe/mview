@@ -194,6 +194,28 @@ filter_rearrangements_by_region <- function(rearrange_data, contigs, zoom, assem
     if (!is.null(contigs_table)) {
       contig_col <- if ("contig" %in% colnames(events_df)) "contig" else "contig_id"
       
+      # first check if coordinates are in plotted view before converting
+      in_view <- cxt_coords_in_view(events_df[[contig_col]], events_df$out_clip, limit_to_zoom = FALSE)
+      events_df <- events_df[in_view, ]
+      
+      if (nrow(events_df) == 0) {
+        return(NULL)
+      }
+      
+      # filter support and coverage matrices to match in_view filter
+      if (!is.null(rearrange_data$support)) {
+        rearrange_data$support <- rearrange_data$support[in_view, , drop = FALSE]
+      }
+      if (!is.null(rearrange_data$coverage)) {
+        rearrange_data$coverage <- rearrange_data$coverage[in_view, , drop = FALSE]
+      }
+      
+      # filter read_events if present
+      if (!is.null(rearrange_data$read_events)) {
+        kept_event_ids <- events_df$event_id
+        rearrange_data$read_events <- rearrange_data$read_events[rearrange_data$read_events$event_id %in% kept_event_ids, ]
+      }
+      
       # convert event coordinates to global using context services
       events_df$gcoord <- cxt_contig2global(events_df[[contig_col]], events_df$out_clip)
       
@@ -208,7 +230,7 @@ filter_rearrangements_by_region <- function(rearrange_data, contigs, zoom, assem
         return(NULL)
       }
       
-      # filter support and coverage matrices
+      # filter support and coverage matrices by zoom
       if (!is.null(rearrange_data$support)) {
         rearrange_data$support <- rearrange_data$support[keep_zoom, , drop = FALSE]
       }

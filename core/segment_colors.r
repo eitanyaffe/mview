@@ -12,13 +12,29 @@
 
 # register user-defined color schemes
 # schemes: named list, e.g. list(bin = "bin_color", genome = "genome_color")
+# or list(bin = list(color = "bin_color", gray = "bin_gray"))
 register_segment_colors <- function(schemes) {
   if (!is.list(schemes)) {
     stop("schemes must be a named list")
   }
   for (name in names(schemes)) {
-    cat(sprintf("registering segment color scheme: %s -> %s\n", name, schemes[[name]]))
-    .seg_colors_env$user_schemes[[name]] <- schemes[[name]]
+    scheme_val <- schemes[[name]]
+    if (is.character(scheme_val)) {
+      # backward compatible: single string means color field only
+      .seg_colors_env$user_schemes[[name]] <- list(color = scheme_val, gray = NULL)
+      cat(sprintf("registering segment color scheme: %s -> %s\n", name, scheme_val))
+    } else if (is.list(scheme_val)) {
+      # new format: list with color and gray fields
+      color_field <- if ("color" %in% names(scheme_val)) scheme_val$color else NULL
+      gray_field <- if ("gray" %in% names(scheme_val)) scheme_val$gray else NULL
+      .seg_colors_env$user_schemes[[name]] <- list(color = color_field, gray = gray_field)
+      cat(sprintf("registering segment color scheme: %s -> color: %s, gray: %s\n", 
+                  name, 
+                  if (is.null(color_field)) "NULL" else color_field,
+                  if (is.null(gray_field)) "NULL" else gray_field))
+    } else {
+      stop(sprintf("scheme value for %s must be a character string or a list with color/gray fields", name))
+    }
   }
 }
 

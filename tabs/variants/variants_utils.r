@@ -268,6 +268,22 @@ filter_variants_by_region <- function(variant_data, contigs, zoom, assembly) {
     # need to convert local coordinates to global coordinates
     contigs_table <- get_contigs(assembly)
     if (!is.null(contigs_table)) {
+      # first check if coordinates are in plotted view before converting
+      in_view <- cxt_coords_in_view(variants_df$contig, variants_df$coord, limit_to_zoom = FALSE)
+      variants_df <- variants_df[in_view, ]
+      
+      if (nrow(variants_df) == 0) {
+        return(NULL)
+      }
+      
+      # filter support and coverage matrices to match in_view filter
+      if (!is.null(variant_data$support)) {
+        variant_data$support <- variant_data$support[in_view, , drop = FALSE]
+      }
+      if (!is.null(variant_data$coverage)) {
+        variant_data$coverage <- variant_data$coverage[in_view, , drop = FALSE]
+      }
+      
       # convert variant coordinates to global using context services
       variants_df$gcoord <- cxt_contig2global(variants_df$contig, variants_df$coord)
       
@@ -282,7 +298,7 @@ filter_variants_by_region <- function(variant_data, contigs, zoom, assembly) {
         return(NULL)
       }
       
-      # filter support and coverage matrices
+      # filter support and coverage matrices by zoom
       if (!is.null(variant_data$support)) {
         variant_data$support <- variant_data$support[keep_zoom, , drop = FALSE]
       }

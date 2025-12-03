@@ -100,7 +100,7 @@ default_alignment_params <- list(
   max_reads = list(
     group_id = "align_full",
     type = "integer",
-    default = 10000
+    default = 100000
   ),
   max_mutations = list(
     group_id = "align_full",
@@ -183,8 +183,8 @@ align_profile <- function(id, name, is_fixed = FALSE,
                           use_pileup = FALSE,
                           target_bins = 100,
                           height_style = "by_mutations",
-                          max_mutations = 1000,
-                          max_reads = 1000,
+                          max_mutations = 10000,
+                          max_reads = 100000,
                           full_style = "by_mutations",
                           clip_mode = "all",
                           clip_margin = 10,

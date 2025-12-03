@@ -1,9 +1,10 @@
 # organizer state management
 # reactive values for segment list editing
 
-# sequence_segments_rv stores a data frame with columns: segment, strand
+# sequence_segments_rv stores a data frame with columns: segment, strand, removed
 # this is a local copy for editing before Apply
-sequence_segments_rv <- reactiveVal(data.frame(segment = character(), strand = character(), stringsAsFactors = FALSE))
+# removed column: TRUE if segment is marked for removal (not applied until Apply is pressed)
+sequence_segments_rv <- reactiveVal(data.frame(segment = character(), strand = character(), removed = logical(), stringsAsFactors = FALSE))
 
 # get the current sequence segments as data frame
 get_sequence_segments <- function() {
@@ -12,12 +13,21 @@ get_sequence_segments <- function() {
 
 # set sequence segments
 # accepts either character vector (will add default strand '+') or data frame with segment/strand
+# if data frame doesn't have 'removed' column, adds it with FALSE values
 set_sequence_segments <- function(value, caller = "unknown") {
   if (is.character(value)) {
     if (length(value) == 0) {
-      value <- data.frame(segment = character(), strand = character(), stringsAsFactors = FALSE)
+      value <- data.frame(segment = character(), strand = character(), removed = logical(), stringsAsFactors = FALSE)
     } else {
-      value <- data.frame(segment = value, strand = rep("+", length(value)), stringsAsFactors = FALSE)
+      value <- data.frame(segment = value, strand = rep("+", length(value)), removed = rep(FALSE, length(value)), stringsAsFactors = FALSE)
+    }
+  } else if (is.data.frame(value)) {
+    if (!"removed" %in% names(value)) {
+      if (nrow(value) == 0) {
+        value$removed <- logical()
+      } else {
+        value$removed <- rep(FALSE, nrow(value))
+      }
     }
   }
   sequence_segments_rv(value)

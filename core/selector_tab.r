@@ -47,9 +47,9 @@ organizer_tab_ui <- function() {
         gap: 0;
       }
       .organizer-left {
-        width: 250px;
+        width: 350px;
         min-width: 150px;
-        max-width: 400px;
+        max-width: 500px;
         padding-right: 10px;
       }
       .organizer-splitter {
@@ -86,7 +86,7 @@ organizer_tab_ui <- function() {
           var container = document.querySelector('.organizer-container');
           var rect = container.getBoundingClientRect();
           var newWidth = e.clientX - rect.left;
-          newWidth = Math.max(150, Math.min(400, newWidth));
+          newWidth = Math.max(150, Math.min(500, newWidth));
           left.style.width = newWidth + 'px';
         });
         document.addEventListener('mouseup', function() {
@@ -104,9 +104,11 @@ organizer_tab_ui <- function() {
                    choices = c("order"),
                    selected = "order",
                    width = "100%"),
+        checkboxInput("segmentGrayscale", "Grayscale", value = FALSE),
         p("Click to select, Alt/Cmd+click for multi-select, drag to reorder", style = "color: #666; font-size: 11px; margin-bottom: 8px;"),
         uiOutput("selectorSegmentListUI"),
-        uiOutput("selectorOrganizerButtons")
+        uiOutput("selectorActionButtons"),
+        uiOutput("selectorApplyResetButtons")
       ),
       # splitter
       div(class = "organizer-splitter"),
@@ -128,6 +130,40 @@ organizer_tab_ui <- function() {
             column(3,
               numericInput("selectorNeighborDepth", "Neighbor depth:", 
                          value = 1, min = 0, max = 3, step = 1)
+            )
+          )
+        ),
+        # edge controls
+        wellPanel(style = "padding: 10px; margin-top: 10px;",
+          fluidRow(
+            column(3,
+              selectInput("graphEdgeMetric", "Edge metric:",
+                         choices = c("none" = "none", "support" = "support", 
+                                   "percent" = "percent", "change" = "change"),
+                         selected = cache_get_if_exists("graph.edge_metric", "none"),
+                         width = "100%")
+            ),
+            column(3,
+              conditionalPanel(
+                condition = "input.graphEdgeMetric == 'change'",
+                selectInput("graphEdgeLib1", "Library 1:",
+                           choices = list(),
+                           selected = NULL,
+                           width = "100%")
+              )
+            ),
+            column(3,
+              conditionalPanel(
+                condition = "input.graphEdgeMetric == 'change'",
+                selectInput("graphEdgeLib2", "Library 2:",
+                           choices = list(),
+                           selected = NULL,
+                           width = "100%")
+              )
+            ),
+            column(3,
+              checkboxInput("graphEdgeLabels", "Edge labels", 
+                          value = cache_get_if_exists("graph.edge_labels", FALSE))
             )
           )
         ),
@@ -156,7 +192,7 @@ organizer_tab_ui <- function() {
               )
             )
           ),
-          div(style = "flex: 1;",
+          div(style = "flex: 1.1;",
             wellPanel(style = "padding: 10px; height: 100%; margin: 0;",
               uiOutput("selectorHoverInfo")
             )
@@ -170,7 +206,8 @@ organizer_tab_ui <- function() {
           tags$span("Label:", style = "margin-left: 10px;"),
           selectInput("graphNodeLabel", "", choices = c("index" = "index", "id" = "id"), selected = "index", width = "80px"),
           tags$span("Font:", style = "margin-left: 10px;"),
-          selectInput("graphFontSize", "", choices = c("S" = "28", "M" = "38", "L" = "48", "XL" = "56"), selected = "28", width = "70px")
+          selectInput("graphFontSize", "", choices = c("S" = "28", "M" = "38", "L" = "48", "XL" = "56"), selected = "38", width = "70px"),
+          checkboxInput("graphDirectedEdges", "Directed", value = FALSE)
         ),
         # graph at bottom
         div(

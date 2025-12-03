@@ -5,13 +5,10 @@ get_alignment_colors <- function(alignments, chunks, style) {
   if (style == "none") {
     return(rep("lightgray", nrow(alignments)))
   } else if (style == "by_strand") {
-    # get corresponding chunk info
-    chunk_lookup <- setNames(chunks$read_reversed, chunks$chunk_id)
-    chunk_is_reverse <- chunk_lookup[alignments$chunk_id]
+    # strand_flipped is already computed in C++: true if same contig as first alignment
+    # in chunk AND different strand. Just use it directly.
+    colors <- ifelse(alignments$strand_flipped, "#efcb39", "#dcfbdc")
     
-    # xor of chunk and alignment strand
-    alignments$along_contig = !xor(alignments$is_reverse, chunk_is_reverse)
-    colors <- ifelse(alignments$along_contig, "#dcfbdc", "#efcb39")
     return(colors)
   } else if (style == "by_mutations") {
     # use shared mutation color function
@@ -28,7 +25,7 @@ get_alignment_colors <- function(alignments, chunks, style) {
 
 align_query_full_mode <- function(aln, 
 height_style_str = "by_mutations", 
-max_reads = 1000,
+max_reads = 100000,
 clip_mode = "all",
 clip_margin = 10,
 min_mutations_percent = 0.0,
@@ -41,6 +38,7 @@ min_indel_length = 3) {
   
   intervals <- cxt_get_zoom_view()
   plotted_segs <- cxt_get_plotted_segments()
+  xlim <- cxt_get_xlim()
   
   # Create cache key based on all relevant parameters
   # Use address of external pointer as unique identifier for alignment
@@ -71,7 +69,8 @@ min_indel_length = 3) {
                        max_alignment_length = max_alignment_length,
                        max_margin = max_margin,
                        chunk_type = chunk_type,
-                       min_indel_length = min_indel_length
+                       min_indel_length = min_indel_length,
+                       xlim = xlim
                      ), algo = "md5"))
   
   # Use cache for the full query
@@ -91,7 +90,10 @@ min_indel_length = 3) {
     # alntools full mode outputs 1-based coordinates  
     alns$start <- alns$contig_start
     alns$end <- alns$contig_end
-    alignments <- cxt_filter_intervals(alns)
+    # use vstart/vend from C++ (already clipped to interval)
+    alns$gstart <- alns$vstart
+    alns$gend <- alns$vend
+    alignments <- alns
   }
 
   # Process mutations
@@ -104,29 +106,16 @@ min_indel_length = 3) {
     mutations <- cxt_filter_coords(muts)
   }
 
-  # Process reads
-  reads <- NULL
-  if (!is.null(df$reads) && nrow(df$reads) > 0) {
-    reads <- df$reads
-    reads$contig <- reads$contig_id
-    # alntools full mode outputs 1-based coordinates
-    reads$start <- reads$span_start
-    reads$end <- reads$span_end
-    reads <- cxt_filter_intervals(reads)
-  }
-
-  # Process chunks
+  # Process chunks - they already have vcoords from alntools
   chunks <- NULL
   if (!is.null(df$chunks) && nrow(df$chunks) > 0) {
     chunks <- df$chunks
-    chunks$contig <- chunks$contig_id
-    # alntools full mode outputs 1-based coordinates
-    chunks$start <- chunks$span_start
-    chunks$end <- chunks$span_end
-    chunks <- cxt_filter_intervals(chunks)
+    # chunks now have vstart/vend which are view coordinates
+    chunks$gstart <- chunks$vstart
+    chunks$gend <- chunks$vend
   }
   
-  return(list(alignments = alignments, mutations = mutations, reads = reads, chunks = chunks))
+  return(list(alignments = alignments, mutations = mutations, chunks = chunks))
 }
 
 align_profile_full <- function(profile, aln, gg) {
@@ -164,7 +153,7 @@ align_profile_full <- function(profile, aln, gg) {
       chunks$hover_text <- paste0(
         "Chunk: ", chunks$chunk_id, "\n",
         "Read: ", chunks$read_id, "\n",
-        chunks$start, "-", chunks$end
+        "Alignments: ", chunks$num_alignments
       )
     } else {
       chunks$hover_text <- ""
@@ -184,11 +173,22 @@ align_profile_full <- function(profile, aln, gg) {
   }
   
   # Plot alignments
+  chunks <- df$chunks
   if (!is.null(df$alignments) && nrow(df$alignments) > 0) {
     cat(sprintf("plotting %d alignments\n", nrow(df$alignments)))
 
     alignments <- df$alignments
-    alignments = alignments[is.element(alignments$chunk_id, chunks$chunk_id), ]
+    # filter to alignments with chunks if chunks exist
+    if (!is.null(chunks) && nrow(chunks) > 0) {
+      alignments <- alignments[is.element(alignments$chunk_id, chunks$chunk_id), ]
+    }
+    
+    # exit early if no alignments remain after filtering
+    if (is.null(alignments) || nrow(alignments) == 0) {
+      gg <- gg + ggplot2::geom_hline(yintercept = 0, color = "black", linewidth = 0.3)
+      return(list(plot = gg, legends = list()))
+    }
+    
     alignments$rect_ymin <- alignments$height
     alignments$rect_ymax <- alignments$height + 1
 
@@ -197,15 +197,34 @@ align_profile_full <- function(profile, aln, gg) {
 
     # determine clipped status
     xlim <- cxt_get_xlim()
-    left_in_plot = alignments$gstart > xlim[1]
-    right_in_plot = alignments$gend < xlim[2]
+    left_in_plot <- alignments$gstart > xlim[1]
+    right_in_plot <- alignments$gend < xlim[2]
 
     # check if read is soft-clipped (doesn't start at 0 or doesn't end at read_length)
-    clip_read_start = alignments$read_start > profile$max_margin
-    clip_read_end = alignments$read_end < alignments$read_length - profile$max_margin
+    clip_read_start <- alignments$read_start > profile$max_margin
+    clip_read_end <- alignments$read_end < alignments$read_length - profile$max_margin
 
-    alignments$clipped_left <- ifelse(!alignments$is_reverse, clip_read_start, clip_read_end) & left_in_plot
-    alignments$clipped_right <- ifelse(!alignments$is_reverse, clip_read_end, clip_read_start) & right_in_plot
+    # account for segment strand when determining clipping side in view coordinates
+    # when segment is minus strand, gstart corresponds to higher contig coord (right side)
+    plotted_segs <- cxt_get_plotted_segments()
+    seg_strand_lookup <- setNames(plotted_segs$strand, plotted_segs$contig)
+    aln_seg_strand <- seg_strand_lookup[alignments$contig_id]
+    aln_seg_strand[is.na(aln_seg_strand)] <- "+"
+    seg_is_minus <- aln_seg_strand == "-"
+    
+    # effective reverse in view coords: XOR of alignment reverse and segment minus
+    effective_reverse <- xor(alignments$is_reverse, seg_is_minus)
+    
+    # combine read soft-clipping with interval clipping flags
+    # clip_start/clip_end indicate if vstart/vend correspond to clipped positions
+    # for plus strand: clip_start means left was clipped, clip_end means right was clipped
+    # for minus strand: clip_start/clip_end are swapped to match vcoords
+    interval_clip_left <- ifelse(!effective_reverse, alignments$clip_start, alignments$clip_end)
+    interval_clip_right <- ifelse(!effective_reverse, alignments$clip_end, alignments$clip_start)
+    
+    # combine read soft-clipping and interval clipping
+    alignments$clipped_left <- (ifelse(!effective_reverse, clip_read_start, clip_read_end) | interval_clip_left) & left_in_plot
+    alignments$clipped_right <- (ifelse(!effective_reverse, clip_read_end, clip_read_start) | interval_clip_right) & right_in_plot
 
     # set colors based on color mode
     alignments$color <- get_alignment_colors(alignments, chunks, profile$full_style)
@@ -301,23 +320,26 @@ align_profile_full <- function(profile, aln, gg) {
     visible_chunk_alignments <- alignments$alignment_index
     mutations = mutations[is.element(mutations$alignment_index, visible_chunk_alignments), ]
 
-    # build hover text for align-specific format
-    if (profile$show_hover) {
-      mutations$hover_text <- paste0(
-        "Read: ", mutations$read_id, "\n",
-        "Position: ", mutations$coord, "\n",
-        "Type: ", mutations$desc
-      )
-    } else {
-      mutations$hover_text <- ""
+    # only proceed if mutations remain after filtering
+    if (!is.null(mutations) && nrow(mutations) > 0) {
+      # build hover text for align-specific format
+      if (profile$show_hover) {
+        mutations$hover_text <- paste0(
+          "Read: ", mutations$read_id, "\n",
+          "Position: ", mutations$coord, "\n",
+          "Type: ", mutations$desc
+        )
+      } else {
+        mutations$hover_text <- ""
+      }
+
+      # add ybottom and ytop for align profile (height and height + 1)
+      mutations$ybottom <- mutations$height
+      mutations$ytop <- mutations$height + 1
+
+      # use unified mutation plotting function
+      gg <- plot_mutations_unified(gg, mutations, profile)
     }
-
-    # add ybottom and ytop for align profile (height and height + 1)
-    mutations$ybottom <- mutations$height
-    mutations$ytop <- mutations$height + 1
-
-    # use unified mutation plotting function
-    gg <- plot_mutations_unified(gg, mutations, profile)
   }
   
   # apply force_max_y if set

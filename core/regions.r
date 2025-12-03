@@ -1,8 +1,8 @@
 # core/regions.r
 # Defines the UI and server logic for the region management module.
 
-# Hardcoded fields from the main application region to be tracked
-TRACKED_REGION_FIELDS <- c("contigs", "zoom", "assembly")
+# Source legacy loader for backward compatibility
+source("core/regions_legacy.r", local = TRUE)
 
 # ---- UI Definition ----
 
@@ -53,175 +53,33 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           level = integer(),
           description = character(),
           assembly = character(),
-          contigs = character(),
-          zoom_start = numeric(),
-          zoom_end = numeric(),
-          segment_contig = character(),
-          segment_start = integer(),
-          segment_end = integer(),
-          single_contig = logical(),
+          segments = character(),  # comma-separated segment IDs
+          xlim_start = numeric(),  # can be NA for full view
+          xlim_end = numeric(),    # can be NA for full view
           stringsAsFactors = FALSE
         )
       }
       
-      # migrate region table to add missing columns
-      migrate_region_table <- function(rt) {
-        required_new_cols <- c("level", "segment_contig", "segment_start", "segment_end", "single_contig")
-        missing_cols <- setdiff(required_new_cols, colnames(rt))
-        
-        if (length(missing_cols) == 0) {
-          return(rt)
-        }
-        
-        cat("migrating regions table: adding", paste(missing_cols, collapse = ", "), "columns\n")
-        
-        # add missing columns with default values
-        for (col in missing_cols) {
-          if (col == "level") {
-            rt[[col]] <- rep(3L, nrow(rt))  # default level is 1
-          } else if (col == "segment_contig") {
-            rt[[col]] <- character(nrow(rt))
-          } else if (col %in% c("segment_start", "segment_end")) {
-            rt[[col]] <- integer(nrow(rt))
-          } else if (col == "single_contig") {
-            rt[[col]] <- logical(nrow(rt))
-          }
-        }
-        
-        # ensure level column is in correct position (second column after id)
-        if ("level" %in% missing_cols && "id" %in% colnames(rt)) {
-          col_order <- colnames(rt)
-          id_pos <- which(col_order == "id")
-          level_pos <- which(col_order == "level")
-          
-          # reorder columns to put level right after id
-          new_order <- c(col_order[1:id_pos], "level", col_order[setdiff(seq_along(col_order), c(id_pos, level_pos))])
-          rt <- rt[, new_order, drop = FALSE]
-        }
-        
-        # compute segment information for each row
-        for (i in seq_len(nrow(rt))) {
-          segment_info <- compute_segment_info(rt[i, ])
-          rt$segment_contig[i] <- segment_info$contig
-          rt$segment_start[i] <- segment_info$start
-          rt$segment_end[i] <- segment_info$end
-          rt$single_contig[i] <- segment_info$single_contig
-        }
-        
-        return(rt)
-      }
-      
-      # compute segment information for a single region row
-      compute_segment_info <- function(region_row) {
-        # parse contigs
-        contigs_list <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
-          character(0)
-        } else {
-          trimws(strsplit(region_row$contigs, ",")[[1]])
-        }
-        
-        # default values for multi-contig or invalid regions
-        default_result <- list(
-          contig = NA_character_,
-          start = 0L,
-          end = 0L,
-          single_contig = FALSE
-        )
-        
-        if (length(contigs_list) == 0 || 
-            is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
-          return(default_result)
-        }
-        
-        # get segments for the contigs in this region
-        all_segments <- get_segments(region_row$assembly)
-        if (is.null(all_segments)) {
-          return(default_result)
-        }
-        region_segments <- all_segments[all_segments$contig %in% contigs_list, ]
-        if (nrow(region_segments) == 0) {
-          return(default_result)
-        }
-        
-        # save current context state
-        saved_assembly <- cxt_get_assembly()
-        saved_segments <- tryCatch(get_state_segments(), error = function(e) NULL)
-        saved_zoom <- tryCatch(cxt_get_xlim(), error = function(e) NULL)
-        
-        # set up context for this region temporarily
-        tryCatch({
-          cxt_set_assembly(region_row$assembly)
-          cxt_set_view(region_segments)
-          cxt_set_zoom(c(region_row$zoom_start, region_row$zoom_end))
-          
-          # check which contigs the region spans
-          cdf <- cxt_get_entire_view()
-          zoom_contigs <- cdf[cdf$vstart < region_row$zoom_end & cdf$vend > region_row$zoom_start, ]
-          
-          result <- if (nrow(zoom_contigs) != 1) {
-            # spans multiple contigs or no contigs
-            default_result
-          } else {
-            # single contig case - convert virtual to local coordinates
-            contig_name <- zoom_contigs$contig[1]
-            vstart <- zoom_contigs$vstart[1]
-            local_start_offset <- zoom_contigs$start[1]
-            local_start <- round(region_row$zoom_start - vstart) + local_start_offset
-            local_end <- round(region_row$zoom_end - vstart) + local_start_offset
-            
-            list(
-              contig = contig_name,
-              start = as.integer(local_start),
-              end = as.integer(local_end),
-              single_contig = TRUE
-            )
-          }
-          
-          # restore original context
-          if (!is.null(saved_assembly) && !is.null(saved_segments)) {
-            cxt_set_assembly(saved_assembly)
-            cxt_set_view(saved_segments)
-            if (!is.null(saved_zoom)) {
-              cxt_set_zoom(saved_zoom)
-            }
-          }
-          
-          return(result)
-        }, error = function(e) {
-          # restore on error
-          if (!is.null(saved_assembly) && !is.null(saved_segments)) {
-            cxt_set_assembly(saved_assembly)
-            cxt_set_view(saved_segments)
-            if (!is.null(saved_zoom)) {
-              cxt_set_zoom(saved_zoom)
-            }
-          }
-          return(default_result)
-        })
-        
-        return(list(
-          contig = contig_name,
-          start = as.integer(local_start),
-          end = as.integer(local_end),
-          single_contig = TRUE
-        ))
-      }
 
-      format_contigs_for_display <- function(contigs_vector) {
-        if (length(contigs_vector) == 0) {
+      format_segments_for_display <- function(segments_str) {
+        if (segments_str == "" || is.na(segments_str)) {
           return("None")
         }
-        if (length(contigs_vector) == 1) {
-          return(as.character(contigs_vector[1]))
+        segment_ids <- trimws(strsplit(segments_str, ",")[[1]])
+        if (length(segment_ids) == 0) {
+          return("None")
         }
-        return(paste(length(contigs_vector), "contigs"))
+        if (length(segment_ids) == 1) {
+          return(segment_ids[1])
+        }
+        return(paste(length(segment_ids), "segments"))
       }
 
-      format_zoom_for_display <- function(zoom_vector) {
-        if (is.null(zoom_vector) || length(zoom_vector) != 2) {
+      format_xlim_for_display <- function(xlim_start, xlim_end) {
+        if (is.na(xlim_start) || is.na(xlim_end)) {
           return("Full range")
         }
-        return(paste(round(zoom_vector[1]), "–", round(zoom_vector[2])))
+        return(paste(round(xlim_start), "–", round(xlim_end)))
       }
 
       # --- Reactive Values ---
@@ -257,7 +115,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         cache_set("segments.current_regions", segments_data)
       })
       
-      # convert regions table to segments format
+      # convert regions table to segments format (for display/export)
       convert_regions_to_segments <- function(rt) {
         if (is.null(rt) || nrow(rt) == 0) {
           return(data.frame(
@@ -271,10 +129,47 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           ))
         }
         
-        # filter for single-contig segments only
-        single_contig_rows <- rt[rt$single_contig %in% TRUE & !is.na(rt$segment_contig), ]
+        # Convert regions with single segment to segment format
+        result_rows <- list()
+        for (i in seq_len(nrow(rt))) {
+          row <- rt[i, ]
+          if (row$segments == "" || is.na(row$segments)) {
+            next
+          }
+          
+          segment_ids <- trimws(strsplit(row$segments, ",")[[1]])
+          if (length(segment_ids) != 1) {
+            next  # Only single-segment regions
+          }
+          
+          # Get segment info
+          all_segments <- tryCatch({
+            get_segments(row$assembly)
+          }, error = function(e) {
+            return(NULL)
+          })
+          
+          if (is.null(all_segments)) {
+            next
+          }
+          
+          seg <- all_segments[all_segments$segment == segment_ids[1], ]
+          if (nrow(seg) == 0) {
+            next
+          }
+          
+          result_rows[[length(result_rows) + 1]] <- data.frame(
+            assembly = row$assembly,
+            contig = seg$contig[1],
+            start = seg$start[1],
+            end = seg$end[1],
+            desc = row$description,
+            id = row$id,
+            stringsAsFactors = FALSE
+          )
+        }
         
-        if (nrow(single_contig_rows) == 0) {
+        if (length(result_rows) == 0) {
           return(data.frame(
             assembly = character(),
             contig = character(),
@@ -286,15 +181,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           ))
         }
         
-        data.frame(
-          assembly = single_contig_rows$assembly,
-          contig = single_contig_rows$segment_contig,
-          start = single_contig_rows$segment_start,
-          end = single_contig_rows$segment_end,
-          desc = single_contig_rows$description,
-          id = single_contig_rows$id,
-          stringsAsFactors = FALSE
-        )
+        do.call(rbind, result_rows)
       }
 
       # ensure regions directory exists
@@ -313,8 +200,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       # save region table with versioning
       save_region_table <- function(filename) {
+        cat("=== SAVE_REGION_TABLE: START ===\n")
         regions_dir <- ensure_regions_dir()
         file_path <- file.path(regions_dir, filename)
+        
+        rt <- region_table()
+        cat("saving ", nrow(rt), " rows to ", filename, "\n", sep = "")
         
         # create backup version if file exists
         if (file.exists(file_path)) {
@@ -326,7 +217,8 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           file.copy(file_path, file.path(versions_dir, version_filename))
         }
         
-        write.table(region_table(), file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        write.table(rt, file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        cat("=== SAVE_REGION_TABLE: END ===\n\n")
         shiny::showNotification(paste("regions table saved to", filename), type = "message")
       }
 
@@ -339,16 +231,25 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           stop(paste("region file not found:", file_path))
         }
         
+        # Try loading as new format first
         df <- read.table(file_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
         
-        # validate required columns
-        required_cols <- c("id", "description", "assembly", "contigs", "zoom_start", "zoom_end")
+        # Check if this is old format (has "contigs" column)
+        if ("contigs" %in% colnames(df)) {
+          cat("[LOAD] detected legacy format, converting...\n")
+          df <- load_legacy_region_table(file_path, regions_dir)
+          if (is.null(df)) {
+            stop("failed to convert legacy region file")
+          }
+        }
+        
+        # Validate new format columns
+        required_cols <- c("id", "description", "assembly", "segments", "xlim_start", "xlim_end")
         if (!all(required_cols %in% colnames(df))) {
           stop(paste("region file missing required columns:", paste(setdiff(required_cols, colnames(df)), collapse = ", ")))
         }
         
-        # migrate table to add segment columns if needed
-        df <- migrate_region_table(df)
+        cat("[LOAD] file=", filename, " rows=", nrow(df), "\n", sep = "")
         
         region_table(df)
         set_current_regions_file(filename)
@@ -816,7 +717,7 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           return()
         }
         
-        # load target file to check for duplicate IDs
+        # load target file
         target_table <- if (selected_file == current_regions_file()) {
           region_table()
         } else {
@@ -834,47 +735,35 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           })
         }
         
-        # check for duplicate ID in target file
-        if (custom_id %in% target_table$id) {
-          shiny::showNotification(paste("ID", custom_id, "already exists in", selected_file), type = "error")
-          return()
-        }
-        
         current_app_state <- shiny::isolate(shiny::reactiveValuesToList(main_state_rv))
         
-        # prepare contigs (comma-separated)
-        current_contigs <- unique(current_app_state$segments$contig)
-        contigs_str <- if (is.null(current_contigs) || length(current_contigs) == 0) {
+        # Get segment IDs from current segments
+        current_segments <- current_app_state$segments
+        segment_ids <- if (is.null(current_segments) || nrow(current_segments) == 0) {
           ""
         } else {
-          paste(current_contigs, collapse = ",")
+          paste(current_segments$segment, collapse = ",")
         }
         
-        # prepare zoom
-        zoom_start <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[1]
-        zoom_end <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[2]
+        # Get xlim (zoom)
+        xlim_start <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[1]
+        xlim_end <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[2]
+        
+        cat("[SAVE] id=", custom_id, " assembly=", current_app_state$assembly %||% "NULL", 
+            " segments=", if (segment_ids == "") "EMPTY" else segment_ids, 
+            " xlim=", if (is.null(current_app_state$zoom)) "NULL" else paste(current_app_state$zoom, collapse = "-"),
+            " seg_count=", if (is.null(current_segments) || nrow(current_segments) == 0) "0" else nrow(current_segments), "\n", sep = "")
         
         new_row <- data.frame(
           id = custom_id,
           level = level,
           description = description,
           assembly = current_app_state$assembly %||% "",
-          contigs = contigs_str,
-          zoom_start = zoom_start,
-          zoom_end = zoom_end,
-          segment_contig = NA_character_,
-          segment_start = 0L,
-          segment_end = 0L,
-          single_contig = FALSE,
+          segments = segment_ids,
+          xlim_start = xlim_start,
+          xlim_end = xlim_end,
           stringsAsFactors = FALSE
         )
-        
-        # compute segment information
-        segment_info <- compute_segment_info(new_row)
-        new_row$segment_contig <- segment_info$contig
-        new_row$segment_start <- segment_info$start
-        new_row$segment_end <- segment_info$end
-        new_row$single_contig <- segment_info$single_contig
         
         # add region to target table and save
         updated_target_table <- rbind(target_table, new_row)
@@ -960,14 +849,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         current_table <- region_table()
-        old_id <- current_table[selected_rows[1], "id"]
-        
-        # check for duplicate ID (but allow keeping the same ID)
-        if (new_id != old_id && new_id %in% current_table$id) {
-          shiny::showNotification(paste("ID", new_id, "already exists"), type = "error")
-          return()
-        }
-        
         current_table[selected_rows[1], "id"] <- new_id
         current_table[selected_rows[1], "level"] <- new_level
         current_table[selected_rows[1], "description"] <- new_description
@@ -1013,12 +894,21 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       # goto region (with undo functionality)
       goto_region <- function(region_row) {
+        cat("=== GOTO REGION: START ===\n")
+        cat("input: id=", region_row$id, " segments=", region_row$segments, 
+            " xlim=", region_row$xlim_start, "-", region_row$xlim_end, 
+            " assembly=", region_row$assembly, "\n", sep = "")
+        
         # push current region to undo stack
         current_state <- list(
           segments = main_state_rv$segments,
           zoom = main_state_rv$zoom,
           assembly = main_state_rv$assembly
         )
+        
+        cat("current state: assembly=", current_state$assembly %||% "NULL", 
+            " segs=", if (is.null(current_state$segments) || nrow(current_state$segments) == 0) "0" else nrow(current_state$segments),
+            " zoom=", if (is.null(current_state$zoom)) "NULL" else paste(current_state$zoom, collapse = "-"), "\n", sep = "")
         
         current_undo <- undo_stack()
         current_undo[[length(current_undo) + 1]] <- current_state
@@ -1027,23 +917,32 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         # apply region
         main_state_rv$assembly <- region_row$assembly
         
-        # parse contigs and get segments
-        if (region_row$contigs != "" && !is.na(region_row$contigs)) {
-          contig_list <- trimws(strsplit(region_row$contigs, ",")[[1]])
-          segments <- get_segments(main_state_rv$assembly)
-          selected_segments <- segments[segments$contig %in% contig_list, ]
+        # Parse and set segments
+        if (region_row$segments != "" && !is.na(region_row$segments)) {
+          segment_ids <- trimws(strsplit(region_row$segments, ",")[[1]])
+          all_segments <- get_segments(main_state_rv$assembly)
+          selected_segments <- all_segments[all_segments$segment %in% segment_ids, ]
+          cat("selected_segments: ", nrow(selected_segments), " rows\n", sep = "")
           main_state_rv$segments <- selected_segments
         } else {
+          cat("segments is empty, setting empty segments\n")
           main_state_rv$segments <- data.frame(segment = character(), contig = character(), 
                                                 start = integer(), end = integer(), stringsAsFactors = FALSE)
         }
         
-        # apply zoom
-        if (!is.na(region_row$zoom_start) && !is.na(region_row$zoom_end)) {
-          main_state_rv$zoom <- c(region_row$zoom_start, region_row$zoom_end)
+        # apply xlim
+        if (!is.na(region_row$xlim_start) && !is.na(region_row$xlim_end)) {
+          main_state_rv$zoom <- c(region_row$xlim_start, region_row$xlim_end)
+          cat("setting xlim=", region_row$xlim_start, "-", region_row$xlim_end, "\n", sep = "")
         } else {
+          cat("xlim is NA, setting zoom=NULL\n")
           main_state_rv$zoom <- NULL
         }
+        
+        cat("final state: assembly=", main_state_rv$assembly %||% "NULL",
+            " segs=", if (is.null(main_state_rv$segments) || nrow(main_state_rv$segments) == 0) "0" else nrow(main_state_rv$segments),
+            " zoom=", if (is.null(main_state_rv$zoom)) "NULL" else paste(main_state_rv$zoom, collapse = "-"), "\n", sep = "")
+        cat("=== GOTO REGION: END ===\n\n")
         
         shiny::showNotification(paste("navigated to region:", region_row$description), type = "message")
       }
@@ -1091,37 +990,15 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           Level = if("level" %in% colnames(rt)) rt$level else rep(1L, nrow(rt)),
           Description = rt$description,
           Assembly = rt$assembly,
-          Contigs = sapply(rt$contigs, function(x) {
-            if (x == "" || is.na(x)) return("None")
-            contigs_list <- trimws(strsplit(x, ",")[[1]])
-            if (length(contigs_list) == 1) return(contigs_list[1])
-            return(paste(length(contigs_list), "contigs"))
-          }),
+          Segments = sapply(rt$segments, format_segments_for_display),
           Window = sapply(seq_len(nrow(rt)), function(i) {
-            if (is.na(rt$zoom_start[i]) || is.na(rt$zoom_end[i])) return("Full range")
-            window_size <- round(rt$zoom_end[i]) - round(rt$zoom_start[i])
+            if (is.na(rt$xlim_start[i]) || is.na(rt$xlim_end[i])) return("Full range")
+            window_size <- round(rt$xlim_end[i]) - round(rt$xlim_start[i])
             return(format_bp(window_size))
           }),
           Coordinates = sapply(seq_len(nrow(rt)), function(i) {
-            if (is.na(rt$zoom_start[i]) || is.na(rt$zoom_end[i])) return("Full range")
-            
-            contigs_list <- if (rt$contigs[i] == "" || is.na(rt$contigs[i])) {
-              character(0)
-            } else {
-              trimws(strsplit(rt$contigs[i], ",")[[1]])
-            }
-            
-            if (length(contigs_list) == 0) return("Global")
-            
-            # For segment-based state, just show zoom coords directly
-            # (more complex conversion would require temporarily setting context)
-            if (length(contigs_list) == 1) {
-              sprintf("%s: %d-%d", contigs_list[1], as.integer(rt$zoom_start[i]), as.integer(rt$zoom_end[i]))
-            } else if (length(contigs_list) > 1) {
-              "Multiple contigs"
-            } else {
-              "Global"
-            }
+            if (is.na(rt$xlim_start[i]) || is.na(rt$xlim_end[i])) return("Full range")
+            return(format_xlim_for_display(rt$xlim_start[i], rt$xlim_end[i]))
           }),
           stringsAsFactors = FALSE
         )

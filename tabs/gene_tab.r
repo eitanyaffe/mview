@@ -64,7 +64,21 @@ get_genes_for_context <- function(assembly, contigs, zoom) {
 
 # ---- DataTable Renderer ----
 
+# reactive trigger to force table update when dependencies change
+genes_table_trigger <- reactiveVal(0)
+
+# observer to update table when assembly, segments, or zoom change
+observeEvent(list(state$assembly, state$segments, state$zoom), {
+  if (!is.null(state$assembly)) {
+    # increment trigger to force renderDT to re-execute
+    genes_table_trigger(genes_table_trigger() + 1)
+  }
+}, ignoreNULL = FALSE, ignoreInit = FALSE)
+
 output$genesTable <- renderDT({
+  # depend on trigger to ensure updates
+  genes_table_trigger()
+  
   genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
 
   if (is.null(genes_df) || nrow(genes_df) == 0) {

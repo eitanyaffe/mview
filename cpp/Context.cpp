@@ -516,6 +516,7 @@ std::vector<IntervalRow> Context::get_view_intervals(bool limit_to_zoom, bool me
     row.n_segments = 1;
     row.trim_left = false;
     row.trim_right = false;
+    row.segment_strand = pseg.strand;
     intervals.push_back(row);
   }
   
@@ -523,7 +524,7 @@ std::vector<IntervalRow> Context::get_view_intervals(bool limit_to_zoom, bool me
     return intervals;
   }
   
-  // Step 2: Merge adjacent intervals on same contig
+  // Step 2: Merge adjacent intervals on same contig with same strand
   
   std::vector<IntervalRow> merged;
   IntervalRow current = intervals[0];
@@ -531,10 +532,29 @@ std::vector<IntervalRow> Context::get_view_intervals(bool limit_to_zoom, bool me
   for (size_t i = 1; i < intervals.size(); i++) {
     const IntervalRow& next = intervals[i];
     
-    // Check if adjacent (same contig and contig coords are adjacent)
-    if (next.contig == current.contig && next.start == current.end + 1) {
+    // Check if same contig and same strand
+    bool same_contig = (next.contig == current.contig);
+    bool same_strand = (next.segment_strand == current.segment_strand);
+    
+    // Check adjacency based on strand
+    bool adjacent = false;
+    if (same_contig && same_strand) {
+      if (current.segment_strand == '+') {
+        // plus strand: segments in contig order
+        adjacent = (next.start == current.end + 1);
+      } else {
+        // minus strand: segments in reverse contig order (current has higher coords)
+        adjacent = (current.start == next.end + 1);
+      }
+    }
+    
+    if (adjacent) {
       // Merge: extend current interval
-      current.end = next.end;
+      if (current.segment_strand == '+') {
+        current.end = next.end;
+      } else {
+        current.start = next.start;
+      }
       current.vend = next.vend;
       current.segment_ids += "," + next.segment_ids;
       current.n_segments += next.n_segments;
@@ -694,17 +714,19 @@ std::vector<IntervalRow> Context::filter_intervals(const std::vector<IntervalRow
     return filtered;
   }
   
-  // Merge adjacent intervals (adjacent in vcoord space)
+  // Merge adjacent intervals (adjacent in vcoord space, same strand)
   std::vector<IntervalRow> merged;
   IntervalRow current = filtered[0];
   
   for (size_t i = 1; i < filtered.size(); i++) {
     const IntervalRow& next = filtered[i];
     
-    // Check if adjacent in vcoord space
+    // Check if adjacent in vcoord space and same strand
     int64_t current_vend = static_cast<int64_t>(current.vend);
     int64_t next_vstart = static_cast<int64_t>(next.vstart);
-    if (next_vstart == current_vend + 1) {
+    bool same_strand = (next.segment_strand == current.segment_strand);
+    
+    if (same_strand && next_vstart == current_vend + 1) {
       current.end = next.end;
       current.vend = next.vend;
       current.trim_right = next.trim_right;

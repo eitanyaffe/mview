@@ -317,7 +317,7 @@ DataFrame plotted_segments_to_dataframe(const std::vector<PlottedSegment>& segme
   );
 }
 
-// For get_view_intervals: vstart, vend, contig, start, end, segment_ids, n_segments
+// For get_view_intervals: vstart, vend, contig, start, end, segment_ids, n_segments, strand
 DataFrame view_intervals_to_dataframe(const std::vector<IntervalRow>& rows) {
   int n = rows.size();
   
@@ -330,6 +330,7 @@ DataFrame view_intervals_to_dataframe(const std::vector<IntervalRow>& rows) {
       Named("end") = IntegerVector(),
       Named("segment_ids") = CharacterVector(),
       Named("n_segments") = IntegerVector(),
+      Named("strand") = CharacterVector(),
       Named("stringsAsFactors") = false
     );
   }
@@ -341,6 +342,7 @@ DataFrame view_intervals_to_dataframe(const std::vector<IntervalRow>& rows) {
   IntegerVector ends(n);
   CharacterVector segment_ids(n);
   IntegerVector n_segments(n);
+  CharacterVector strands(n);
   
   for (int i = 0; i < n; i++) {
     vstarts[i] = rows[i].vstart;
@@ -350,6 +352,7 @@ DataFrame view_intervals_to_dataframe(const std::vector<IntervalRow>& rows) {
     ends[i] = static_cast<int>(rows[i].end);
     segment_ids[i] = rows[i].segment_ids;
     n_segments[i] = rows[i].n_segments;
+    strands[i] = std::string(1, rows[i].segment_strand);
   }
   
   return DataFrame::create(
@@ -360,6 +363,7 @@ DataFrame view_intervals_to_dataframe(const std::vector<IntervalRow>& rows) {
     Named("end") = ends,
     Named("segment_ids") = segment_ids,
     Named("n_segments") = n_segments,
+    Named("strand") = strands,
     Named("stringsAsFactors") = false
   );
 }

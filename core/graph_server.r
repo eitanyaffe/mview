@@ -99,9 +99,19 @@ observeEvent(input$selectorMinPercent, {
 # graph action buttons (write directly to state$segments)
 #########################################################################
 
+# extracts segment IDs from side-node IDs (strips _L or _R suffix)
+extract_segments_from_nodes <- function(node_ids) {
+  if (length(node_ids) == 0) return(character())
+  segs <- sub("_[LR]$", "", node_ids)
+  unique(segs)
+}
+
 # goto: navigate to selected segments in main view
 observeEvent(input$selectorGotoBtn, {
-  seg_ids <- selected_graph_segments()
+  node_ids <- selected_graph_segments()
+  if (length(node_ids) == 0) return()
+  
+  seg_ids <- extract_segments_from_nodes(node_ids)
   if (length(seg_ids) == 0) return()
   
   if (is.null(state$assembly)) return()
@@ -116,11 +126,17 @@ observeEvent(input$selectorGotoBtn, {
   
   regions_module_output$push_undo_state()
   state$segments <- selected_segments
+  
+  # reset zoom to see full range of new segments
+  state$zoom <- NULL
 })
 
 # add: append selected graph segments to state$segments
 observeEvent(input$selectorAddBtn, {
-  seg_ids <- selected_graph_segments()
+  node_ids <- selected_graph_segments()
+  if (length(node_ids) == 0) return()
+  
+  seg_ids <- extract_segments_from_nodes(node_ids)
   if (length(seg_ids) == 0) return()
   
   if (is.null(state$assembly)) return()
@@ -141,13 +157,22 @@ observeEvent(input$selectorAddBtn, {
   if (is.null(current_segs) || nrow(current_segs) == 0) {
     state$segments <- new_segments
   } else {
-    state$segments <- rbind(current_segs, new_segments)
+    # use only columns present in current_segs
+    common_cols <- intersect(names(current_segs), names(new_segments))
+    state$segments <- rbind(current_segs[, common_cols, drop = FALSE], 
+                           new_segments[, common_cols, drop = FALSE])
   }
+  
+  # reset zoom to see full range of new segments
+  state$zoom <- NULL
 })
 
 # remove: remove selected graph segments from state$segments
 observeEvent(input$selectorRemoveBtn, {
-  seg_ids <- selected_graph_segments()
+  node_ids <- selected_graph_segments()
+  if (length(node_ids) == 0) return()
+  
+  seg_ids <- extract_segments_from_nodes(node_ids)
   if (length(seg_ids) == 0) return()
   
   current_segs <- state$segments
@@ -157,12 +182,17 @@ observeEvent(input$selectorRemoveBtn, {
   
   regions_module_output$push_undo_state()
   state$segments <- new_segs
+  
+  # reset zoom to see full range of remaining segments
+  state$zoom <- NULL
 })
 
 # select all graph nodes
 observeEvent(input$selectorSelectAllBtn, {
   all_segs <- computed_graph_segments()
-  selected_graph_segments(all_segs)
+  # convert segment IDs to node IDs (both L and R)
+  all_nodes <- c(paste0(all_segs, "_L"), paste0(all_segs, "_R"))
+  selected_graph_segments(all_nodes)
 })
 
 # clear graph selection
@@ -197,44 +227,79 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   associated_mat <- load_seg_adj_associated(state$assembly)
   bin_segment_table <- load_bin_segment_table(state$assembly)
   
-  # build nodes
+  # build nodes (two per segment: left and right sides)
   nodes <- build_graph_nodes(seg_ids)
   
-  # build edges
+  # build edges (internal + inter-segment)
+  directed <- if (!is.null(input$graphDirectedEdges)) input$graphDirectedEdges else FALSE
   edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat, bin_segment_table,
-                            min_support(), min_percent())
+                            min_support(), min_percent(), directed = directed)
   
-  # color nodes using central color system
+  # color nodes using central color system (use segment field for color lookup)
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(seg_ids, state$assembly, ordered_segs)
-  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
-                                   seg_colors[nodes$id], "#E0E0E0")
+  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
+  names(seg_colors) <- nodes$segment
+  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
+                                   seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
   
-  # set node labels: index only for segments in view, id for all segments
+  # set node labels based on label type
   label_type <- if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index"
-  nodes$label <- sapply(nodes$id, function(seg_id) {
+  nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
+    seg <- nodes$segment[i]
+    side <- nodes$side[i]
     if (label_type == "id") {
-      return(seg_id)
+      return(paste0(seg, "_", side))
     }
-    if (!seg_id %in% ordered_segs) return("")
-    return(as.character(which(ordered_segs == seg_id)))
+    if (!seg %in% ordered_segs) return(" ")
+    idx <- which(ordered_segs == seg)
+    return(paste0(idx, "_", side))
   })
   
+  # style edges: internal edges are thick and short, inter-segment edges are thinner
+  # apply initial colors and labels based on current metric selection
   if (nrow(edges) > 0) {
-    edges$color.color <- "#848484"
+    metric <- if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none"
+    show_labels <- if (!is.null(input$graphEdgeLabels)) input$graphEdgeLabels else FALSE
+    lib1 <- input$graphEdgeLib1
+    lib2 <- input$graphEdgeLib2
+    font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
+    edge_font_size <- font_size
+    
+    edge_colors <- compute_edge_colors(edges, metric, lib1, lib2)
+    if (length(edge_colors) == nrow(edges)) {
+      edges$color.color <- edge_colors
+    } else {
+      edges$color.color <- ifelse(edges$..is_internal.., "#000000", "#848484")
+    }
+    
+    edge_labels <- compute_edge_labels(edges, metric, show_labels, lib1, lib2)
+    if (length(edge_labels) == nrow(edges)) {
+      edges$label <- edge_labels
+      edges$font.size <- edge_font_size
+    } else {
+      edges$label <- ""
+      edges$font.size <- edge_font_size
+    }
+    
+    edges$width <- ifelse(edges$..is_internal.., 24, 6)
+    edges$length <- ifelse(edges$..is_internal.., 15, 200)
+    
+    # internal edges always light gray and thick
+    internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
+    edges$color.color[internal_mask] <- "#D3D3D3"
+    edges$label[internal_mask] <- ""
   }
   
   current_graph_nodes(nodes)
   current_graph_edges(edges)
   current_bin_segment_table(bin_segment_table)
   
-  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 28
+  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
   network <- visNetwork::visNetwork(nodes, edges) %>%
     visNetwork::visNodes(
       font = list(size = font_size, color = "black")
     ) %>%
-    visNetwork::visEdges(arrows = "to") %>%
     visNetwork::visLayout(randomSeed = 42) %>%
     visNetwork::visPhysics(
       stabilization = list(enabled = TRUE, iterations = 200)
@@ -305,11 +370,12 @@ observeEvent(selected_graph_segments(), {
   
   selected_nodes <- selected_graph_segments()
   
-  # color nodes using central color system
+  # color nodes using central color system (use segment field)
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$id, state$assembly, ordered_segs)
-  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
-                                   seg_colors[nodes$id], "#CCCCCC")
+  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
+  names(seg_colors) <- nodes$segment
+  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
+                                   seg_colors[nodes$segment], "#CCCCCC")
   nodes$color.border <- "#666666"
   nodes$borderWidth <- 1
   nodes$font.color <- get_text_color_for_background(nodes$color.background)
@@ -329,9 +395,10 @@ observeEvent(input$segmentColorScheme, {
   if (is.null(nodes) || nrow(nodes) == 0) return()
   
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$id, state$assembly, ordered_segs)
-  nodes$color.background <- ifelse(nodes$id %in% names(seg_colors), 
-                                   seg_colors[nodes$id], "#E0E0E0")
+  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
+  names(seg_colors) <- nodes$segment
+  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
+                                   seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
   
   selected_nodes <- selected_graph_segments()
@@ -345,6 +412,35 @@ observeEvent(input$segmentColorScheme, {
     visNetwork::visUpdateNodes(nodes)
 }, ignoreInit = TRUE)
 
+# update node colors via proxy when grayscale checkbox changes
+# use observe() instead of observeEvent() to ensure it runs after color mapping observer
+observe({
+  # establish dependency on grayscale - this ensures we run after color mapping updates
+  grayscale_val <- input$segmentGrayscale
+  # also depend on color scheme to ensure mapping is current
+  scheme_val <- input$segmentColorScheme
+  
+  nodes <- current_graph_nodes()
+  if (is.null(nodes) || nrow(nodes) == 0) return()
+  
+  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
+  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
+  names(seg_colors) <- nodes$segment
+  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
+                                   seg_colors[nodes$segment], "#E0E0E0")
+  nodes$color.border <- "#666666"
+  
+  selected_nodes <- selected_graph_segments()
+  if (length(selected_nodes) > 0) {
+    nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
+    nodes$borderWidth <- ifelse(nodes$id %in% selected_nodes, 3, 1)
+  }
+  
+  current_graph_nodes(nodes)
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visUpdateNodes(nodes)
+})
+
 # update node labels via proxy when label type changes
 observeEvent(input$graphNodeLabel, {
   nodes <- current_graph_nodes()
@@ -352,10 +448,15 @@ observeEvent(input$graphNodeLabel, {
   
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
   label_type <- input$graphNodeLabel
-  nodes$label <- sapply(nodes$id, function(seg_id) {
-    if (label_type == "id") return(seg_id)
-    if (!seg_id %in% ordered_segs) return("")
-    return(as.character(which(ordered_segs == seg_id)))
+  nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
+    seg <- nodes$segment[i]
+    side <- nodes$side[i]
+    if (label_type == "id") {
+      return(paste0(seg, "_", side))
+    }
+    if (!seg %in% ordered_segs) return(" ")
+    idx <- which(ordered_segs == seg)
+    return(paste0(idx, "_", side))
   })
   
   current_graph_nodes(nodes)
@@ -366,9 +467,88 @@ observeEvent(input$graphNodeLabel, {
 # update font size via proxy when font size changes
 observeEvent(input$graphFontSize, {
   font_size <- as.numeric(input$graphFontSize)
+  edge_font_size <- font_size
+  
   visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visSetOptions(options = list(nodes = list(font = list(size = font_size, color = "black"))))
+    visNetwork::visSetOptions(options = list(
+      nodes = list(font = list(size = font_size, color = "black")),
+      edges = list(font = list(size = edge_font_size))
+    ))
+  
+  # also update edge font sizes in edge data
+  edges <- current_graph_edges()
+  if (!is.null(edges) && nrow(edges) > 0) {
+    edges$font.size <- edge_font_size
+    visNetwork::visNetworkProxy("selectorGraph") %>%
+      visNetwork::visUpdateEdges(edges)
+  }
 }, ignoreInit = TRUE)
+
+# update library dropdowns when assembly changes
+observeEvent(state$assembly, {
+  if (is.null(state$assembly)) return()
+  
+  count_mat <- load_seg_adj_count(state$assembly)
+  if (is.null(count_mat)) return()
+  
+  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+                     "contig_src", "start_src", "end_src", 
+                     "contig_tgt", "start_tgt", "end_tgt")
+  lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
+  
+  if (length(lib_cols) > 0) {
+    lib_choices <- setNames(lib_cols, lib_cols)
+    updateSelectInput(session, "graphEdgeLib1", choices = lib_choices, selected = NULL)
+    updateSelectInput(session, "graphEdgeLib2", choices = lib_choices, selected = NULL)
+  }
+}, ignoreNULL = FALSE)
+
+# cache edge metric and labels
+observeEvent(input$graphEdgeMetric, {
+  cache_set("graph.edge_metric", input$graphEdgeMetric)
+})
+
+observeEvent(input$graphEdgeLabels, {
+  cache_set("graph.edge_labels", input$graphEdgeLabels)
+})
+
+# update edge colors and labels via proxy when edge metric/labels change
+observe({
+  edges <- current_graph_edges()
+  if (is.null(edges) || nrow(edges) == 0) return()
+  
+  metric <- if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none"
+  show_labels <- if (!is.null(input$graphEdgeLabels)) input$graphEdgeLabels else FALSE
+  lib1 <- input$graphEdgeLib1
+  lib2 <- input$graphEdgeLib2
+  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
+  edge_font_size <- font_size
+  
+  # compute colors
+  edge_colors <- compute_edge_colors(edges, metric, lib1, lib2)
+  if (length(edge_colors) == nrow(edges)) {
+    edges$color.color <- edge_colors
+  }
+  
+  # compute labels
+  edge_labels <- compute_edge_labels(edges, metric, show_labels, lib1, lib2)
+  if (length(edge_labels) == nrow(edges)) {
+    edges$label <- edge_labels
+  }
+  
+  # set edge font size (5x node font size)
+  edges$font.size <- edge_font_size
+  
+  # internal edges always light gray and thick
+  internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
+  edges$color.color[internal_mask] <- "#D3D3D3"
+  edges$width[internal_mask] <- 24
+  edges$width[!internal_mask] <- 6
+  edges$label[internal_mask] <- ""
+  
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visUpdateEdges(edges)
+})
 
 observeEvent(input$selectorGraphNodeSelect, {
   nodes <- input$selectorGraphNodeSelect
@@ -417,10 +597,11 @@ observeEvent(input$selectorGraphZoomOut, {
 #########################################################################
 
 output$selectorSelectedSegmentText <- renderText({
-  seg_ids <- selected_graph_segments()
-  if (length(seg_ids) == 0) {
+  node_ids <- selected_graph_segments()
+  if (length(node_ids) == 0) {
     return("None")
   }
+  seg_ids <- extract_segments_from_nodes(node_ids)
   return(paste(seg_ids, collapse = ", "))
 })
 
@@ -428,17 +609,27 @@ output$selectorHoverInfo <- renderUI({
   node_hover <- hovered_node()
   edge_hover <- hovered_edge()
   
-  # show hovered node details
+  # show hovered node details (side-nodes have segment field)
   if (!is.null(node_hover) && node_hover != "") {
-    seg_id <- node_hover
-    seg_table <- get_segments(state$assembly)
-    bin_segment_table <- load_bin_segment_table(state$assembly)
+    nodes <- current_graph_nodes()
     edges <- current_graph_edges()
     
-    # compute degree from edges
+    # extract segment from side-node
+    seg_id <- node_hover
+    side <- NULL
+    if (!is.null(nodes) && nrow(nodes) > 0 && node_hover %in% nodes$id) {
+      node_row <- nodes[nodes$id == node_hover, ]
+      seg_id <- node_row$segment[1]
+      side <- node_row$side[1]
+    }
+    
+    seg_table <- get_segments(state$assembly)
+    bin_segment_table <- load_bin_segment_table(state$assembly)
+    
+    # compute degree from edges (count edges connected to this node)
     degree <- 0
     if (!is.null(edges) && nrow(edges) > 0) {
-      degree <- sum(edges$from == seg_id) + sum(edges$to == seg_id)
+      degree <- sum(edges$from == node_hover) + sum(edges$to == node_hover)
     }
     
     if (!is.null(seg_table) && seg_id %in% seg_table$segment) {
@@ -453,8 +644,9 @@ output$selectorHoverInfo <- renderUI({
         bin <- bin_segment_table$bin[bin_segment_table$segment == seg_id][1]
       }
       
+      side_text <- if (!is.null(side)) paste0(" (", side, ")") else ""
       return(tags$div(
-        tags$strong("Segment: "), seg_id, tags$br(),
+        tags$strong("Segment: "), seg_id, side_text, tags$br(),
         tags$strong("Contig: "), contig, tags$br(),
         tags$strong("Coords: "), format(start, big.mark = ","), " - ", format(end, big.mark = ","), tags$br(),
         tags$strong("Length: "), length_kb, " kb", tags$br(),
@@ -468,48 +660,130 @@ output$selectorHoverInfo <- renderUI({
   # show hovered edge details
   if (!is.null(edge_hover) && edge_hover != "") {
     edges <- current_graph_edges()
-    from_seg <- NULL
-    to_seg <- NULL
-    support <- NA
-    total_associated <- NA
-    total <- NA
-    pct <- NA
     
     if (!is.null(edges) && nrow(edges) > 0 && "id" %in% names(edges)) {
-      edge_idx <- which(edges$id == edge_hover)
+      edge_idx <- which(!is.na(edges$id) & edges$id == edge_hover)
       if (length(edge_idx) > 0) {
-        from_seg <- edges$from[edge_idx[1]]
-        to_seg <- edges$to[edge_idx[1]]
-        if ("..support.." %in% names(edges)) support <- edges$..support..[edge_idx[1]]
-        if ("..total_associated.." %in% names(edges)) total_associated <- edges$..total_associated..[edge_idx[1]]
-        if ("..total.." %in% names(edges)) total <- edges$..total..[edge_idx[1]]
-        if ("..percent.." %in% names(edges)) pct <- edges$..percent..[edge_idx[1]]
+        edge_row <- edges[edge_idx[1], ]
+        is_internal <- if (!is.null(edge_row$..is_internal..) && !is.na(edge_row$..is_internal..)) edge_row$..is_internal.. else FALSE
+        
+        # internal edge: show segment info
+        if (is_internal) {
+          seg_id <- edge_row$..segment..
+          return(tags$div(
+            tags$strong("Internal edge"), tags$br(),
+            tags$strong("Segment: "), seg_id
+          ))
+        }
+        
+        # inter-segment edge
+        seg_from <- edge_row$..seg_from..
+        seg_to <- edge_row$..seg_to..
+        side_from <- edge_row$..side_from..
+        side_to <- edge_row$..side_to..
+        support <- edge_row$..support..
+        total <- edge_row$..total..
+        total_associated <- edge_row$..total_associated..
+        pct <- edge_row$..percent..
+        is_directed <- if (!is.null(edge_row$arrows) && !is.na(edge_row$arrows) && edge_row$arrows == "to") TRUE else FALSE
+        
+        format_val <- function(x) if (!is.na(x)) format(x, big.mark = ",") else "N/A"
+        format_pct <- function(x) if (!is.na(x)) paste0(round(x, 1), "%") else "N/A"
+        
+        edge_label <- if (is_directed) {
+          paste0(seg_from, "_", side_from, " → ", seg_to, "_", side_to)
+        } else {
+          paste0(seg_from, "_", side_from, " - ", seg_to, "_", side_to)
+        }
+        
+        # get library columns from edge data
+        lib_cols <- character()
+        pct_cols <- names(edge_row)[grepl("^\\.\\.pct_.*\\.\\.$", names(edge_row))]
+        for (col in pct_cols) {
+          lib_name <- gsub("^\\.\\.pct_(.*)\\.\\.$", "\\1", col)
+          if (lib_name != "") lib_cols <- c(lib_cols, lib_name)
+        }
+        lib_cols <- unique(lib_cols)
+        
+        # get current metric to determine if we show change
+        metric <- if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none"
+        lib1 <- input$graphEdgeLib1
+        lib2 <- input$graphEdgeLib2
+        
+        # build table rows
+        support_vals <- c()
+        assoc_vals <- c()
+        pct_vals <- c()
+        
+        for (lib in lib_cols) {
+          sup_col <- paste0("..sup_", lib, "..")
+          assoc_col <- paste0("..assoc_", lib, "..")
+          pct_col <- paste0("..pct_", lib, "..")
+          sup_val <- if (sup_col %in% names(edge_row)) edge_row[[sup_col]] else 0
+          assoc_val <- if (assoc_col %in% names(edge_row)) edge_row[[assoc_col]] else 0
+          pct_val <- if (pct_col %in% names(edge_row)) edge_row[[pct_col]] else 0
+          sup_val[is.na(sup_val)] <- 0
+          assoc_val[is.na(assoc_val)] <- 0
+          pct_val[is.na(pct_val)] <- 0
+          support_vals <- c(support_vals, round(sup_val))
+          assoc_vals <- c(assoc_vals, round(assoc_val))
+          pct_vals <- c(pct_vals, round(pct_val))
+        }
+        
+        # add mean column
+        support_vals <- c(support_vals, round(support))
+        assoc_vals <- c(assoc_vals, round(total_associated))
+        pct_vals <- c(pct_vals, round(pct))
+        
+        # build table
+        header_cols <- c(lib_cols, "mean")
+        table_rows <- list()
+        
+        # Support row
+        support_cells <- lapply(support_vals, function(x) tags$td(format(x, big.mark = ","), style = "border: 1px solid #ccc; padding: 4px; text-align: right;"))
+        table_rows <- c(table_rows, list(tags$tr(
+          tags$td(tags$strong("Support"), style = "border: 1px solid #ccc; padding: 4px; text-align: left;"),
+          support_cells
+        )))
+        
+        # Total Associated row
+        assoc_cells <- lapply(assoc_vals, function(x) tags$td(format(x, big.mark = ","), style = "border: 1px solid #ccc; padding: 4px; text-align: right;"))
+        table_rows <- c(table_rows, list(tags$tr(
+          tags$td(tags$strong("Total Associated"), style = "border: 1px solid #ccc; padding: 4px; text-align: left;"),
+          assoc_cells
+        )))
+        
+        # Percent row
+        pct_cells <- lapply(pct_vals, function(x) tags$td(paste0(x, "%"), style = "border: 1px solid #ccc; padding: 4px; text-align: right;"))
+        table_rows <- c(table_rows, list(tags$tr(
+          tags$td(tags$strong("Percent"), style = "border: 1px solid #ccc; padding: 4px; text-align: left;"),
+          pct_cells
+        )))
+        
+        result_div <- tags$div(
+          tags$strong("Edge: "), edge_label, tags$br(), tags$br(),
+          tags$table(
+            style = "border-collapse: collapse; font-size: 12px;",
+            tags$thead(
+              tags$tr(
+                tags$th("", style = "border: 1px solid #ccc; padding: 4px; text-align: left;"),
+                lapply(header_cols, function(h) tags$th(h, style = "border: 1px solid #ccc; padding: 4px; text-align: center;"))
+              )
+            ),
+            tags$tbody(table_rows)
+          )
+        )
+        
+        return(result_div)
       }
-    }
-    
-    if (is.null(from_seg)) {
-      parts <- strsplit(edge_hover, "_")[[1]]
-      if (length(parts) >= 2) {
-        from_seg <- parts[1]
-        to_seg <- parts[2]
-      }
-    }
-    
-    if (!is.null(from_seg) && !is.null(to_seg)) {
-      return(tags$div(
-        tags$strong("Edge: "), from_seg, " → ", to_seg, tags$br(),
-        tags$strong("Supporting reads: "), if (!is.na(support)) format(support, big.mark = ",") else "N/A", tags$br(),
-        tags$strong("Total associated: "), if (!is.na(total_associated)) format(total_associated, big.mark = ",") else "N/A", tags$br(),
-        tags$strong("Total reads: "), if (!is.na(total)) format(total, big.mark = ",") else "N/A", tags$br(),
-        tags$strong("Percent: "), if (!is.na(pct)) paste0(round(pct, 1), "%") else "N/A"
-      ))
     }
     return(tags$p(tags$strong("Edge: "), edge_hover))
   }
   
   # show selected segments if nothing hovered
-  seg_ids <- selected_graph_segments()
-  if (length(seg_ids) > 0) {
+  node_ids <- selected_graph_segments()
+  if (length(node_ids) > 0) {
+    seg_ids <- extract_segments_from_nodes(node_ids)
     return(tags$p(tags$strong("Selected: "), paste(seg_ids, collapse = ", ")))
   }
   

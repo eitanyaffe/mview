@@ -116,6 +116,10 @@ register_seg_bins_f(function(assembly) {
     unique_bins <- sort(unique(seg_table$bin))
     bin_colors <- setNames(rainbow(length(unique_bins), s = 0.5, v = 0.9), unique_bins)
     seg_table$bin_color <- bin_colors[seg_table$bin]
+    # generate grayscale colors maintaining relative brightness
+    gray_values <- seq(0.3, 0.85, length.out = length(unique_bins))
+    bin_grays <- setNames(gray(gray_values), unique_bins)
+    seg_table$bin_gray <- bin_grays[seg_table$bin]
     return(seg_table)
   }
   
@@ -133,20 +137,27 @@ register_seg_bins_f(function(assembly) {
   # assign rainbow colors to hosts
   host_colors <- setNames(rainbow(length(host_bins), s = 0.6, v = 0.85), host_bins)
   
+  # assign grayscale colors to hosts (maintaining relative brightness)
+  gray_values <- seq(0.3, 0.85, length.out = length(host_bins))
+  host_grays <- setNames(gray(gray_values), host_bins)
+  
   # non-hosts get light gray
   all_bins <- unique(seg_table$bin)
   non_host_bins <- all_bins[!all_bins %in% host_bins]
   non_host_colors <- setNames(rep("#CCCCCC", length(non_host_bins)), non_host_bins)
+  non_host_grays <- setNames(rep("#CCCCCC", length(non_host_bins)), non_host_bins)
   
   # combine colors
   bin_colors <- c(host_colors, non_host_colors)
+  bin_grays <- c(host_grays, non_host_grays)
   seg_table$bin_color <- bin_colors[seg_table$bin]
+  seg_table$bin_gray <- bin_grays[seg_table$bin]
   
   return(seg_table)
 })
 
-# Register segment color schemes
-register_segment_colors(list(bin = "bin_color"))
+# Register segment color schemes (with both color and gray fields)
+register_segment_colors(list(bin = list(color = "bin_color", gray = "bin_gray")))
 
 # Register seg_adj function (segment adjacency matrices)
 register_seg_adj_f(function(assembly) {
