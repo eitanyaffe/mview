@@ -714,19 +714,28 @@ std::vector<IntervalRow> Context::filter_intervals(const std::vector<IntervalRow
     return filtered;
   }
   
-  // Merge adjacent intervals (adjacent in vcoord space, same strand)
+  // Sort by input_index first, then by vstart, so intervals from same input row are grouped
+  std::sort(filtered.begin(), filtered.end(), [](const IntervalRow& a, const IntervalRow& b) {
+    if (a.input_index != b.input_index) {
+      return a.input_index < b.input_index;
+    }
+    return a.vstart < b.vstart;
+  });
+  
+  // Merge adjacent intervals (adjacent in vcoord space, same strand, same input_index)
   std::vector<IntervalRow> merged;
   IntervalRow current = filtered[0];
   
   for (size_t i = 1; i < filtered.size(); i++) {
     const IntervalRow& next = filtered[i];
     
-    // Check if adjacent in vcoord space and same strand
+    // Check if adjacent in vcoord space, same strand, and same input_index
     int64_t current_vend = static_cast<int64_t>(current.vend);
     int64_t next_vstart = static_cast<int64_t>(next.vstart);
     bool same_strand = (next.segment_strand == current.segment_strand);
+    bool same_input = (next.input_index == current.input_index);
     
-    if (same_strand && next_vstart == current_vend + 1) {
+    if (same_input && same_strand && next_vstart == current_vend + 1) {
       current.end = next.end;
       current.vend = next.vend;
       current.trim_right = next.trim_right;

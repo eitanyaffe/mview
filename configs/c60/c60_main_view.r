@@ -209,7 +209,7 @@ interval_profile(
 ########################################################
 
 interval_profile(
-  id = "binning_segment_table",
+  id = "new_segment_table",
   name = "New Segments",
   intervals_f = function(assembly) {
     seg_table <- get_data("BINNING_SEGMENT_TABLE_NEW", tag = assembly, null.on.missing = TRUE)
@@ -229,7 +229,7 @@ interval_profile(
     names(colors) <- sorted_ids
     colors[ids]
   },
-  merge_adjacent = FALSE,
+  merge_adjacent = TRUE,
   height = 60
 )
 

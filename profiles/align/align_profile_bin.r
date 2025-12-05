@@ -69,6 +69,7 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
                      digest::digest(list(
                        aln_id = aln_id,
                        seg_key = seg_key,
+                       xlim = xlim,
                        bin_size = bin_size,
                        seg_threshold = seg_threshold,
                        non_ref_threshold = non_ref_threshold,

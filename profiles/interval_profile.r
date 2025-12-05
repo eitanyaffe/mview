@@ -1,22 +1,21 @@
 interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
-                         intervals_f = NULL,
-                           color = "#2E86AB",
-                           color_field = NULL,
-                           color_f = NULL,
-                           merge_adjacent = TRUE,
-                           auto_register = TRUE) {
-
+                          intervals_f = NULL,
+                          color = "#2E86AB",
+                          color_field = NULL,
+                          color_f = NULL,
+                          merge_adjacent = TRUE,
+                          auto_register = TRUE) 
+{
   plot_f <- function(profile, gg) {
     assembly <- cxt_get_assembly()
     intervals <- NULL
     if (is.function(profile$intervals_f)) {
       intervals <- profile$intervals_f(assembly)
-    } else if (is.character(profile$intervals_f)) {
-      if (cache_exists(profile$intervals_f)) {
-        intervals <- cache_get(profile$intervals_f)
-      }
     } else if (is.data.frame(profile$intervals_f)) {
       intervals <- profile$intervals_f
+    } else {
+      warning(sprintf("invalid intervals_f for interval_profile '%s': %s", id, profile$intervals_f))
+      return(list(plot = gg, legends = list()))
     }
     
     if (is.null(intervals) || nrow(intervals) == 0) {

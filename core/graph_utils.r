@@ -220,7 +220,6 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
       lib_cols <- all_lib_cols
     }
   }
-  browser()
   # row sums per matrix limited to library columns
   if (length(lib_cols) == 1) {
     count_sums <- data.frame(count_mat[, key_cols], 

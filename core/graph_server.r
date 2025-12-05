@@ -233,21 +233,21 @@ observeEvent(input$selectorAddNeighbors, {
 # graph rendering
 #########################################################################
 
-# store current graph data for proxy updates
-current_graph_nodes <- reactiveVal(NULL)
-current_graph_edges <- reactiveVal(NULL)
+# store base graph data (structure only, no visual properties) for proxy updates
+base_graph_nodes <- reactiveVal(NULL)
+base_graph_edges <- reactiveVal(NULL)
 current_bin_segment_table <- reactiveVal(NULL)
 
 output$selectorGraph <- visNetwork::renderVisNetwork({
   # dependencies: computed_graph_segments (which depends on input$graphEdgeLibs),
-  # selected_graph_segments, state$assembly, input$graphDirectedEdges, 
-  # input$graphEdgeLibs (read directly below), min_support(), min_percent()
+  # state$assembly, input$graphDirectedEdges, input$graphEdgeLibs (read directly below),
+  # min_support(), min_percent()
+  # NOTE: visual inputs (selection, colors, labels, fonts, edge metrics) are NOT dependencies
   seg_ids <- computed_graph_segments()
-  selected_nodes <- selected_graph_segments()
   
   if (length(seg_ids) == 0) {
-    current_graph_nodes(NULL)
-    current_graph_edges(NULL)
+    base_graph_nodes(NULL)
+    base_graph_edges(NULL)
     return(visNetwork::visNetwork(
       data.frame(id = character(), label = character()),
       data.frame(from = character(), to = character())
@@ -270,9 +270,15 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   if (edge_lib == "all") edge_lib <- NULL
   edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat, bin_segment_table,
                             min_support(), min_percent(), directed = directed, lib = edge_lib)
-                            browser()
-  cat("#### edges: ", nrow(edges), "\n")
-  # color nodes using central color system (use segment field for color lookup)
+  
+  # store base nodes/edges (structure only, before visual properties)
+  base_graph_nodes(nodes)
+  base_graph_edges(edges)
+  current_bin_segment_table(bin_segment_table)
+  
+  # apply visual properties for initial render (using isolate to avoid reactive dependencies)
+  # unified observer will handle all subsequent updates via proxy
+  selected_nodes <- isolate(selected_graph_segments())
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
   seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
   names(seg_colors) <- nodes$segment
@@ -289,7 +295,7 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   }
   
   # set node labels based on label type
-  label_type <- if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index"
+  label_type <- isolate(if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index")
   nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
     seg <- nodes$segment[i]
     side <- nodes$side[i]
@@ -304,11 +310,11 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   # style edges: internal edges are thick and short, inter-segment edges are thinner
   # apply initial colors and labels based on current metric selection
   if (nrow(edges) > 0) {
-    metric <- if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none"
-    show_labels <- if (!is.null(input$graphEdgeLabels)) input$graphEdgeLabels else FALSE
-    lib1 <- input$graphEdgeLib1
-    lib2 <- input$graphEdgeLib2
-    font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
+    metric <- isolate(if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none")
+    show_labels <- isolate(if (!is.null(input$graphEdgeLabels)) input$graphEdgeLabels else FALSE)
+    lib1 <- isolate(input$graphEdgeLib1)
+    lib2 <- isolate(input$graphEdgeLib2)
+    font_size <- isolate(if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38)
     edge_font_size <- font_size
     
     edge_colors <- compute_edge_colors(edges, metric, lib1, lib2)
@@ -364,10 +370,6 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
     edges$label[internal_mask] <- ""
   }
   
-  current_graph_nodes(nodes)
-  current_graph_edges(edges)
-  current_bin_segment_table(bin_segment_table)
-  
   # compute layout using igraph's Fruchterman-Reingold algorithm
   if (nrow(edges) > 0 && requireNamespace("igraph", quietly = TRUE)) {
     # create igraph graph from edges (use directed based on input setting)
@@ -383,7 +385,6 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
     nodes$y <- -layout[, 2] * 100  # invert for vis.js
   }
   
-  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
   nodes$font.color <- "black"
   
   network <- visNetwork::visNetwork(nodes, edges) %>%
@@ -452,96 +453,49 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   return(network)
 })
 
-# update node highlighting via proxy when selection changes
-observeEvent(selected_graph_segments(), {
-  return()
-  nodes <- current_graph_nodes()
+# unified observer for all visual updates (selection, colors, labels, fonts, edges)
+observe({
+  # watch all visual inputs
+  selected_nodes <- selected_graph_segments()
+  scheme_val <- input$segmentColorScheme
+  grayscale_val <- input$segmentGrayscale
+  label_type <- input$graphNodeLabel
+  font_size <- input$graphFontSize
+  metric <- input$graphEdgeMetric
+  show_labels <- input$graphEdgeLabels
+  directed <- input$graphDirectedEdges
+  lib1 <- input$graphEdgeLib1
+  lib2 <- input$graphEdgeLib2
+  
+  # get base nodes/edges from reactiveVals
+  nodes <- base_graph_nodes()
+  edges <- base_graph_edges()
+  
   if (is.null(nodes) || nrow(nodes) == 0) return()
   
-  selected_nodes <- selected_graph_segments()
+  # compute node visual properties from base data
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
   seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
   names(seg_colors) <- nodes$segment
   nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
-                                   seg_colors[nodes$segment], "#CCCCCC")
+                                   seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
   nodes$borderWidth <- 1
   nodes$font.color <- "black"
   
+  # apply selection highlighting
   if (length(selected_nodes) > 0) {
     selected_mask <- nodes$id %in% selected_nodes
     nodes$color.border[selected_mask] <- "#C92A2A"
     nodes$borderWidth[selected_mask] <- 3
   }
   
-  current_graph_nodes(nodes)
-  visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visUpdateNodes(nodes)
-}, ignoreNULL = FALSE)
-
-# update node colors via proxy when color scheme changes
-observeEvent(input$segmentColorScheme, {
-  nodes <- current_graph_nodes()
-  if (is.null(nodes) || nrow(nodes) == 0) return()
-  
-  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
-  names(seg_colors) <- nodes$segment
-  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
-                                   seg_colors[nodes$segment], "#E0E0E0")
-  nodes$color.border <- "#666666"
-  
-  selected_nodes <- selected_graph_segments()
-  if (length(selected_nodes) > 0) {
-    nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
-    nodes$borderWidth <- ifelse(nodes$id %in% selected_nodes, 3, 1)
-  }
-  
-  current_graph_nodes(nodes)
-  visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visUpdateNodes(nodes)
-}, ignoreInit = TRUE)
-
-# update node colors via proxy when grayscale checkbox changes
-# use observe() instead of observeEvent() to ensure it runs after color mapping observer
-observe({
-  # establish dependency on grayscale - this ensures we run after color mapping updates
-  grayscale_val <- input$segmentGrayscale
-  # also depend on color scheme to ensure mapping is current
-  scheme_val <- input$segmentColorScheme
-  
-  nodes <- current_graph_nodes()
-  if (is.null(nodes) || nrow(nodes) == 0) return()
-  
-  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
-  names(seg_colors) <- nodes$segment
-  nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
-                                   seg_colors[nodes$segment], "#E0E0E0")
-  nodes$color.border <- "#666666"
-  
-  selected_nodes <- selected_graph_segments()
-  if (length(selected_nodes) > 0) {
-    nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
-    nodes$borderWidth <- ifelse(nodes$id %in% selected_nodes, 3, 1)
-  }
-  
-  current_graph_nodes(nodes)
-  visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visUpdateNodes(nodes)
-})
-
-# update node labels via proxy when label type changes
-observeEvent(input$graphNodeLabel, {
-  nodes <- current_graph_nodes()
-  if (is.null(nodes) || nrow(nodes) == 0) return()
-  
-  ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  label_type <- input$graphNodeLabel
+  # set node labels based on label type
+  label_type_val <- if (!is.null(label_type)) label_type else "index"
   nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
     seg <- nodes$segment[i]
     side <- nodes$side[i]
-    if (label_type == "id") {
+    if (label_type_val == "id") {
       return(paste0(seg, "_", side))
     }
     if (!seg %in% ordered_segs) return(" ")
@@ -549,30 +503,87 @@ observeEvent(input$graphNodeLabel, {
     return(paste0(idx, "_", side))
   })
   
-  current_graph_nodes(nodes)
-  visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visUpdateNodes(nodes)
-}, ignoreInit = TRUE)
-
-# update font size via proxy when font size changes
-observeEvent(input$graphFontSize, {
-  font_size <- as.numeric(input$graphFontSize)
-  edge_font_size <- font_size
-  
+  # update font size via options
+  font_size_val <- if (!is.null(font_size)) as.numeric(font_size) else 38
   visNetwork::visNetworkProxy("selectorGraph") %>%
     visNetwork::visSetOptions(options = list(
-      nodes = list(font = list(size = font_size, color = "black")),
-      edges = list(font = list(size = edge_font_size))
+      nodes = list(font = list(size = font_size_val, color = "black"))
     ))
   
-  # also update edge font sizes in edge data
-  edges <- current_graph_edges()
+  # compute edge visual properties from base data
   if (!is.null(edges) && nrow(edges) > 0) {
+    metric_val <- if (!is.null(metric)) metric else "none"
+    show_labels_val <- if (!is.null(show_labels)) show_labels else FALSE
+    lib1_val <- lib1
+    lib2_val <- lib2
+    edge_font_size <- font_size_val
+    
+    edge_colors <- compute_edge_colors(edges, metric_val, lib1_val, lib2_val)
+    if (length(edge_colors) == nrow(edges)) {
+      edges$color.color <- edge_colors
+    } else {
+      edges$color.color <- ifelse(edges$..is_internal.., "#000000", "#848484")
+    }
+    
+    edge_labels <- compute_edge_labels(edges, metric_val, show_labels_val, lib1_val, lib2_val)
+    if (length(edge_labels) == nrow(edges)) {
+      edges$label <- edge_labels
+    } else {
+      edges$label <- ""
+    }
     edges$font.size <- edge_font_size
+    
+    edges$width <- ifelse(edges$..is_internal.., 18, 6)
+    edges$length <- ifelse(edges$..is_internal.., 15, 200)
+    
+    # update smooth curves for bidirectional edges when directed mode changes
+    directed_val <- if (!is.null(directed)) directed else FALSE
+    if (directed_val && nrow(edges) > 0) {
+      # detect bidirectional edges
+      edge_pairs <- paste(edges$from, edges$to, sep = "|")
+      reverse_pairs <- paste(edges$to, edges$from, sep = "|")
+      is_bidirectional <- edge_pairs %in% reverse_pairs
+      
+      # apply smooth curves to bidirectional edges (visNetwork expects list format)
+      edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
+        if (is_bidirectional[i]) {
+          list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
+        } else {
+          FALSE
+        }
+      }))
+      
+      # alternate curve direction for reverse edges
+      bidirectional_indices <- which(is_bidirectional)
+      for (i in bidirectional_indices) {
+        reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
+        if (length(reverse_idx) > 0) {
+          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
+        }
+      }
+    } else {
+      edges$smooth <- FALSE
+    }
+    
+    # internal edges always light gray and thick
+    internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
+    edges$color.color[internal_mask] <- "#D3D3D3"
+    edges$width[internal_mask] <- 18
+    edges$width[!internal_mask] <- 6
+    edges$label[internal_mask] <- ""
+    
+    # update edges via proxy
     visNetwork::visNetworkProxy("selectorGraph") %>%
+      visNetwork::visSetOptions(options = list(
+        edges = list(font = list(size = edge_font_size))
+      )) %>%
       visNetwork::visUpdateEdges(edges)
   }
-}, ignoreInit = TRUE)
+  
+  # update nodes via proxy
+  visNetwork::visNetworkProxy("selectorGraph") %>%
+    visNetwork::visUpdateNodes(nodes)
+})
 
 # update library dropdowns when assembly changes
 observeEvent(state$assembly, {
@@ -643,72 +654,6 @@ observeEvent(input$graphEdgeLibs, {
   }
 })
 
-# update edge colors and labels via proxy when edge metric/labels change
-observe({
-  edges <- current_graph_edges()
-  if (is.null(edges) || nrow(edges) == 0) return()
-  
-  metric <- if (!is.null(input$graphEdgeMetric)) input$graphEdgeMetric else "none"
-  show_labels <- if (!is.null(input$graphEdgeLabels)) input$graphEdgeLabels else FALSE
-  lib1 <- input$graphEdgeLib1
-  lib2 <- input$graphEdgeLib2
-  font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
-  edge_font_size <- font_size
-  
-  # compute colors
-  edge_colors <- compute_edge_colors(edges, metric, lib1, lib2)
-  if (length(edge_colors) == nrow(edges)) {
-    edges$color.color <- edge_colors
-  }
-  
-  # compute labels
-  edge_labels <- compute_edge_labels(edges, metric, show_labels, lib1, lib2)
-  if (length(edge_labels) == nrow(edges)) {
-    edges$label <- edge_labels
-  }
-  
-  # set edge font size (5x node font size)
-  edges$font.size <- edge_font_size
-  
-  # internal edges always light gray and thick
-  internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
-  edges$color.color[internal_mask] <- "#D3D3D3"
-  edges$width[internal_mask] <- 18
-  edges$width[!internal_mask] <- 6
-  edges$label[internal_mask] <- ""
-  
-  # update smooth curves for bidirectional edges when directed mode changes
-  directed <- if (!is.null(input$graphDirectedEdges)) input$graphDirectedEdges else FALSE
-  if (directed && nrow(edges) > 0) {
-    # detect bidirectional edges
-    edge_pairs <- paste(edges$from, edges$to, sep = "|")
-    reverse_pairs <- paste(edges$to, edges$from, sep = "|")
-    is_bidirectional <- edge_pairs %in% reverse_pairs
-    
-    # apply smooth curves to bidirectional edges (visNetwork expects list format)
-    edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
-      if (is_bidirectional[i]) {
-        list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
-      } else {
-        FALSE
-      }
-    }))
-    
-    # alternate curve direction for reverse edges
-    bidirectional_indices <- which(is_bidirectional)
-    for (i in bidirectional_indices) {
-      reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
-      if (length(reverse_idx) > 0) {
-        edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
-      }
-    }
-  } else {
-    edges$smooth <- FALSE
-  }
-  
-  visNetwork::visNetworkProxy("selectorGraph") %>%
-    visNetwork::visUpdateEdges(edges)
-})
 
 observeEvent(input$selectorGraphNodeSelect, {
   nodes <- input$selectorGraphNodeSelect
@@ -771,8 +716,8 @@ output$selectorHoverInfo <- renderUI({
   
   # show hovered node details (side-nodes have segment field)
   if (!is.null(node_hover) && node_hover != "") {
-    nodes <- current_graph_nodes()
-    edges <- current_graph_edges()
+    nodes <- base_graph_nodes()
+    edges <- base_graph_edges()
     
     # extract segment from side-node
     seg_id <- node_hover
@@ -819,7 +764,7 @@ output$selectorHoverInfo <- renderUI({
   
   # show hovered edge details
   if (!is.null(edge_hover) && edge_hover != "") {
-    edges <- current_graph_edges()
+    edges <- base_graph_edges()
     
     if (!is.null(edges) && nrow(edges) > 0 && "id" %in% names(edges)) {
       edge_idx <- which(!is.na(edges$id) & edges$id == edge_hover)

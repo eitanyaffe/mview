@@ -59,6 +59,7 @@ min_indel_length = 3) {
                      digest::digest(list(
                        aln_id = aln_id,
                        seg_key = seg_key,
+                       xlim = xlim,
                        height_style_str = height_style_str,
                        max_reads = max_reads,
                        clip_mode = clip_mode,
@@ -69,8 +70,7 @@ min_indel_length = 3) {
                        max_alignment_length = max_alignment_length,
                        max_margin = max_margin,
                        chunk_type = chunk_type,
-                       min_indel_length = min_indel_length,
-                       xlim = xlim
+                       min_indel_length = min_indel_length
                      ), algo = "md5"))
   
   # Use cache for the full query
@@ -215,16 +215,14 @@ align_profile_full <- function(profile, aln, gg) {
     # effective reverse in view coords: XOR of alignment reverse and segment minus
     effective_reverse <- xor(alignments$is_reverse, seg_is_minus)
     
-    # combine read soft-clipping with interval clipping flags
-    # clip_start/clip_end indicate if vstart/vend correspond to clipped positions
-    # for plus strand: clip_start means left was clipped, clip_end means right was clipped
-    # for minus strand: clip_start/clip_end are swapped to match vcoords
-    interval_clip_left <- ifelse(!effective_reverse, alignments$clip_start, alignments$clip_end)
-    interval_clip_right <- ifelse(!effective_reverse, alignments$clip_end, alignments$clip_start)
+    # determine if read is actually clipped (soft-clipped or interval-clipped)
+    alignments$clipped_left <- ifelse(!effective_reverse, clip_read_start, clip_read_end)
+    alignments$clipped_right <- ifelse(!effective_reverse, clip_read_end, clip_read_start)
     
-    # combine read soft-clipping and interval clipping
-    alignments$clipped_left <- (ifelse(!effective_reverse, clip_read_start, clip_read_end) | interval_clip_left) & left_in_plot
-    alignments$clipped_right <- (ifelse(!effective_reverse, clip_read_end, clip_read_start) | interval_clip_right) & right_in_plot
+    # only show clipping indicators if read is actually clipped AND edge is visible in view
+    # black vertical lines indicate alignment ends in middle of read, not just outside view
+    # alignments$clipped_left <- (read_clip_left | interval_clip_left) & left_in_plot
+    # alignments$clipped_right <- (read_clip_right | interval_clip_right) & right_in_plot
 
     # set colors based on color mode
     alignments$color <- get_alignment_colors(alignments, chunks, profile$full_style)
