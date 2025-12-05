@@ -129,13 +129,20 @@ organizer_tab_ui <- function() {
             ),
             column(3,
               numericInput("selectorNeighborDepth", "Neighbor depth:", 
-                         value = 1, min = 0, max = 3, step = 1)
+                         value = cache_get_if_exists("selector.neighbor_depth", 1), 
+                         min = 0, max = 3, step = 1)
             )
           )
         ),
         # edge controls
         wellPanel(style = "padding: 10px; margin-top: 10px;",
           fluidRow(
+            column(3,
+              selectInput("graphEdgeLibs", "edge libs:",
+                         choices = list(),
+                         selected = cache_get_if_exists("graph.edge_libs", "all"),
+                         width = "100%")
+            ),
             column(3,
               selectInput("graphEdgeMetric", "Edge metric:",
                          choices = c("none" = "none", "support" = "support", 
@@ -175,6 +182,7 @@ organizer_tab_ui <- function() {
               div(style = "margin-top: 8px; display: flex; align-items: center; gap: 10px;",
                 actionButton("selectorUpdateToView", "Current view", class = "btn btn-sm btn-primary"),
                 actionButton("selectorUpdateToZoom", "Current zoom", class = "btn btn-sm btn-default"),
+                actionButton("selectorAddNeighbors", "Add neighbors", class = "btn btn-sm btn-default"),
                 radioButtons("selectorAutoUpdate", "Automatic:",
                             choices = c("Off" = "off", "Track View" = "view", "Track Zoom" = "zoom"),
                             selected = "off", inline = TRUE)
@@ -204,10 +212,13 @@ organizer_tab_ui <- function() {
           actionButton("selectorGraphZoomIn", "+", class = "btn btn-sm btn-default"),
           actionButton("selectorGraphZoomOut", "−", class = "btn btn-sm btn-default"),
           tags$span("Label:", style = "margin-left: 10px;"),
-          selectInput("graphNodeLabel", "", choices = c("index" = "index", "id" = "id"), selected = "index", width = "80px"),
+          selectInput("graphNodeLabel", "", choices = c("index" = "index", "id" = "id"), 
+                     selected = cache_get_if_exists("graph.node_label", "index"), width = "80px"),
           tags$span("Font:", style = "margin-left: 10px;"),
-          selectInput("graphFontSize", "", choices = c("S" = "28", "M" = "38", "L" = "48", "XL" = "56"), selected = "38", width = "70px"),
-          checkboxInput("graphDirectedEdges", "Directed", value = FALSE)
+          selectInput("graphFontSize", "", choices = c("S" = "28", "M" = "38", "L" = "48", "XL" = "56"), 
+                     selected = cache_get_if_exists("graph.font_size", "38"), width = "70px"),
+          checkboxInput("graphDirectedEdges", "Directed", 
+                       value = cache_get_if_exists("graph.directed_edges", FALSE))
         ),
         # graph at bottom
         div(

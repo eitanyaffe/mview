@@ -59,15 +59,23 @@ computed_graph_segments <- reactive({
     return(base_segments)
   }
   
-  # expand neighbors iteratively
+  # get filter values for neighbor expansion
+  min_support_val <- min_support()
+  min_percent_val <- min_percent()
+  
+  # get edge library selection
+  edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+  if (edge_lib == "all") edge_lib <- NULL
+  
+  # expand neighbors iteratively along filtered edges only
   all_segments <- base_segments
   current_frontier <- base_segments
   
   for (i in seq_len(depth)) {
     new_neighbors <- character()
     for (seg_id in current_frontier) {
-      neighbors <- add_neighbors(seg_id)
-      if (!is.null(neighbors)) {
+      neighbors <- add_filtered_neighbors(seg_id, min_support_val, min_percent_val, lib = edge_lib)
+      if (!is.null(neighbors) && length(neighbors) > 0) {
         new_neighbors <- c(new_neighbors, neighbors)
       }
     }
@@ -93,6 +101,10 @@ observeEvent(input$selectorMinSupport, {
 observeEvent(input$selectorMinPercent, {
   min_percent(input$selectorMinPercent)
   cache_set("selector.min_percent", input$selectorMinPercent)
+})
+
+observeEvent(input$selectorNeighborDepth, {
+  cache_set("selector.neighbor_depth", input$selectorNeighborDepth)
 })
 
 #########################################################################
@@ -190,7 +202,6 @@ observeEvent(input$selectorRemoveBtn, {
 # select all graph nodes
 observeEvent(input$selectorSelectAllBtn, {
   all_segs <- computed_graph_segments()
-  # convert segment IDs to node IDs (both L and R)
   all_nodes <- c(paste0(all_segs, "_L"), paste0(all_segs, "_R"))
   selected_graph_segments(all_nodes)
 })
@@ -198,6 +209,24 @@ observeEvent(input$selectorSelectAllBtn, {
 # clear graph selection
 observeEvent(input$selectorClearSelectionBtn, {
   selected_graph_segments(character())
+})
+
+# add neighbors: expand graph to include neighbors of selected nodes
+observeEvent(input$selectorAddNeighbors, {
+  selected_nodes <- selected_graph_segments()
+  if (length(selected_nodes) == 0 || is.null(state$assembly)) return()
+  
+  edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+  if (edge_lib == "all") edge_lib <- NULL
+  neighbor_nodes <- find_neighbor_nodes(selected_nodes, state$assembly, 
+                                       min_support(), min_percent(), lib = edge_lib)
+  
+  if (length(neighbor_nodes) > 0) {
+    neighbor_seg_ids <- unique(sub("_[LR]$", "", neighbor_nodes))
+    current_base_segs <- graph_base_segments()
+    graph_base_segments(unique(c(current_base_segs, neighbor_seg_ids)))
+    selected_graph_segments(character())
+  }
 })
 
 #########################################################################
@@ -210,8 +239,12 @@ current_graph_edges <- reactiveVal(NULL)
 current_bin_segment_table <- reactiveVal(NULL)
 
 output$selectorGraph <- visNetwork::renderVisNetwork({
-  # only re-render when graph structure changes (color/label/font use proxy updates)
+  # dependencies: computed_graph_segments (which depends on input$graphEdgeLibs),
+  # selected_graph_segments, state$assembly, input$graphDirectedEdges, 
+  # input$graphEdgeLibs (read directly below), min_support(), min_percent()
   seg_ids <- computed_graph_segments()
+  selected_nodes <- selected_graph_segments()
+  
   if (length(seg_ids) == 0) {
     current_graph_nodes(NULL)
     current_graph_edges(NULL)
@@ -231,10 +264,14 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   nodes <- build_graph_nodes(seg_ids)
   
   # build edges (internal + inter-segment)
+  # reading input$graphEdgeLibs here establishes reactive dependency
   directed <- if (!is.null(input$graphDirectedEdges)) input$graphDirectedEdges else FALSE
+  edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+  if (edge_lib == "all") edge_lib <- NULL
   edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat, bin_segment_table,
-                            min_support(), min_percent(), directed = directed)
-  
+                            min_support(), min_percent(), directed = directed, lib = edge_lib)
+                            browser()
+  cat("#### edges: ", nrow(edges), "\n")
   # color nodes using central color system (use segment field for color lookup)
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
   seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
@@ -242,6 +279,14 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
                                    seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
+  nodes$borderWidth <- 1
+  
+  # apply selection highlighting during initial rendering
+  if (length(selected_nodes) > 0) {
+    selected_mask <- nodes$id %in% selected_nodes
+    nodes$color.border[selected_mask] <- "#C92A2A"
+    nodes$borderWidth[selected_mask] <- 3
+  }
   
   # set node labels based on label type
   label_type <- if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index"
@@ -282,8 +327,36 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
       edges$font.size <- edge_font_size
     }
     
-    edges$width <- ifelse(edges$..is_internal.., 24, 6)
+    edges$width <- ifelse(edges$..is_internal.., 18, 6)
     edges$length <- ifelse(edges$..is_internal.., 15, 200)
+    
+    # add smooth curves for bidirectional edges to avoid overlap
+    if (directed && nrow(edges) > 0) {
+      # detect bidirectional edges (where A->B and B->A both exist)
+      edge_pairs <- paste(edges$from, edges$to, sep = "|")
+      reverse_pairs <- paste(edges$to, edges$from, sep = "|")
+      is_bidirectional <- edge_pairs %in% reverse_pairs
+      
+      # apply smooth curves to bidirectional edges (visNetwork expects list format)
+      edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
+        if (is_bidirectional[i]) {
+          list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
+        } else {
+          FALSE
+        }
+      }))
+      
+      # alternate curve direction for reverse edges
+      bidirectional_indices <- which(is_bidirectional)
+      for (i in bidirectional_indices) {
+        reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
+        if (length(reverse_idx) > 0) {
+          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
+        }
+      }
+    } else {
+      edges$smooth <- FALSE
+    }
     
     # internal edges always light gray and thick
     internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
@@ -295,14 +368,30 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   current_graph_edges(edges)
   current_bin_segment_table(bin_segment_table)
   
+  # compute layout using igraph's Fruchterman-Reingold algorithm
+  if (nrow(edges) > 0 && requireNamespace("igraph", quietly = TRUE)) {
+    # create igraph graph from edges (use directed based on input setting)
+    g <- igraph::graph_from_data_frame(edges[, c("from", "to"), drop = FALSE], directed = directed, vertices = nodes)
+    
+    # compute Fruchterman-Reingold layout (force-directed)
+    # set seed for reproducible layout
+    set.seed(42)
+    layout <- igraph::layout_with_fr(g)
+    
+    # apply layout coordinates to nodes (scale and invert y for vis.js)
+    nodes$x <- layout[, 1] * 100
+    nodes$y <- -layout[, 2] * 100  # invert for vis.js
+  }
+  
   font_size <- if (!is.null(input$graphFontSize)) as.numeric(input$graphFontSize) else 38
+  nodes$font.color <- "black"
+  
   network <- visNetwork::visNetwork(nodes, edges) %>%
     visNetwork::visNodes(
       font = list(size = font_size, color = "black")
     ) %>%
-    visNetwork::visLayout(randomSeed = 42) %>%
     visNetwork::visPhysics(
-      stabilization = list(enabled = TRUE, iterations = 200)
+      enabled = FALSE
     ) %>%
     visNetwork::visInteraction(
       zoomView = FALSE,
@@ -363,14 +452,13 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   return(network)
 })
 
-# update node highlighting via proxy
+# update node highlighting via proxy when selection changes
 observeEvent(selected_graph_segments(), {
+  return()
   nodes <- current_graph_nodes()
   if (is.null(nodes) || nrow(nodes) == 0) return()
   
   selected_nodes <- selected_graph_segments()
-  
-  # color nodes using central color system (use segment field)
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
   seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
   names(seg_colors) <- nodes$segment
@@ -378,13 +466,15 @@ observeEvent(selected_graph_segments(), {
                                    seg_colors[nodes$segment], "#CCCCCC")
   nodes$color.border <- "#666666"
   nodes$borderWidth <- 1
-  nodes$font.color <- get_text_color_for_background(nodes$color.background)
+  nodes$font.color <- "black"
   
   if (length(selected_nodes) > 0) {
-    nodes$color.border <- ifelse(nodes$id %in% selected_nodes, "#C92A2A", nodes$color.border)
-    nodes$borderWidth <- ifelse(nodes$id %in% selected_nodes, 3, 1)
+    selected_mask <- nodes$id %in% selected_nodes
+    nodes$color.border[selected_mask] <- "#C92A2A"
+    nodes$borderWidth[selected_mask] <- 3
   }
   
+  current_graph_nodes(nodes)
   visNetwork::visNetworkProxy("selectorGraph") %>%
     visNetwork::visUpdateNodes(nodes)
 }, ignoreNULL = FALSE)
@@ -498,18 +588,59 @@ observeEvent(state$assembly, {
   
   if (length(lib_cols) > 0) {
     lib_choices <- setNames(lib_cols, lib_cols)
-    updateSelectInput(session, "graphEdgeLib1", choices = lib_choices, selected = NULL)
-    updateSelectInput(session, "graphEdgeLib2", choices = lib_choices, selected = NULL)
+    # restore cached library selections if they're still available
+    cached_lib1 <- cache_get_if_exists("graph.edge_lib1", NULL)
+    cached_lib2 <- cache_get_if_exists("graph.edge_lib2", NULL)
+    selected_lib1 <- if (!is.null(cached_lib1) && cached_lib1 %in% lib_cols) cached_lib1 else NULL
+    selected_lib2 <- if (!is.null(cached_lib2) && cached_lib2 %in% lib_cols) cached_lib2 else NULL
+    updateSelectInput(session, "graphEdgeLib1", choices = lib_choices, selected = selected_lib1)
+    updateSelectInput(session, "graphEdgeLib2", choices = lib_choices, selected = selected_lib2)
+    
+    # populate edge libs dropdown with "all" + each library
+    edge_libs_choices <- c("all" = "all", lib_choices)
+    cached_edge_libs <- cache_get_if_exists("graph.edge_libs", "all")
+    selected_edge_libs <- if (cached_edge_libs %in% names(edge_libs_choices)) cached_edge_libs else "all"
+    updateSelectInput(session, "graphEdgeLibs", choices = edge_libs_choices, selected = selected_edge_libs)
   }
 }, ignoreNULL = FALSE)
 
-# cache edge metric and labels
+# cache graph controls
 observeEvent(input$graphEdgeMetric, {
   cache_set("graph.edge_metric", input$graphEdgeMetric)
 })
 
 observeEvent(input$graphEdgeLabels, {
   cache_set("graph.edge_labels", input$graphEdgeLabels)
+})
+
+observeEvent(input$graphNodeLabel, {
+  cache_set("graph.node_label", input$graphNodeLabel)
+})
+
+observeEvent(input$graphFontSize, {
+  cache_set("graph.font_size", input$graphFontSize)
+})
+
+observeEvent(input$graphDirectedEdges, {
+  cache_set("graph.directed_edges", input$graphDirectedEdges)
+})
+
+observeEvent(input$graphEdgeLib1, {
+  if (!is.null(input$graphEdgeLib1) && input$graphEdgeLib1 != "") {
+    cache_set("graph.edge_lib1", input$graphEdgeLib1)
+  }
+})
+
+observeEvent(input$graphEdgeLib2, {
+  if (!is.null(input$graphEdgeLib2) && input$graphEdgeLib2 != "") {
+    cache_set("graph.edge_lib2", input$graphEdgeLib2)
+  }
+})
+
+observeEvent(input$graphEdgeLibs, {
+  if (!is.null(input$graphEdgeLibs) && input$graphEdgeLibs != "") {
+    cache_set("graph.edge_libs", input$graphEdgeLibs)
+  }
 })
 
 # update edge colors and labels via proxy when edge metric/labels change
@@ -542,9 +673,38 @@ observe({
   # internal edges always light gray and thick
   internal_mask <- !is.na(edges$..is_internal..) & edges$..is_internal..
   edges$color.color[internal_mask] <- "#D3D3D3"
-  edges$width[internal_mask] <- 24
+  edges$width[internal_mask] <- 18
   edges$width[!internal_mask] <- 6
   edges$label[internal_mask] <- ""
+  
+  # update smooth curves for bidirectional edges when directed mode changes
+  directed <- if (!is.null(input$graphDirectedEdges)) input$graphDirectedEdges else FALSE
+  if (directed && nrow(edges) > 0) {
+    # detect bidirectional edges
+    edge_pairs <- paste(edges$from, edges$to, sep = "|")
+    reverse_pairs <- paste(edges$to, edges$from, sep = "|")
+    is_bidirectional <- edge_pairs %in% reverse_pairs
+    
+    # apply smooth curves to bidirectional edges (visNetwork expects list format)
+    edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
+      if (is_bidirectional[i]) {
+        list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
+      } else {
+        FALSE
+      }
+    }))
+    
+    # alternate curve direction for reverse edges
+    bidirectional_indices <- which(is_bidirectional)
+    for (i in bidirectional_indices) {
+      reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
+      if (length(reverse_idx) > 0) {
+        edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
+      }
+    }
+  } else {
+    edges$smooth <- FALSE
+  }
   
   visNetwork::visNetworkProxy("selectorGraph") %>%
     visNetwork::visUpdateEdges(edges)

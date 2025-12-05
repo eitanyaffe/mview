@@ -22,7 +22,7 @@ color_to_grayscale <- function(hex_color) {
 # helper: compute segment degrees from filtered adjacency data
 #########################################################################
 
-compute_segment_degrees <- function(assembly, min_support_val, min_percent_val) {
+compute_segment_degrees <- function(assembly, min_support_val, min_percent_val, lib = NULL) {
   count_mat <- load_seg_adj_count(assembly)
   total_mat <- load_seg_adj_total(assembly)
   associated_mat <- load_seg_adj_associated(assembly)
@@ -35,7 +35,7 @@ compute_segment_degrees <- function(assembly, min_support_val, min_percent_val) 
     return(list())
   }
   
-  edge_metrics <- aggregate_edge_metrics(count_mat, count_mat, total_mat, associated_mat)
+  edge_metrics <- aggregate_edge_metrics(count_mat, count_mat, total_mat, associated_mat, lib = lib)
   if (is.null(edge_metrics) || nrow(edge_metrics) == 0) {
     return(list())
   }
@@ -95,7 +95,9 @@ observe({
   
   # register "degree" mapping
   if (!is.null(assembly)) {
-    degrees <- compute_segment_degrees(assembly, min_support_val, min_percent_val)
+    edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+    if (edge_lib == "all") edge_lib <- NULL
+    degrees <- compute_segment_degrees(assembly, min_support_val, min_percent_val, lib = edge_lib)
     degree_vec <- unlist(degrees)
     if (use_grayscale) {
       # create light-to-dark grayscale gradient based on degree

@@ -89,11 +89,117 @@ add_neighbors <- function(segment_id) {
   return(all_neighbors)
 }
 
+# finds neighbors connected by edges that pass min_support and min_percent filters
+add_filtered_neighbors <- function(segment_id, min_support_val, min_percent_val, lib = NULL) {
+  if (is.null(segment_id) || segment_id == "" || is.null(state$assembly)) {
+    return(NULL)
+  }
+  
+  count_mat <- load_seg_adj_count(state$assembly)
+  total_mat <- load_seg_adj_total(state$assembly)
+  associated_mat <- load_seg_adj_associated(state$assembly)
+  
+  if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
+    return(NULL)
+  }
+  
+  if (!"seg_src" %in% names(count_mat) || !"seg_tgt" %in% names(count_mat)) {
+    return(NULL)
+  }
+  
+  # find edges where segment is source or target (exclude self-loops)
+  edge_rows <- count_mat[(count_mat$seg_src == segment_id | count_mat$seg_tgt == segment_id) &
+                        count_mat$seg_src != count_mat$seg_tgt, ]
+  
+  if (nrow(edge_rows) == 0) {
+    return(NULL)
+  }
+  
+  # aggregate metrics for edges
+  em <- aggregate_edge_metrics(edge_rows, count_mat, total_mat, associated_mat, lib = lib)
+  if (is.null(em) || nrow(em) == 0) {
+    return(NULL)
+  }
+  
+  # apply filters
+  em <- em[em$support >= min_support_val & em$percent >= min_percent_val, ]
+  if (nrow(em) == 0) {
+    return(NULL)
+  }
+  
+  # extract neighbor segments (either src or tgt, excluding the current segment)
+  neighbors <- unique(c(em$seg_src[em$seg_src != segment_id], 
+                       em$seg_tgt[em$seg_tgt != segment_id]))
+  
+  return(neighbors)
+}
+
+# finds neighbor node IDs for selected node IDs, using adjacency matrices and filters
+# returns node IDs (with _L/_R suffixes) for neighbors that pass min_support and min_percent
+find_neighbor_nodes <- function(selected_node_ids, assembly, min_support_val, min_percent_val, lib = NULL) {
+  if (length(selected_node_ids) == 0) {
+    return(character())
+  }
+  
+  # extract segment IDs from node IDs (strips _L or _R suffix)
+  selected_seg_ids <- sub("_[LR]$", "", selected_node_ids)
+  selected_seg_ids <- unique(selected_seg_ids)
+  
+  if (length(selected_seg_ids) == 0) {
+    return(character())
+  }
+  
+  # load adjacency matrices
+  count_mat <- load_seg_adj_count(assembly)
+  total_mat <- load_seg_adj_total(assembly)
+  associated_mat <- load_seg_adj_associated(assembly)
+  
+  if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
+    return(character())
+  }
+  
+  # find all edges from selected segments in the adjacency matrix
+  edge_rows <- count_mat[count_mat$seg_src %in% selected_seg_ids | 
+                        count_mat$seg_tgt %in% selected_seg_ids, ]
+  
+  if (nrow(edge_rows) == 0) {
+    return(character())
+  }
+  
+  # aggregate metrics and filter by thresholds
+  em <- aggregate_edge_metrics(edge_rows, count_mat, total_mat, associated_mat, lib = lib)
+  if (is.null(em) || nrow(em) == 0) {
+    return(character())
+  }
+  
+  # filter by min_support and min_percent
+  filtered_em <- em[em$support >= min_support_val & em$percent >= min_percent_val, ]
+  if (nrow(filtered_em) == 0) {
+    return(character())
+  }
+  
+  # extract neighbor segments (either src or tgt, excluding selected segments)
+  neighbor_seg_ids <- unique(c(filtered_em$seg_src[!filtered_em$seg_src %in% selected_seg_ids],
+                               filtered_em$seg_tgt[!filtered_em$seg_tgt %in% selected_seg_ids]))
+  neighbor_seg_ids <- neighbor_seg_ids[!is.na(neighbor_seg_ids)]
+  
+  if (length(neighbor_seg_ids) == 0) {
+    return(character())
+  }
+  
+  # convert segment IDs to node IDs (both L and R for each neighbor segment)
+  neighbor_nodes <- c(paste0(neighbor_seg_ids, "_L"), paste0(neighbor_seg_ids, "_R"))
+  # remove any that are already selected
+  neighbor_nodes <- neighbor_nodes[!neighbor_nodes %in% selected_node_ids]
+  
+  return(neighbor_nodes)
+}
+
 #########################################################################
 # edge metrics aggregation
 #########################################################################
 
-aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_mat) {
+aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_mat, lib = NULL) {
   if (is.null(edge_rows) || nrow(edge_rows) == 0) {
     return(NULL)
   }
@@ -101,16 +207,36 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
   metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
                      "contig_src", "start_src", "end_src", 
                      "contig_tgt", "start_tgt", "end_tgt")
-  lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
+  all_lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
   key_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt")
   
+  # determine which library columns to use
+  if (is.null(lib) || lib == "" || lib == "all") {
+    lib_cols <- all_lib_cols
+  } else {
+    if (lib %in% all_lib_cols) {
+      lib_cols <- lib
+    } else {
+      lib_cols <- all_lib_cols
+    }
+  }
+  browser()
   # row sums per matrix limited to library columns
-  count_sums <- data.frame(count_mat[, key_cols], 
-                           support = rowSums(count_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
-  total_sums <- data.frame(total_mat[, key_cols], 
-                           total = rowSums(total_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
-  associated_sums <- data.frame(associated_mat[, key_cols], 
-                                total_associated = rowSums(associated_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+  if (length(lib_cols) == 1) {
+    count_sums <- data.frame(count_mat[, key_cols], 
+                             support = count_mat[, lib_cols])
+    total_sums <- data.frame(total_mat[, key_cols], 
+                             total = total_mat[, lib_cols])
+    associated_sums <- data.frame(associated_mat[, key_cols], 
+                                  total_associated = associated_mat[, lib_cols])
+  } else {
+    count_sums <- data.frame(count_mat[, key_cols], 
+                             support = rowSums(count_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+    total_sums <- data.frame(total_mat[, key_cols], 
+                             total = rowSums(total_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+    associated_sums <- data.frame(associated_mat[, key_cols], 
+                                  total_associated = rowSums(associated_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
+  }
   
   # merge with edge_rows
   result <- edge_rows[, key_cols]
@@ -163,7 +289,7 @@ normalize_side <- function(side) {
 }
 
 # creates internal edges (within segment) and inter-segment edges
-build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat, bin_segment_table, min_support_val, min_percent_val, directed = FALSE) {
+build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat, bin_segment_table, min_support_val, min_percent_val, directed = FALSE, lib = NULL) {
   empty_edges <- data.frame(from = character(), to = character(), stringsAsFactors = FALSE)
   
   if (length(segment_ids) == 0) {
@@ -200,7 +326,7 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
   }
   
   # aggregate metrics for all directed edges
-  em <- aggregate_edge_metrics(edge_rows, count_mat, total_mat, associated_mat)
+  em <- aggregate_edge_metrics(edge_rows, count_mat, total_mat, associated_mat, lib = lib)
   if (is.null(em) || nrow(em) == 0) {
     return(internal_edges)
   }
@@ -416,20 +542,15 @@ compute_edge_colors <- function(edges, metric, lib1 = NULL, lib2 = NULL) {
       pct1[is.na(pct1)] <- 0
       pct2[is.na(pct2)] <- 0
       
-      # compute log2 change, handling zeros and infinity
-      log2_change <- numeric(length(pct1))
-      for (i in seq_along(pct1)) {
-        if (pct1[i] > 0 && pct2[i] > 0) {
-          log2_change[i] <- log2(pct2[i] / pct1[i])
-          # check for infinity or NaN (can happen with very small/large ratios)
-          if (!is.finite(log2_change[i])) {
-            log2_change[i] <- 0  # use gray for infinity/NaN
-          }
-        } else {
-          # if either is zero, use gray (0) instead of saturating
-          log2_change[i] <- 0
-        }
-      }
+      # add pseudo 1% to both before change calc to track changes with zeros
+      pct1 <- pct1 + 1
+      pct2 <- pct2 + 1
+      
+      # compute log2 change
+      log2_change <- log2(pct2 / pct1)
+      
+      # check for infinity or NaN (can happen with very small/large ratios)
+      log2_change[!is.finite(log2_change)] <- 0
       
       # clamp to [-2, 2], but preserve 0 for gray
       log2_change[log2_change > 2] <- 2
@@ -490,14 +611,15 @@ compute_edge_labels <- function(edges, metric, show_labels, lib1 = NULL, lib2 = 
       pct1[is.na(pct1)] <- 0
       pct2[is.na(pct2)] <- 0
       
-      log2_change <- numeric(length(pct1))
-      for (i in seq_along(pct1)) {
-        if (pct1[i] > 0 && pct2[i] > 0) {
-          log2_change[i] <- log2(pct2[i] / pct1[i])
-        } else {
-          log2_change[i] <- 0
-        }
-      }
+      # add pseudo 1% to both before change calc to track changes with zeros
+      pct1 <- pct1 + 1
+      pct2 <- pct2 + 1
+      
+      # compute log2 change
+      log2_change <- log2(pct2 / pct1)
+      
+      # check for infinity or NaN
+      log2_change[!is.finite(log2_change)] <- 0
       
       # clamp to [-2, 2] for display
       log2_change[log2_change > 2] <- 2

@@ -5,6 +5,9 @@
 selected_graph_segments <- reactiveVal(character())
 selected_graph_edge <- reactiveVal(NULL)
 
+# trigger to force graph re-render when selection changes
+graph_selection_trigger <- reactiveVal(0)
+
 # hover state
 hovered_node <- reactiveVal(NULL)
 hovered_edge <- reactiveVal(NULL)

@@ -23,6 +23,25 @@ set_tab_panel_f(function() {
     fluidRow(
       column(12,
         div(
+          style = "padding: 10px; margin-bottom: 5px;",
+          fluidRow(
+            column(3,
+              selectInput("alignment_profile_select", "Profile:", choices = NULL, width = "100%")
+            ),
+            column(8,
+              textInput("alignment_read_id_input", "Read ID:", value = "", width = "100%", placeholder = "Enter read ID")
+            ),
+            column(1,
+              br(),
+              actionButton("alignment_clear_btn", "Clear", style = "margin-top: 5px;")
+            )
+          )
+        )
+      )
+    ),
+    fluidRow(
+      column(12,
+        div(
           style = "background-color: #f5f5f5; padding: 10px; margin-bottom: 5px; border-radius: 4px; border: 1px solid #ddd;",
           uiOutput("alignmentReadInfo")
         )
@@ -94,26 +113,64 @@ output$alignmentReadInfo <- renderUI({
   )
 })
 
-# ---- Plotly Click Event Handler ----
+# ---- Profile Dropdown Updater ----
 
-# handle plotly click events from the combined plot to display alignment details
-observeEvent(eventExpr = plotly::event_data("plotly_click"), {
-  event_data <- plotly::event_data("plotly_click")
-  req(event_data)
-  req(event_data$key)
+# helper to get session object
+get_session <- function() {
+  if (exists("session", envir = parent.frame())) {
+    return(get("session", envir = parent.frame()))
+  }
+  return(NULL)
+}
+
+# update profile dropdown choices based on available alignment objects
+observe({
+  aln_list <- cache_get_if_exists("aln_obj", list())
+  session <- get_session()
   
-  # parse composite key: "profile_id:read_id"
-  click_key <- event_data$key[[1]]
-  key_parts <- strsplit(click_key, ":", fixed = TRUE)[[1]]
-  if (length(key_parts) < 2) {
-    cat(sprintf("invalid click key format: %s\n", click_key))
+  if (is.null(aln_list) || !is.list(aln_list) || length(aln_list) == 0) {
+    if (!is.null(session)) {
+      updateSelectInput(session, "alignment_profile_select", choices = list("(none)" = ""), selected = "")
+    }
     return()
   }
-  profile_id <- key_parts[1]
-  read_id <- paste(key_parts[-1], collapse = ":")  # handle read_ids with colons
+  
+  profile_ids <- names(aln_list)
+  if (length(profile_ids) == 0) {
+    if (!is.null(session)) {
+      updateSelectInput(session, "alignment_profile_select", choices = list("(none)" = ""), selected = "")
+    }
+    return()
+  }
+  
+  choices <- setNames(profile_ids, profile_ids)
+  current_selection <- input$alignment_profile_select
+  
+  # if current selection is not in choices, use first available
+  if (is.null(current_selection) || !is.element(current_selection, profile_ids)) {
+    current_selection <- profile_ids[1]
+  }
+  
+  if (!is.null(session)) {
+    updateSelectInput(session, "alignment_profile_select", choices = choices, selected = current_selection)
+  }
+})
+
+# ---- Helper Function to Load Read ----
+
+# shared function to load read data from profile and read_id
+load_read_from_profile <- function(profile_id, read_id) {
+  if (is.null(profile_id) || profile_id == "" || is.null(read_id) || read_id == "") {
+    state$clicked_read_data <- NULL
+    state$clicked_profile_id <- NULL
+    cache_set("selected_read_id", NULL)
+    current_val <- refresh_trigger()
+    refresh_trigger(current_val + 1)
+    return()
+  }
   
   # get alignment list and look up by profile id
-  aln_list <- cache_get("aln_obj")
+  aln_list <- cache_get_if_exists("aln_obj", list())
   if (is.null(aln_list) || !is.list(aln_list)) {
     return()
   }
@@ -124,7 +181,7 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
     return()
   }
   
-  cat(sprintf("clicked profile: %s, read_id: %s\n", profile_id, read_id))
+  cat(sprintf("loading read from profile: %s, read_id: %s\n", profile_id, read_id))
   
   result <- tryCatch({
     aln_alignments_from_read_id(aln, read_id)
@@ -148,6 +205,81 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
     current_val <- refresh_trigger()
     refresh_trigger(current_val + 1)
   }
+}
+
+# ---- Text Input Observer ----
+
+# handle text input changes for read_id
+observeEvent(input$alignment_read_id_input, {
+  profile_id <- input$alignment_profile_select
+  read_id <- input$alignment_read_id_input
+  
+  # only process if both profile and read_id are provided
+  if (is.null(profile_id) || profile_id == "" || is.null(read_id) || read_id == "") {
+    return()
+  }
+  
+  load_read_from_profile(profile_id, read_id)
+}, ignoreInit = TRUE)
+
+# ---- Profile Selection Observer ----
+
+# handle profile dropdown changes
+observeEvent(input$alignment_profile_select, {
+  profile_id <- input$alignment_profile_select
+  read_id <- input$alignment_read_id_input
+  
+  # only process if both profile and read_id are provided
+  if (is.null(profile_id) || profile_id == "" || is.null(read_id) || read_id == "") {
+    return()
+  }
+  
+  load_read_from_profile(profile_id, read_id)
+}, ignoreInit = TRUE)
+
+# ---- Clear Button Observer ----
+
+# handle clear button click
+observeEvent(input$alignment_clear_btn, {
+  session <- get_session()
+  if (!is.null(session)) {
+    updateTextInput(session, "alignment_read_id_input", value = "")
+  }
+  state$clicked_read_data <- NULL
+  state$clicked_profile_id <- NULL
+  cache_set("selected_read_id", NULL)
+  # trigger profile refresh to clear highlighting
+  current_val <- refresh_trigger()
+  refresh_trigger(current_val + 1)
+})
+
+# ---- Plotly Click Event Handler ----
+
+# handle plotly click events from the combined plot to display alignment details
+observeEvent(eventExpr = plotly::event_data("plotly_click"), {
+  event_data <- plotly::event_data("plotly_click")
+  req(event_data)
+  req(event_data$key)
+  
+  # parse composite key: "profile_id:read_id"
+  click_key <- event_data$key[[1]]
+  key_parts <- strsplit(click_key, ":", fixed = TRUE)[[1]]
+  if (length(key_parts) < 2) {
+    cat(sprintf("invalid click key format: %s\n", click_key))
+    return()
+  }
+  profile_id <- key_parts[1]
+  read_id <- paste(key_parts[-1], collapse = ":")  # handle read_ids with colons
+  
+  # update UI inputs to reflect clicked read
+  session <- get_session()
+  if (!is.null(session)) {
+    updateSelectInput(session, "alignment_profile_select", selected = profile_id)
+    updateTextInput(session, "alignment_read_id_input", value = read_id)
+  }
+  
+  # load the read data
+  load_read_from_profile(profile_id, read_id)
 })
 
 # ---- Alignment Plot Renderer ----

@@ -205,6 +205,35 @@ interval_profile(
 )
 
 ########################################################
+# binning segment table interval profile
+########################################################
+
+interval_profile(
+  id = "binning_segment_table",
+  name = "New Segments",
+  intervals_f = function(assembly) {
+    seg_table <- get_data("BINNING_SEGMENT_TABLE_NEW", tag = assembly, null.on.missing = TRUE)
+    
+    if (is.null(seg_table)) {
+      return(NULL)
+    }
+    seg_table$desc <- paste0("Segment: ", seg_table$segment)
+    seg_table$id <- seg_table$segment
+    return(seg_table)
+  },
+  color_f = function(ids) {
+    # sort IDs to ensure consistent ordering for alternating pattern
+    sorted_ids <- sort(ids)
+    # alternate between light and gray in a two-way pattern
+    colors <- ifelse(seq_along(sorted_ids) %% 2 == 0, "#E8E8E8", "#CCCCCC")
+    names(colors) <- sorted_ids
+    colors[ids]
+  },
+  merge_adjacent = FALSE,
+  height = 60
+)
+
+########################################################
 # variants profile
 ########################################################
 

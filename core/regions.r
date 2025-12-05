@@ -200,12 +200,10 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       # save region table with versioning
       save_region_table <- function(filename) {
-        cat("=== SAVE_REGION_TABLE: START ===\n")
         regions_dir <- ensure_regions_dir()
         file_path <- file.path(regions_dir, filename)
         
         rt <- region_table()
-        cat("saving ", nrow(rt), " rows to ", filename, "\n", sep = "")
         
         # create backup version if file exists
         if (file.exists(file_path)) {
@@ -218,7 +216,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         }
         
         write.table(rt, file_path, sep = "\t", row.names = FALSE, quote = FALSE)
-        cat("=== SAVE_REGION_TABLE: END ===\n\n")
         shiny::showNotification(paste("regions table saved to", filename), type = "message")
       }
 
@@ -236,7 +233,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         
         # Check if this is old format (has "contigs" column)
         if ("contigs" %in% colnames(df)) {
-          cat("[LOAD] detected legacy format, converting...\n")
           df <- load_legacy_region_table(file_path, regions_dir)
           if (is.null(df)) {
             stop("failed to convert legacy region file")
@@ -248,8 +244,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         if (!all(required_cols %in% colnames(df))) {
           stop(paste("region file missing required columns:", paste(setdiff(required_cols, colnames(df)), collapse = ", ")))
         }
-        
-        cat("[LOAD] file=", filename, " rows=", nrow(df), "\n", sep = "")
         
         region_table(df)
         set_current_regions_file(filename)
@@ -749,11 +743,6 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         xlim_start <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[1]
         xlim_end <- if (is.null(current_app_state$zoom)) NA else current_app_state$zoom[2]
         
-        cat("[SAVE] id=", custom_id, " assembly=", current_app_state$assembly %||% "NULL", 
-            " segments=", if (segment_ids == "") "EMPTY" else segment_ids, 
-            " xlim=", if (is.null(current_app_state$zoom)) "NULL" else paste(current_app_state$zoom, collapse = "-"),
-            " seg_count=", if (is.null(current_segments) || nrow(current_segments) == 0) "0" else nrow(current_segments), "\n", sep = "")
-        
         new_row <- data.frame(
           id = custom_id,
           level = level,
@@ -894,21 +883,12 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
 
       # goto region (with undo functionality)
       goto_region <- function(region_row) {
-        cat("=== GOTO REGION: START ===\n")
-        cat("input: id=", region_row$id, " segments=", region_row$segments, 
-            " xlim=", region_row$xlim_start, "-", region_row$xlim_end, 
-            " assembly=", region_row$assembly, "\n", sep = "")
-        
         # push current region to undo stack
         current_state <- list(
           segments = main_state_rv$segments,
           zoom = main_state_rv$zoom,
           assembly = main_state_rv$assembly
         )
-        
-        cat("current state: assembly=", current_state$assembly %||% "NULL", 
-            " segs=", if (is.null(current_state$segments) || nrow(current_state$segments) == 0) "0" else nrow(current_state$segments),
-            " zoom=", if (is.null(current_state$zoom)) "NULL" else paste(current_state$zoom, collapse = "-"), "\n", sep = "")
         
         current_undo <- undo_stack()
         current_undo[[length(current_undo) + 1]] <- current_state
@@ -922,10 +902,11 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           segment_ids <- trimws(strsplit(region_row$segments, ",")[[1]])
           all_segments <- get_segments(main_state_rv$assembly)
           selected_segments <- all_segments[all_segments$segment %in% segment_ids, ]
-          cat("selected_segments: ", nrow(selected_segments), " rows\n", sep = "")
+          # preserve order from saved segment_ids
+          seg_order <- match(selected_segments$segment, segment_ids)
+          selected_segments <- selected_segments[order(seg_order), ]
           main_state_rv$segments <- selected_segments
         } else {
-          cat("segments is empty, setting empty segments\n")
           main_state_rv$segments <- data.frame(segment = character(), contig = character(), 
                                                 start = integer(), end = integer(), stringsAsFactors = FALSE)
         }
@@ -933,16 +914,9 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         # apply xlim
         if (!is.na(region_row$xlim_start) && !is.na(region_row$xlim_end)) {
           main_state_rv$zoom <- c(region_row$xlim_start, region_row$xlim_end)
-          cat("setting xlim=", region_row$xlim_start, "-", region_row$xlim_end, "\n", sep = "")
         } else {
-          cat("xlim is NA, setting zoom=NULL\n")
           main_state_rv$zoom <- NULL
         }
-        
-        cat("final state: assembly=", main_state_rv$assembly %||% "NULL",
-            " segs=", if (is.null(main_state_rv$segments) || nrow(main_state_rv$segments) == 0) "0" else nrow(main_state_rv$segments),
-            " zoom=", if (is.null(main_state_rv$zoom)) "NULL" else paste(main_state_rv$zoom, collapse = "-"), "\n", sep = "")
-        cat("=== GOTO REGION: END ===\n\n")
         
         shiny::showNotification(paste("navigated to region:", region_row$description), type = "message")
       }
