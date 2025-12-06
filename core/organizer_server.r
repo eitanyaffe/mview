@@ -127,20 +127,6 @@ get_text_color <- function(hex_color) {
   if (luminance > 0.5) "black" else "white"
 }
 
-# convert hex color to grayscale
-color_to_grayscale <- function(hex_color) {
-  hex_color <- gsub("^#", "", hex_color)
-  if (nchar(hex_color) != 6) return("#888888")
-  
-  r <- strtoi(substr(hex_color, 1, 2), base = 16)
-  g <- strtoi(substr(hex_color, 3, 4), base = 16)
-  b <- strtoi(substr(hex_color, 5, 6), base = 16)
-  
-  gray <- round(0.299 * r + 0.587 * g + 0.114 * b)
-  gray_hex <- sprintf("#%02X%02X%02X", gray, gray, gray)
-  return(gray_hex)
-}
-
 # build segment list item
 build_selector_item <- function(seg_id, strand, seg_table, bin_segment_table, seg_color = NULL, index = NULL) {
   seg_with_strand <- paste0(seg_id, strand)
@@ -481,9 +467,8 @@ output$selectorOrganizerButtons <- renderUI({
 
 output$selectorSegmentListUI <- renderUI({
   seq_df <- get_sequence_segments()
-  # trigger re-render when color scheme or grayscale checkbox changes
+  # trigger re-render when color scheme changes
   input$segmentColorScheme
-  input$segmentGrayscale
   
   # filter out removed segments for display
   display_df <- seq_df[!seq_df$removed, , drop = FALSE]

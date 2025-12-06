@@ -346,7 +346,7 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
       # apply smooth curves to bidirectional edges (visNetwork expects list format)
       edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
         if (is_bidirectional[i]) {
-          list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
+          list(enabled = TRUE, type = "curvedCW", roundness = 0.3)
         } else {
           FALSE
         }
@@ -357,7 +357,7 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
       for (i in bidirectional_indices) {
         reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
         if (length(reverse_idx) > 0) {
-          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
+          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.3)
         }
       }
     } else {
@@ -458,7 +458,6 @@ observe({
   # watch all visual inputs
   selected_nodes <- selected_graph_segments()
   scheme_val <- input$segmentColorScheme
-  grayscale_val <- input$segmentGrayscale
   label_type <- input$graphNodeLabel
   font_size <- input$graphFontSize
   metric <- input$graphEdgeMetric
@@ -547,7 +546,7 @@ observe({
       # apply smooth curves to bidirectional edges (visNetwork expects list format)
       edges$smooth <- I(lapply(seq_len(nrow(edges)), function(i) {
         if (is_bidirectional[i]) {
-          list(enabled = TRUE, type = "curvedCW", roundness = 0.1)
+          list(enabled = TRUE, type = "curvedCW", roundness = 0.3)
         } else {
           FALSE
         }
@@ -558,7 +557,7 @@ observe({
       for (i in bidirectional_indices) {
         reverse_idx <- which(edges$from == edges$to[i] & edges$to == edges$from[i])
         if (length(reverse_idx) > 0) {
-          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.1)
+          edges$smooth[[reverse_idx[1]]] <- list(enabled = TRUE, type = "curvedCCW", roundness = 0.3)
         }
       }
     } else {
