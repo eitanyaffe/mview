@@ -148,13 +148,72 @@ register_seg_bins_f(function(assembly) {
 # Register segment color schemes
 register_segment_colors(list(bin = "bin_color"))
 
-# Register seg_adj function (segment adjacency matrices)
+# Register seg_adj function (segment adjacency matrices, normalize to generic src/tgt)
 register_seg_adj_f(function(assembly) {
-  list(
-    count = get_data("BINNING_SEG_ADJ_count", tag = assembly, null.on.missing = TRUE),
-    total = get_data("BINNING_SEG_ADJ_total_read_count", tag = assembly, null.on.missing = TRUE),
-    associated = get_data("BINNING_SEG_ADJ_associated_read_count", tag = assembly, null.on.missing = TRUE)
+  count_mat <- get_data("BINNING_SEG_ADJ_count", tag = assembly, null.on.missing = TRUE)
+  total_mat <- get_data("BINNING_SEG_ADJ_total_read_count", tag = assembly, null.on.missing = TRUE)
+  assoc_mat <- get_data("BINNING_SEG_ADJ_associated_read_count", tag = assembly, null.on.missing = TRUE)
+  
+  # normalize column names to generic src/tgt
+  if (!is.null(count_mat)) {
+    names(count_mat)[names(count_mat) == "seg_src"] <- "src"
+    names(count_mat)[names(count_mat) == "seg_tgt"] <- "tgt"
+  }
+  if (!is.null(total_mat)) {
+    names(total_mat)[names(total_mat) == "seg_src"] <- "src"
+    names(total_mat)[names(total_mat) == "seg_tgt"] <- "tgt"
+  }
+  if (!is.null(assoc_mat)) {
+    names(assoc_mat)[names(assoc_mat) == "seg_src"] <- "src"
+    names(assoc_mat)[names(assoc_mat) == "seg_tgt"] <- "tgt"
+  }
+  
+  list(count = count_mat, total = total_mat, associated = assoc_mat)
+})
+
+# register csegments function (keep csegment column names)
+register_csegments_f(function(assembly = NULL) {
+  df <- get_data("BINNING_CSEG_TABLE", null.on.missing = TRUE)
+  map <- get_data("BINNING_CSEG_MAP", null.on.missing = TRUE)
+  map  = map[map$assembly == assembly, ]
+  df = df[is.element(df$cseg, map$csegment), ]
+  
+  if (is.null(df)) return(NULL)
+  data.frame(
+    csegment = df$cseg,
+    seg_cluster = df$seg_cluster,
+    count = df$count,
+    length = df$length,
+    stringsAsFactors = FALSE
   )
+})
+
+# register cluster mapping function
+register_cluster_mapping_f(function(assembly = NULL) {
+  get_data("BINNING_ASS_CLUSTER_MAPPING", tag = assembly, null.on.missing = TRUE)
+})
+
+# register cseg adjacency function (normalize to generic src/tgt)
+register_cseg_adj_f(function(assembly) {
+  count_mat <- get_data("BINNING_CSEG_ADJ_count", tag = assembly, null.on.missing = TRUE)
+  total_mat <- get_data("BINNING_CSEG_ADJ_total_read_count", tag = assembly, null.on.missing = TRUE)
+  assoc_mat <- get_data("BINNING_CSEG_ADJ_associated_read_count", tag = assembly, null.on.missing = TRUE)
+  
+  # normalize column names to generic src/tgt
+  if (!is.null(count_mat)) {
+    names(count_mat)[names(count_mat) == "cluster_src"] <- "src"
+    names(count_mat)[names(count_mat) == "cluster_tgt"] <- "tgt"
+  }
+  if (!is.null(total_mat)) {
+    names(total_mat)[names(total_mat) == "cluster_src"] <- "src"
+    names(total_mat)[names(total_mat) == "cluster_tgt"] <- "tgt"
+  }
+  if (!is.null(assoc_mat)) {
+    names(assoc_mat)[names(assoc_mat) == "cluster_src"] <- "src"
+    names(assoc_mat)[names(assoc_mat) == "cluster_tgt"] <- "tgt"
+  }
+  
+  list(count = count_mat, total = total_mat, associated = assoc_mat)
 })
 
 ########################################################

@@ -42,6 +42,17 @@ output$mainTabsPanel <- renderUI({
         actionButton("removeSegmentsFromListBtn", "remove"),
         actionButton("clearSegmentSelectionBtn", "clear selection"),
         DTOutput("segmentTable")
+      ),
+      tabPanel(
+        "Csegments",
+        p("Csegments are clusters of segments. Operations work on member segments."),
+        checkboxInput("allowMultipleCsegmentsChk", "allow multiple", 
+                      value = cache_get_if_exists("allow_multiple_csegments", FALSE)),
+        actionButton("gotoCsegmentsBtn", "goto"),
+        actionButton("addCsegmentsBtn", "add"),
+        actionButton("removeCsegmentsFromListBtn", "remove"),
+        actionButton("clearCsegmentSelectionBtn", "clear selection"),
+        DTOutput("csegmentTable")
       )
     )
   )

@@ -78,6 +78,42 @@ output$segmentTable <- renderDT({
     )
 })
 
+output$csegmentTable <- renderDT({
+  cseg_table <- get_csegments(state$assembly)
+  mapping <- get_cluster_mapping(state$assembly)
+  
+  if (is.null(cseg_table)) {
+    return(datatable(
+      data.frame(Message = "No csegment data available"),
+      options = list(dom = "t"),
+      rownames = FALSE,
+      selection = "none"
+    ))
+  }
+  
+  # add segments column
+  if (!is.null(mapping)) {
+    mapping_split <- split(mapping$segment, mapping$csegment)
+    cseg_table$segments <- sapply(cseg_table$csegment, function(cs) {
+      segs <- mapping_split[[as.character(cs)]]
+      if (is.null(segs)) "" else paste(segs, collapse = ", ")
+    })
+  } else {
+    cseg_table$segments <- ""
+  }
+  
+  index <- which(names(cseg_table) == "csegment")
+  enable_highlighting <- if (is.null(input$enable_contig_highlighting)) TRUE else input$enable_contig_highlighting
+  selection_mode <- if (!is.null(input$allowMultipleCsegmentsChk) && !input$allowMultipleCsegmentsChk) "single" else "multiple"
+  
+  datatable(
+    cseg_table,
+    rownames = FALSE,
+    selection = list(mode = selection_mode, target = "row"),
+    options = get.highlight.options(character(), index, enable_highlighting)
+  )
+})
+
 output$mapTable <- renderDT({
     dat <- get_segment_map(state$assembly)
     index <- which(names(dat) == "segment")

@@ -315,7 +315,7 @@ observeEvent(input$selectorResetBtn, {
   state_order <- if (!is.null(state_segs) && nrow(state_segs) > 0) state_segs$segment else character()
   
   # get colors for all segments (use state$segments order for consistency with graph)
-  seg_colors <- get_segment_colors(display_df$segment, state$assembly, state_order)
+  seg_colors <- get_segment_colors(display_df$segment)
   
   list_items <- lapply(seq_len(nrow(display_df)), function(i) {
     seg_id <- display_df$segment[i]
@@ -369,7 +369,7 @@ observeEvent(input$selectorRemoveSegments, {
   state_order <- if (!is.null(state_segs) && nrow(state_segs) > 0) state_segs$segment else character()
   
   # get colors for all segments (use state$segments order for consistency with graph)
-  seg_colors <- get_segment_colors(display_df$segment, state$assembly, state_order)
+  seg_colors <- get_segment_colors(display_df$segment)
   
   list_items <- lapply(seq_len(nrow(display_df)), function(i) {
     seg_id <- display_df$segment[i]
@@ -400,7 +400,7 @@ observeEvent(input$selectorFlipBtn, {
   state_order <- if (!is.null(state_segs) && nrow(state_segs) > 0) state_segs$segment else character()
   
   # get colors for all segments (use state$segments order for consistency with graph)
-  seg_colors <- get_segment_colors(display_df$segment, state$assembly, state_order)
+  seg_colors <- get_segment_colors(display_df$segment)
   
   list_items <- lapply(seq_len(nrow(display_df)), function(i) {
     seg_id <- display_df$segment[i]
@@ -441,7 +441,7 @@ observeEvent(input$selectorShowOnly, {
   state_order <- if (!is.null(state_segs) && nrow(state_segs) > 0) state_segs$segment else character()
   
   # get colors for all segments (use state$segments order for consistency with graph)
-  seg_colors <- get_segment_colors(display_df$segment, state$assembly, state_order)
+  seg_colors <- get_segment_colors(display_df$segment)
   
   list_items <- lapply(seq_len(nrow(display_df)), function(i) {
     seg_id <- display_df$segment[i]
@@ -488,7 +488,7 @@ output$selectorSegmentListUI <- renderUI({
   state_order <- if (!is.null(state_segs) && nrow(state_segs) > 0) state_segs$segment else character()
   
   # get colors for all segments (use state$segments order for consistency with graph)
-  seg_colors <- get_segment_colors(display_df$segment, state$assembly, state_order)
+  seg_colors <- get_segment_colors(display_df$segment)
   
   list_items <- lapply(seq_len(nrow(display_df)), function(i) {
     seg_id <- display_df$segment[i]

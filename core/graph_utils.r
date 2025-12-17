@@ -57,6 +57,42 @@ load_seg_adj_associated <- function(assembly) {
   adj$associated
 }
 
+# registered function: register_csegments_f
+load_csegment_table <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  get_csegments(assembly)
+}
+
+# registered function: register_cseg_adj_f
+load_cseg_adj_count <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  adj <- get_cseg_adj(assembly)
+  if (is.null(adj)) return(NULL)
+  adj$count
+}
+
+# registered function: register_cseg_adj_f
+load_cseg_adj_total <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  adj <- get_cseg_adj(assembly)
+  if (is.null(adj)) return(NULL)
+  adj$total
+}
+
+# registered function: register_cseg_adj_f
+load_cseg_adj_associated <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  adj <- get_cseg_adj(assembly)
+  if (is.null(adj)) return(NULL)
+  adj$associated
+}
+
+# registered function: register_cluster_mapping_f
+load_cluster_mapping <- function(assembly) {
+  if (is.null(assembly)) return(NULL)
+  get_cluster_mapping(assembly)
+}
+
 #########################################################################
 # neighbor lookup
 #########################################################################
@@ -71,17 +107,17 @@ add_neighbors <- function(segment_id) {
     return(NULL)
   }
   
-  if (!"seg_src" %in% names(count_mat) || !"seg_tgt" %in% names(count_mat)) {
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
     return(NULL)
   }
   
   # find neighbors where segment is source
-  neighbors_src <- count_mat[count_mat$seg_src == segment_id, ]
-  neighbors_from_src <- unique(neighbors_src$seg_tgt)
+  neighbors_src <- count_mat[count_mat$src == segment_id, ]
+  neighbors_from_src <- unique(neighbors_src$tgt)
   
   # find neighbors where segment is target
-  neighbors_tgt <- count_mat[count_mat$seg_tgt == segment_id, ]
-  neighbors_from_tgt <- unique(neighbors_tgt$seg_src)
+  neighbors_tgt <- count_mat[count_mat$tgt == segment_id, ]
+  neighbors_from_tgt <- unique(neighbors_tgt$src)
   
   # combine all neighbors
   all_neighbors <- unique(c(neighbors_from_src, neighbors_from_tgt))
@@ -95,21 +131,29 @@ add_filtered_neighbors <- function(segment_id, min_support_val, min_percent_val,
     return(NULL)
   }
   
-  count_mat <- load_seg_adj_count(state$assembly)
-  total_mat <- load_seg_adj_total(state$assembly)
-  associated_mat <- load_seg_adj_associated(state$assembly)
+  # mode-aware loading
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    count_mat <- load_cseg_adj_count(state$assembly)
+    total_mat <- load_cseg_adj_total(state$assembly)
+    associated_mat <- load_cseg_adj_associated(state$assembly)
+  } else {
+    count_mat <- load_seg_adj_count(state$assembly)
+    total_mat <- load_seg_adj_total(state$assembly)
+    associated_mat <- load_seg_adj_associated(state$assembly)
+  }
   
   if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
     return(NULL)
   }
   
-  if (!"seg_src" %in% names(count_mat) || !"seg_tgt" %in% names(count_mat)) {
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
     return(NULL)
   }
   
   # find edges where segment is source or target (exclude self-loops)
-  edge_rows <- count_mat[(count_mat$seg_src == segment_id | count_mat$seg_tgt == segment_id) &
-                        count_mat$seg_src != count_mat$seg_tgt, ]
+  edge_rows <- count_mat[(count_mat$src == segment_id | count_mat$tgt == segment_id) &
+                        count_mat$src != count_mat$tgt, ]
   
   if (nrow(edge_rows) == 0) {
     return(NULL)
@@ -128,8 +172,8 @@ add_filtered_neighbors <- function(segment_id, min_support_val, min_percent_val,
   }
   
   # extract neighbor segments (either src or tgt, excluding the current segment)
-  neighbors <- unique(c(em$seg_src[em$seg_src != segment_id], 
-                       em$seg_tgt[em$seg_tgt != segment_id]))
+  neighbors <- unique(c(em$src[em$src != segment_id], 
+                       em$tgt[em$tgt != segment_id]))
   
   return(neighbors)
 }
@@ -149,18 +193,25 @@ find_neighbor_nodes <- function(selected_node_ids, assembly, min_support_val, mi
     return(character())
   }
   
-  # load adjacency matrices
-  count_mat <- load_seg_adj_count(assembly)
-  total_mat <- load_seg_adj_total(assembly)
-  associated_mat <- load_seg_adj_associated(assembly)
+  # mode-aware loading
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    count_mat <- load_cseg_adj_count(assembly)
+    total_mat <- load_cseg_adj_total(assembly)
+    associated_mat <- load_cseg_adj_associated(assembly)
+  } else {
+    count_mat <- load_seg_adj_count(assembly)
+    total_mat <- load_seg_adj_total(assembly)
+    associated_mat <- load_seg_adj_associated(assembly)
+  }
   
   if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
     return(character())
   }
   
   # find all edges from selected segments in the adjacency matrix
-  edge_rows <- count_mat[count_mat$seg_src %in% selected_seg_ids | 
-                        count_mat$seg_tgt %in% selected_seg_ids, ]
+  edge_rows <- count_mat[count_mat$src %in% selected_seg_ids | 
+                        count_mat$tgt %in% selected_seg_ids, ]
   
   if (nrow(edge_rows) == 0) {
     return(character())
@@ -179,8 +230,8 @@ find_neighbor_nodes <- function(selected_node_ids, assembly, min_support_val, mi
   }
   
   # extract neighbor segments (either src or tgt, excluding selected segments)
-  neighbor_seg_ids <- unique(c(filtered_em$seg_src[!filtered_em$seg_src %in% selected_seg_ids],
-                               filtered_em$seg_tgt[!filtered_em$seg_tgt %in% selected_seg_ids]))
+  neighbor_seg_ids <- unique(c(filtered_em$src[!filtered_em$src %in% selected_seg_ids],
+                               filtered_em$tgt[!filtered_em$tgt %in% selected_seg_ids]))
   neighbor_seg_ids <- neighbor_seg_ids[!is.na(neighbor_seg_ids)]
   
   if (length(neighbor_seg_ids) == 0) {
@@ -196,6 +247,60 @@ find_neighbor_nodes <- function(selected_node_ids, assembly, min_support_val, mi
 }
 
 #########################################################################
+# degree calculation from complete adjacency table
+#########################################################################
+
+# compute degree for a single segment/csegment from complete adjacency table
+compute_degree_from_complete_adj <- function(seg_id, assembly, min_support_val, min_percent_val, lib = NULL) {
+  if (is.null(seg_id) || seg_id == "" || is.null(assembly)) {
+    return(0)
+  }
+  
+  # mode-aware loading
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    count_mat <- load_cseg_adj_count(assembly)
+    total_mat <- load_cseg_adj_total(assembly)
+    associated_mat <- load_cseg_adj_associated(assembly)
+  } else {
+    count_mat <- load_seg_adj_count(assembly)
+    total_mat <- load_seg_adj_total(assembly)
+    associated_mat <- load_seg_adj_associated(assembly)
+  }
+  
+  if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
+    return(0)
+  }
+  
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
+    return(0)
+  }
+  
+  # find edges where seg_id is source or target (exclude self-loops)
+  edge_rows <- count_mat[(count_mat$src == seg_id | count_mat$tgt == seg_id) &
+                        count_mat$src != count_mat$tgt, ]
+  
+  if (nrow(edge_rows) == 0) {
+    return(0)
+  }
+  
+  # aggregate metrics and filter
+  em <- aggregate_edge_metrics(edge_rows, count_mat, total_mat, associated_mat, lib = lib)
+  if (is.null(em) || nrow(em) == 0) {
+    return(0)
+  }
+  
+  filtered <- em[em$support >= min_support_val & em$percent >= min_percent_val, ]
+  if (nrow(filtered) == 0) {
+    return(0)
+  }
+  
+  # count unique neighbors (segments/csegments this one connects to)
+  neighbors <- unique(c(filtered$src[filtered$src != seg_id], filtered$tgt[filtered$tgt != seg_id]))
+  return(length(neighbors))
+}
+
+#########################################################################
 # edge metrics aggregation
 #########################################################################
 
@@ -204,11 +309,11 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
     return(NULL)
   }
   
-  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+  metadata_cols <- c("src", "tgt", "side_src", "side_tgt", 
                      "contig_src", "start_src", "end_src", 
                      "contig_tgt", "start_tgt", "end_tgt")
   all_lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
-  key_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt")
+  key_cols <- c("src", "tgt", "side_src", "side_tgt")
   
   # determine which library columns to use
   if (is.null(lib) || lib == "" || lib == "all") {
@@ -237,11 +342,34 @@ aggregate_edge_metrics <- function(edge_rows, count_mat, total_mat, associated_m
                                   total_associated = rowSums(associated_mat[, lib_cols, drop = FALSE], na.rm = TRUE))
   }
   
-  # merge with edge_rows
+  # combine with edge_rows (match by key_cols)
   result <- edge_rows[, key_cols]
-  result <- merge(result, count_sums, by = key_cols, all.x = TRUE)
-  result <- merge(result, total_sums, by = key_cols, all.x = TRUE)
-  result <- merge(result, associated_sums, by = key_cols, all.x = TRUE)
+  
+  # create keys for matching
+  edge_keys <- do.call(paste, c(result[, key_cols], sep = "|"))
+  count_keys <- do.call(paste, c(count_sums[, key_cols], sep = "|"))
+  total_keys <- do.call(paste, c(total_sums[, key_cols], sep = "|"))
+  associated_keys <- do.call(paste, c(associated_sums[, key_cols], sep = "|"))
+  
+  # verify all edge_rows keys exist in sum data frames
+  if (length(setdiff(edge_keys, count_keys)) > 0) {
+    stop("key_cols mismatch between edge_rows and count_sums")
+  }
+  if (length(setdiff(edge_keys, total_keys)) > 0) {
+    stop("key_cols mismatch between edge_rows and total_sums")
+  }
+  if (length(setdiff(edge_keys, associated_keys)) > 0) {
+    stop("key_cols mismatch between edge_rows and associated_sums")
+  }
+  
+  # match and combine columns
+  idx_count <- match(edge_keys, count_keys)
+  idx_total <- match(edge_keys, total_keys)
+  idx_associated <- match(edge_keys, associated_keys)
+  
+  result$support <- count_sums$support[idx_count]
+  result$total <- total_sums$total[idx_total]
+  result$total_associated <- associated_sums$total_associated[idx_associated]
   
   result$support[is.na(result$support)] <- 0
   result$total[is.na(result$total)] <- 0
@@ -288,7 +416,7 @@ normalize_side <- function(side) {
 }
 
 # creates internal edges (within segment) and inter-segment edges
-build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat, bin_segment_table, min_support_val, min_percent_val, directed = FALSE, lib = NULL) {
+build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat, min_support_val, min_percent_val, directed = FALSE, lib = NULL) {
   empty_edges <- data.frame(from = character(), to = character(), stringsAsFactors = FALSE)
   
   if (length(segment_ids) == 0) {
@@ -311,14 +439,14 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
     return(internal_edges)
   }
   
-  if (!"seg_src" %in% names(count_mat) || !"seg_tgt" %in% names(count_mat)) {
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
     return(internal_edges)
   }
   
   # filter to edges where both src and tgt are in graph_segments (exclude self-loops)
-  edge_rows <- count_mat[count_mat$seg_src %in% segment_ids & 
-                        count_mat$seg_tgt %in% segment_ids &
-                        count_mat$seg_src != count_mat$seg_tgt, ]
+  edge_rows <- count_mat[count_mat$src %in% segment_ids & 
+                        count_mat$tgt %in% segment_ids &
+                        count_mat$src != count_mat$tgt, ]
   
   if (nrow(edge_rows) == 0) {
     return(internal_edges)
@@ -330,23 +458,11 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
     return(internal_edges)
   }
   
-  # add bin information
-  if (!is.null(bin_segment_table) && "segment" %in% names(bin_segment_table) && "bin" %in% names(bin_segment_table)) {
-    seg_to_bin <- setNames(bin_segment_table$bin, bin_segment_table$segment)
-    em$bin_src <- seg_to_bin[em$seg_src]
-    em$bin_tgt <- seg_to_bin[em$seg_tgt]
-    em$bin_src[is.na(em$bin_src)] <- "N/A"
-    em$bin_tgt[is.na(em$bin_tgt)] <- "N/A"
-  } else {
-    em$bin_src <- "N/A"
-    em$bin_tgt <- "N/A"
-  }
-  
   # normalize sides to L/R and create node IDs
   em$side_src_norm <- normalize_side(em$side_src)
   em$side_tgt_norm <- normalize_side(em$side_tgt)
-  em$node_src <- paste0(em$seg_src, "_", em$side_src_norm)
-  em$node_tgt <- paste0(em$seg_tgt, "_", em$side_tgt_norm)
+  em$node_src <- paste0(em$src, "_", em$side_src_norm)
+  em$node_tgt <- paste0(em$tgt, "_", em$side_tgt_norm)
   
   # apply filters
   em <- em[em$support >= min_support_val & em$percent >= min_percent_val, ]
@@ -355,18 +471,18 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
   }
   
   # store per-library data for color/label computation
-  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+  metadata_cols <- c("src", "tgt", "side_src", "side_tgt", 
                      "contig_src", "start_src", "end_src", 
                      "contig_tgt", "start_tgt", "end_tgt")
   lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
-  key_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt")
+  key_cols <- c("src", "tgt", "side_src", "side_tgt")
   
   # compute per-library percent for each edge in em
   # create lookup keys for matching
-  em_keys <- paste(em$seg_src, em$seg_tgt, em$side_src, em$side_tgt, sep = "|")
-  count_keys <- paste(count_mat$seg_src, count_mat$seg_tgt, 
+  em_keys <- paste(em$src, em$tgt, em$side_src, em$side_tgt, sep = "|")
+  count_keys <- paste(count_mat$src, count_mat$tgt, 
                      count_mat$side_src, count_mat$side_tgt, sep = "|")
-  assoc_keys <- paste(associated_mat$seg_src, associated_mat$seg_tgt,
+  assoc_keys <- paste(associated_mat$src, associated_mat$tgt,
                       associated_mat$side_src, associated_mat$side_tgt, sep = "|")
   
   lib_percent_data <- list()
@@ -394,15 +510,13 @@ build_graph_edges <- function(segment_ids, count_mat, total_mat, associated_mat,
     id = paste0(em$node_src, "_", em$node_tgt),
     from = em$node_src,
     to = em$node_tgt,
-    title = paste0(em$seg_src, " → ", em$seg_tgt),
+    title = paste0(em$src, " → ", em$tgt),
     ..is_internal.. = FALSE,
     ..support.. = em$support,
-    ..seg_from.. = em$seg_src,
-    ..seg_to.. = em$seg_tgt,
+    ..seg_from.. = em$src,
+    ..seg_to.. = em$tgt,
     ..side_from.. = em$side_src_norm,
     ..side_to.. = em$side_tgt_norm,
-    ..bin_from.. = em$bin_src,
-    ..bin_to.. = em$bin_tgt,
     ..total.. = em$total,
     ..total_associated.. = em$total_associated,
     ..percent.. = em$percent,
@@ -640,8 +754,6 @@ build_edge_table <- function(edges) {
   empty_table <- data.frame(
     seg_from = character(),
     seg_to = character(),
-    bin_from = character(),
-    bin_to = character(),
     side_from = character(),
     side_to = character(),
     support = numeric(),
@@ -667,8 +779,6 @@ build_edge_table <- function(edges) {
   table_data <- data.frame(
     seg_from = inter_edges$..seg_from..,
     seg_to = inter_edges$..seg_to..,
-    bin_from = inter_edges$..bin_from..,
-    bin_to = inter_edges$..bin_to..,
     side_from = inter_edges$..side_from..,
     side_to = inter_edges$..side_to..,
     support = inter_edges$..support..,

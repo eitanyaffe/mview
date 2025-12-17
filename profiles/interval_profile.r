@@ -42,10 +42,11 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
     # determine fill colors - priority: color_f > color_field > color
     fill_colors <- NULL
     
-    # try color_f first (function(id) -> color)
+    # try color_f first (function(ids) -> colors, vectorized)
     if (!is.null(profile$color_f) && is.function(profile$color_f)) {
       if ("id" %in% names(filtered_intervals)) {
-        fill_colors <- sapply(filtered_intervals$id, profile$color_f)
+        # call vectorized function with all IDs at once
+        fill_colors <- profile$color_f(filtered_intervals$id)
         fill_colors[is.na(fill_colors)] <- profile$color
       }
     }

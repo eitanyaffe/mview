@@ -116,6 +116,12 @@ organizer_tab_ui <- function() {
         # graph parameters box
         wellPanel(style = "padding: 10px;",
           fluidRow(
+            column(2,
+              selectInput("graphMode", "Mode:",
+                         choices = c("Segments" = "segments", "Csegments" = "csegments"),
+                         selected = cache_get_if_exists("graph.mode", "segments"),
+                         width = "100%")
+            ),
             column(3,
               numericInput("selectorMinSupport", "Min Support:", 
                          value = cache_get_if_exists("selector.min_support", 0),
@@ -184,7 +190,7 @@ organizer_tab_ui <- function() {
                 actionButton("selectorAddNeighbors", "Add neighbors", class = "btn btn-sm btn-default"),
                 radioButtons("selectorAutoUpdate", "Automatic:",
                             choices = c("Off" = "off", "Track View" = "view", "Track Zoom" = "zoom"),
-                            selected = "off", inline = TRUE)
+                            selected = cache_get_if_exists("graph.auto_update", "off"), inline = TRUE)
               ),
               div(style = "margin-top: 10px;",
                 tags$strong("Selected: "),

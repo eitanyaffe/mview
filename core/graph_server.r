@@ -2,14 +2,215 @@
 # association graph server logic
 
 #########################################################################
+# mode observer
+#########################################################################
+
+observeEvent(input$graphMode, {
+  if (!is.null(input$graphMode)) {
+    new_mode <- input$graphMode
+    old_mode <- tryCatch(graph_mode(), error = function(e) "segments")
+    
+    # convert graph_base_segments before updating mode if we have base segments
+    current_base <- graph_base_segments()
+    converted_base <- current_base
+    if (length(current_base) > 0 && !is.null(state$assembly)) {
+      mapping <- get_cluster_mapping(state$assembly)
+      if (!is.null(mapping)) {
+        # determine what type of IDs we currently have by checking mapping
+        are_segments <- any(current_base %in% mapping$segment)
+        are_csegments <- any(current_base %in% mapping$csegment)
+        
+        if (new_mode == "csegments" && are_segments) {
+          # converting segments → csegments
+          csegs <- unique(mapping$csegment[mapping$segment %in% current_base])
+          converted_base <- csegs
+          graph_base_segments(csegs)
+        } else if (new_mode == "segments" && are_csegments) {
+          # converting csegments → segments
+          segs <- unique(mapping$segment[mapping$csegment %in% current_base])
+          converted_base <- segs
+          graph_base_segments(segs)
+        }
+      }
+    }
+    
+    # translate selected nodes to match new mode
+    # build what the target nodes will be (nodes that will exist in new graph)
+    if (length(converted_base) > 0) {
+      target_node_ids <- c(paste0(converted_base, "_L"), paste0(converted_base, "_R"))
+      target_nodes_df <- data.frame(
+        id = target_node_ids,
+        segment = rep(converted_base, 2),
+        side = c(rep("L", length(converted_base)), rep("R", length(converted_base))),
+        stringsAsFactors = FALSE
+      )
+      
+      selected_nodes <- selected_graph_segments()
+      if (length(selected_nodes) > 0 && old_mode != new_mode) {
+        translated_selection <- translate_node_selection(
+          selected_nodes, 
+          old_mode, 
+          new_mode, 
+          target_nodes_df, 
+          state$assembly
+        )
+        selected_graph_segments(translated_selection)
+      }
+    } else {
+      # no base segments, clear selection
+      selected_graph_segments(character())
+    }
+    
+    # update mode after conversion
+    graph_mode(new_mode)
+    cache_set("graph.mode", new_mode)
+  }
+})
+
+#########################################################################
+# node selection translation between modes
+#########################################################################
+
+# translates selected node IDs between segment and csegment modes
+# only includes nodes that exist in the target graph (base_nodes)
+translate_node_selection <- function(selected_node_ids, from_mode, to_mode, base_nodes, assembly) {
+  if (length(selected_node_ids) == 0 || from_mode == to_mode) {
+    return(selected_node_ids)
+  }
+  
+  if (is.null(assembly) || is.null(base_nodes) || nrow(base_nodes) == 0) {
+    return(character())
+  }
+  
+  mapping <- get_cluster_mapping(assembly)
+  if (is.null(mapping)) {
+    return(character())
+  }
+  
+  # extract base IDs and sides from selected node IDs
+  base_ids <- sub("_[LR]$", "", selected_node_ids)
+  sides <- sub("^.*_([LR])$", "\\1", selected_node_ids)
+  
+  # get available node IDs in target graph
+  available_node_ids <- base_nodes$id
+  
+  if (to_mode == "csegments" && from_mode == "segments") {
+    # segments → csegments: map each segment to its csegment, preserve side
+    # only include if the csegment node exists in the graph
+    cseg_sides_list <- list()
+    for (i in seq_along(base_ids)) {
+      seg_id <- base_ids[i]
+      side <- sides[i]
+      csegs <- unique(mapping$csegment[mapping$segment == seg_id])
+      for (cseg_id in csegs) {
+        # check if this csegment node exists in the graph
+        target_node_id <- paste0(cseg_id, "_", side)
+        if (target_node_id %in% available_node_ids) {
+          if (!cseg_id %in% names(cseg_sides_list)) {
+            cseg_sides_list[[cseg_id]] <- character()
+          }
+          if (!side %in% cseg_sides_list[[cseg_id]]) {
+            cseg_sides_list[[cseg_id]] <- c(cseg_sides_list[[cseg_id]], side)
+          }
+        }
+      }
+    }
+    # build new node IDs
+    new_selected <- character()
+    for (cseg_id in names(cseg_sides_list)) {
+      for (side in cseg_sides_list[[cseg_id]]) {
+        new_selected <- c(new_selected, paste0(cseg_id, "_", side))
+      }
+    }
+    return(new_selected)
+  } else if (to_mode == "segments" && from_mode == "csegments") {
+    # csegments → segments: map each csegment to its segments, preserve side
+    # only include if the segment node exists in the graph
+    seg_sides_list <- list()
+    for (i in seq_along(base_ids)) {
+      cseg_id <- base_ids[i]
+      side <- sides[i]
+      segs <- unique(mapping$segment[mapping$csegment == cseg_id])
+      for (seg_id in segs) {
+        # check if this segment node exists in the graph
+        target_node_id <- paste0(seg_id, "_", side)
+        if (target_node_id %in% available_node_ids) {
+          if (!seg_id %in% names(seg_sides_list)) {
+            seg_sides_list[[seg_id]] <- character()
+          }
+          if (!side %in% seg_sides_list[[seg_id]]) {
+            seg_sides_list[[seg_id]] <- c(seg_sides_list[[seg_id]], side)
+          }
+        }
+      }
+    }
+    # build new node IDs
+    new_selected <- character()
+    for (seg_id in names(seg_sides_list)) {
+      for (side in seg_sides_list[[seg_id]]) {
+        new_selected <- c(new_selected, paste0(seg_id, "_", side))
+      }
+    }
+    return(new_selected)
+  }
+  
+  # no conversion needed
+  return(selected_node_ids)
+}
+
+#########################################################################
+# mode-aware data loading wrappers
+#########################################################################
+
+load_adj_count_for_mode <- function(assembly) {
+  mode <- graph_mode()
+  if (mode == "csegments") {
+    load_cseg_adj_count(assembly)
+  } else {
+    load_seg_adj_count(assembly)
+  }
+}
+
+load_adj_total_for_mode <- function(assembly) {
+  mode <- graph_mode()
+  if (mode == "csegments") {
+    load_cseg_adj_total(assembly)
+  } else {
+    load_seg_adj_total(assembly)
+  }
+}
+
+load_adj_associated_for_mode <- function(assembly) {
+  mode <- graph_mode()
+  if (mode == "csegments") {
+    load_cseg_adj_associated(assembly)
+  } else {
+    load_seg_adj_associated(assembly)
+  }
+}
+
+#########################################################################
 # tracking controls
 #########################################################################
 
 # update to view button
 observeEvent(input$selectorUpdateToView, {
   state_segs <- state$segments
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  
   if (!is.null(state_segs) && nrow(state_segs) > 0) {
+    if (mode == "csegments") {
+      # convert segments to csegments
+      mapping <- get_cluster_mapping(state$assembly)
+      if (!is.null(mapping)) {
+        csegs <- unique(mapping$csegment[mapping$segment %in% state_segs$segment])
+        graph_base_segments(csegs)
+      } else {
+        graph_base_segments(character())
+      }
+    } else {
     graph_base_segments(state_segs$segment)
+    }
   } else {
     graph_base_segments(character())
   }
@@ -18,8 +219,21 @@ observeEvent(input$selectorUpdateToView, {
 # update to zoom button
 observeEvent(input$selectorUpdateToZoom, {
   zoom_segs <- cxt_get_segments(limit_to_zoom = TRUE)
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  
   if (length(zoom_segs) > 0) {
+    if (mode == "csegments") {
+      # convert segments to csegments
+      mapping <- get_cluster_mapping(state$assembly)
+      if (!is.null(mapping)) {
+        csegs <- unique(mapping$csegment[mapping$segment %in% zoom_segs])
+        graph_base_segments(csegs)
+      } else {
+        graph_base_segments(character())
+      }
+    } else {
     graph_base_segments(zoom_segs)
+    }
   }
 })
 
@@ -28,17 +242,41 @@ observe({
   auto_mode <- input$selectorAutoUpdate
   if (is.null(auto_mode) || auto_mode == "off") return()
   
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  
   if (auto_mode == "view") {
     state_segs <- state$segments
     if (!is.null(state_segs) && nrow(state_segs) > 0) {
+      if (mode == "csegments") {
+        # convert segments to csegments
+        mapping <- get_cluster_mapping(state$assembly)
+        if (!is.null(mapping)) {
+          csegs <- unique(mapping$csegment[mapping$segment %in% state_segs$segment])
+          graph_base_segments(csegs)
+        } else {
+          graph_base_segments(character())
+        }
+      } else {
       graph_base_segments(state_segs$segment)
+      }
     } else {
       graph_base_segments(character())
     }
   } else if (auto_mode == "zoom") {
     zoom_segs <- cxt_get_segments(limit_to_zoom = TRUE)
     if (length(zoom_segs) > 0) {
+      if (mode == "csegments") {
+        # convert segments to csegments
+        mapping <- get_cluster_mapping(state$assembly)
+        if (!is.null(mapping)) {
+          csegs <- unique(mapping$csegment[mapping$segment %in% zoom_segs])
+          graph_base_segments(csegs)
+        } else {
+          graph_base_segments(character())
+        }
+      } else {
       graph_base_segments(zoom_segs)
+      }
     }
   }
 })
@@ -123,10 +361,28 @@ observeEvent(input$selectorGotoBtn, {
   node_ids <- selected_graph_segments()
   if (length(node_ids) == 0) return()
   
-  seg_ids <- extract_segments_from_nodes(node_ids)
-  if (length(seg_ids) == 0) return()
+  ids_from_nodes <- extract_segments_from_nodes(node_ids)
+  if (length(ids_from_nodes) == 0) return()
   
   if (is.null(state$assembly)) return()
+  
+  # check mode: if csegments, resolve to member segments
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    # ids_from_nodes are csegment IDs, resolve to segments
+    mapping <- get_cluster_mapping(state$assembly)
+    if (!is.null(mapping)) {
+      seg_ids <- unique(mapping$segment[mapping$csegment %in% ids_from_nodes])
+    } else {
+      seg_ids <- character()
+    }
+  } else {
+    # ids_from_nodes are already segment IDs
+    seg_ids <- ids_from_nodes
+  }
+  
+  if (length(seg_ids) == 0) return()
+  
   seg_table <- get_segments(state$assembly)
   if (is.null(seg_table)) return()
   
@@ -148,10 +404,28 @@ observeEvent(input$selectorAddBtn, {
   node_ids <- selected_graph_segments()
   if (length(node_ids) == 0) return()
   
-  seg_ids <- extract_segments_from_nodes(node_ids)
-  if (length(seg_ids) == 0) return()
+  ids_from_nodes <- extract_segments_from_nodes(node_ids)
+  if (length(ids_from_nodes) == 0) return()
   
   if (is.null(state$assembly)) return()
+  
+  # check mode: if csegments, resolve to member segments
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    # ids_from_nodes are csegment IDs, resolve to segments
+    mapping <- get_cluster_mapping(state$assembly)
+    if (!is.null(mapping)) {
+      seg_ids <- unique(mapping$segment[mapping$csegment %in% ids_from_nodes])
+    } else {
+      seg_ids <- character()
+    }
+  } else {
+    # ids_from_nodes are already segment IDs
+    seg_ids <- ids_from_nodes
+  }
+  
+  if (length(seg_ids) == 0) return()
+  
   seg_table <- get_segments(state$assembly)
   if (is.null(seg_table)) return()
   
@@ -184,7 +458,25 @@ observeEvent(input$selectorRemoveBtn, {
   node_ids <- selected_graph_segments()
   if (length(node_ids) == 0) return()
   
-  seg_ids <- extract_segments_from_nodes(node_ids)
+  ids_from_nodes <- extract_segments_from_nodes(node_ids)
+  if (length(ids_from_nodes) == 0) return()
+  
+  # check mode: if csegments, resolve to member segments
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  if (mode == "csegments") {
+    # ids_from_nodes are csegment IDs, resolve to segments
+    if (is.null(state$assembly)) return()
+    mapping <- get_cluster_mapping(state$assembly)
+    if (!is.null(mapping)) {
+      seg_ids <- unique(mapping$segment[mapping$csegment %in% ids_from_nodes])
+    } else {
+      seg_ids <- character()
+    }
+  } else {
+    # ids_from_nodes are already segment IDs
+    seg_ids <- ids_from_nodes
+  }
+  
   if (length(seg_ids) == 0) return()
   
   current_segs <- state$segments
@@ -236,7 +528,6 @@ observeEvent(input$selectorAddNeighbors, {
 # store base graph data (structure only, no visual properties) for proxy updates
 base_graph_nodes <- reactiveVal(NULL)
 base_graph_edges <- reactiveVal(NULL)
-current_bin_segment_table <- reactiveVal(NULL)
 
 output$selectorGraph <- visNetwork::renderVisNetwork({
   # dependencies: computed_graph_segments (which depends on input$graphEdgeLibs),
@@ -254,11 +545,10 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
     ))
   }
   
-  # load data
-  count_mat <- load_seg_adj_count(state$assembly)
-  total_mat <- load_seg_adj_total(state$assembly)
-  associated_mat <- load_seg_adj_associated(state$assembly)
-  bin_segment_table <- load_bin_segment_table(state$assembly)
+  # load data (mode-aware)
+  count_mat <- load_adj_count_for_mode(state$assembly)
+  total_mat <- load_adj_total_for_mode(state$assembly)
+  associated_mat <- load_adj_associated_for_mode(state$assembly)
   
   # build nodes (two per segment: left and right sides)
   nodes <- build_graph_nodes(seg_ids)
@@ -268,20 +558,57 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   directed <- if (!is.null(input$graphDirectedEdges)) input$graphDirectedEdges else FALSE
   edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
   if (edge_lib == "all") edge_lib <- NULL
-  edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat, bin_segment_table,
+  edges <- build_graph_edges(seg_ids, count_mat, total_mat, associated_mat,
                             min_support(), min_percent(), directed = directed, lib = edge_lib)
   
   # store base nodes/edges (structure only, before visual properties)
   base_graph_nodes(nodes)
   base_graph_edges(edges)
-  current_bin_segment_table(bin_segment_table)
   
   # apply visual properties for initial render (using isolate to avoid reactive dependencies)
   # unified observer will handle all subsequent updates via proxy
   selected_nodes <- isolate(selected_graph_segments())
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
-  names(seg_colors) <- nodes$segment
+  
+  # mode-aware color assignment
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  current_scheme <- get_segment_color_scheme()
+  
+  # special handling for degree colors in csegment mode
+  if (mode == "csegments" && current_scheme == "degree") {
+    min_support_val <- if (!is.null(input$selectorMinSupport)) input$selectorMinSupport else 0
+    min_percent_val <- if (!is.null(input$selectorMinPercent)) input$selectorMinPercent else 0
+    edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+    if (edge_lib == "all") edge_lib <- NULL
+    
+    seg_colors <- get_csegment_degree_colors_direct(nodes$segment, state$assembly, 
+                                                    min_support_val, min_percent_val, lib = edge_lib)
+  } else if (mode == "csegments") {
+    # for csegments: map to segment colors if single segment, gray if multiple
+    mapping <- get_cluster_mapping(state$assembly)
+    if (!is.null(mapping)) {
+      # get colors for all segments first
+      all_seg_ids <- unique(mapping$segment)
+      seg_colors_all <- get_segment_colors(all_seg_ids)
+      
+      # map csegments to colors
+      cseg_colors <- sapply(nodes$segment, function(cseg_id) {
+        segs <- mapping$segment[mapping$csegment == cseg_id]
+        if (length(segs) == 1 && segs[1] %in% names(seg_colors_all)) {
+          seg_colors_all[segs[1]]
+        } else {
+          "#E0E0E0"  # gray for multiple or no segments
+        }
+      })
+      names(cseg_colors) <- nodes$segment
+      seg_colors <- cseg_colors
+    } else {
+      seg_colors <- setNames(rep("#E0E0E0", nrow(nodes)), nodes$segment)
+    }
+  } else {
+    seg_colors <- get_segment_colors(nodes$segment)
+    names(seg_colors) <- nodes$segment
+  }
   nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
                                    seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
@@ -296,15 +623,34 @@ output$selectorGraph <- visNetwork::renderVisNetwork({
   
   # set node labels based on label type
   label_type <- isolate(if (!is.null(input$graphNodeLabel)) input$graphNodeLabel else "index")
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
   nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
     seg <- nodes$segment[i]
     side <- nodes$side[i]
     if (label_type == "id") {
       return(paste0(seg, "_", side))
     }
+    # for index labels, handle csegments by mapping to first member segment
+    if (mode == "csegments") {
+      mapping <- get_cluster_mapping(state$assembly)
+      if (!is.null(mapping)) {
+        member_segs <- mapping$segment[mapping$csegment == seg]
+        if (length(member_segs) > 0) {
+          # find first member segment that's in ordered_segs
+          first_member <- member_segs[member_segs %in% ordered_segs][1]
+          if (!is.na(first_member)) {
+            idx <- which(ordered_segs == first_member)
+            return(paste0(idx, "_", side))
+          }
+        }
+      }
+      return(" ")  # no mapping or no member segments found
+    } else {
+      # segment mode: use segment directly
     if (!seg %in% ordered_segs) return(" ")
     idx <- which(ordered_segs == seg)
     return(paste0(idx, "_", side))
+    }
   })
   
   # style edges: internal edges are thick and short, inter-segment edges are thinner
@@ -474,8 +820,46 @@ observe({
   
   # compute node visual properties from base data
   ordered_segs <- if (!is.null(state$segments) && nrow(state$segments) > 0) state$segments$segment else character()
-  seg_colors <- get_segment_colors(nodes$segment, state$assembly, ordered_segs)
-  names(seg_colors) <- nodes$segment
+  
+  # mode-aware color assignment
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  current_scheme <- get_segment_color_scheme()
+  
+  # special handling for degree colors in csegment mode
+  if (mode == "csegments" && current_scheme == "degree") {
+    min_support_val <- if (!is.null(input$selectorMinSupport)) input$selectorMinSupport else 0
+    min_percent_val <- if (!is.null(input$selectorMinPercent)) input$selectorMinPercent else 0
+    edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
+    if (edge_lib == "all") edge_lib <- NULL
+    
+    seg_colors <- get_csegment_degree_colors_direct(nodes$segment, state$assembly, 
+                                                    min_support_val, min_percent_val, lib = edge_lib)
+  } else if (mode == "csegments") {
+    # for csegments: map to segment colors if single segment, gray if multiple
+    mapping <- get_cluster_mapping(state$assembly)
+    if (!is.null(mapping)) {
+      # get colors for all segments first
+      all_seg_ids <- unique(mapping$segment)
+      seg_colors_all <- get_segment_colors(all_seg_ids)
+      
+      # map csegments to colors
+      cseg_colors <- sapply(nodes$segment, function(cseg_id) {
+        segs <- mapping$segment[mapping$csegment == cseg_id]
+        if (length(segs) == 1 && segs[1] %in% names(seg_colors_all)) {
+          seg_colors_all[segs[1]]
+        } else {
+          "#E0E0E0"  # gray for multiple or no segments
+        }
+      })
+      names(cseg_colors) <- nodes$segment
+      seg_colors <- cseg_colors
+    } else {
+      seg_colors <- setNames(rep("#E0E0E0", nrow(nodes)), nodes$segment)
+    }
+  } else {
+    seg_colors <- get_segment_colors(nodes$segment)
+    names(seg_colors) <- nodes$segment
+  }
   nodes$color.background <- ifelse(nodes$segment %in% names(seg_colors), 
                                    seg_colors[nodes$segment], "#E0E0E0")
   nodes$color.border <- "#666666"
@@ -491,15 +875,34 @@ observe({
   
   # set node labels based on label type
   label_type_val <- if (!is.null(label_type)) label_type else "index"
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
   nodes$label <- sapply(seq_len(nrow(nodes)), function(i) {
     seg <- nodes$segment[i]
     side <- nodes$side[i]
     if (label_type_val == "id") {
       return(paste0(seg, "_", side))
     }
+    # for index labels, handle csegments by mapping to first member segment
+    if (mode == "csegments") {
+      mapping <- get_cluster_mapping(state$assembly)
+      if (!is.null(mapping)) {
+        member_segs <- mapping$segment[mapping$csegment == seg]
+        if (length(member_segs) > 0) {
+          # find first member segment that's in ordered_segs
+          first_member <- member_segs[member_segs %in% ordered_segs][1]
+          if (!is.na(first_member)) {
+            idx <- which(ordered_segs == first_member)
+            return(paste0(idx, "_", side))
+          }
+        }
+      }
+      return(" ")  # no mapping or no member segments found
+    } else {
+      # segment mode: use segment directly
     if (!seg %in% ordered_segs) return(" ")
     idx <- which(ordered_segs == seg)
     return(paste0(idx, "_", side))
+    }
   })
   
   # update font size via options
@@ -591,7 +994,7 @@ observeEvent(state$assembly, {
   count_mat <- load_seg_adj_count(state$assembly)
   if (is.null(count_mat)) return()
   
-  metadata_cols <- c("seg_src", "seg_tgt", "side_src", "side_tgt", 
+  metadata_cols <- c("src", "tgt", "side_src", "side_tgt", 
                      "contig_src", "start_src", "end_src", 
                      "contig_tgt", "start_tgt", "end_tgt")
   lib_cols <- names(count_mat)[!names(count_mat) %in% metadata_cols]
@@ -650,6 +1053,12 @@ observeEvent(input$graphEdgeLib2, {
 observeEvent(input$graphEdgeLibs, {
   if (!is.null(input$graphEdgeLibs) && input$graphEdgeLibs != "") {
     cache_set("graph.edge_libs", input$graphEdgeLibs)
+  }
+})
+
+observeEvent(input$selectorAutoUpdate, {
+  if (!is.null(input$selectorAutoUpdate)) {
+    cache_set("graph.auto_update", input$selectorAutoUpdate)
   }
 })
 
@@ -727,14 +1136,46 @@ output$selectorHoverInfo <- renderUI({
       side <- node_row$side[1]
     }
     
-    seg_table <- get_segments(state$assembly)
-    bin_segment_table <- load_bin_segment_table(state$assembly)
-    
-    # compute degree from edges (count edges connected to this node)
+    # compute degree from complete adjacency table (not just visible graph edges)
     degree <- 0
-    if (!is.null(edges) && nrow(edges) > 0) {
-      degree <- sum(edges$from == node_hover) + sum(edges$to == node_hover)
+    if (!is.null(seg_id) && seg_id != "" && !is.null(state$assembly)) {
+      base_id <- sub("_[LR]$", "", seg_id)  # remove side suffix for degree calculation
+      edge_lib <- if (!is.null(input$graphEdgeLibs) && input$graphEdgeLibs != "all") input$graphEdgeLibs else NULL
+      degree <- compute_degree_from_complete_adj(base_id, state$assembly, min_support(), min_percent(), lib = edge_lib)
     }
+    
+    # check mode for csegment vs segment display
+    mode <- tryCatch(graph_mode(), error = function(e) "segments")
+    
+    if (mode == "csegments") {
+      # extract csegment ID from node (remove _L/_R suffix)
+      cseg_id <- sub("_[LR]$", "", seg_id)
+      
+      cseg_table <- get_csegments(state$assembly)
+      mapping <- get_cluster_mapping(state$assembly)
+      
+      if (!is.null(cseg_table) && cseg_id %in% cseg_table$csegment) {
+        cseg_row <- cseg_table[cseg_table$csegment == cseg_id, ]
+        length_kb <- round(cseg_row$length[1] / 1000, 1)
+        
+        # get member segments
+        member_segments <- character()
+        if (!is.null(mapping)) {
+          member_segments <- mapping$segment[mapping$csegment == cseg_id]
+        }
+        
+        side_text <- if (!is.null(side)) paste0(" (", side, ")") else ""
+        segs_text <- if (length(member_segments) > 0) paste(member_segments, collapse = ", ") else "none"
+        
+        return(tags$div(
+          tags$strong("Csegment: "), cseg_id, side_text, tags$br(),
+          tags$strong("Length: "), length_kb, " kb", tags$br(),
+          tags$strong("Segments: "), segs_text, tags$br(),
+          tags$strong("Degree: "), degree
+        ))
+    }
+    } else {
+      seg_table <- get_segments(state$assembly)
     
     if (!is.null(seg_table) && seg_id %in% seg_table$segment) {
       seg_row <- seg_table[seg_table$segment == seg_id, ]
@@ -743,20 +1184,15 @@ output$selectorHoverInfo <- renderUI({
       end <- seg_row$end[1]
       length_kb <- round((end - start + 1) / 1000, 1)
       
-      bin <- "unassigned"
-      if (!is.null(bin_segment_table) && seg_id %in% bin_segment_table$segment) {
-        bin <- bin_segment_table$bin[bin_segment_table$segment == seg_id][1]
-      }
-      
       side_text <- if (!is.null(side)) paste0(" (", side, ")") else ""
       return(tags$div(
         tags$strong("Segment: "), seg_id, side_text, tags$br(),
         tags$strong("Contig: "), contig, tags$br(),
         tags$strong("Coords: "), format(start, big.mark = ","), " - ", format(end, big.mark = ","), tags$br(),
         tags$strong("Length: "), length_kb, " kb", tags$br(),
-        tags$strong("Bin: "), bin, tags$br(),
         tags$strong("Degree: "), degree
       ))
+      }
     }
     return(tags$p(tags$strong("Segment: "), seg_id, tags$br(), tags$strong("Degree: "), degree))
   }

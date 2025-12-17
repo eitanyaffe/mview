@@ -169,6 +169,7 @@ observeEvent(input$removeGenomesFromListBtn, {
 contigTableProxy <- DT::dataTableProxy("contigTable")
 genomeTableProxy <- DT::dataTableProxy("genomeTable")
 segmentTableProxy <- DT::dataTableProxy("segmentTable")
+csegmentTableProxy <- DT::dataTableProxy("csegmentTable")
 
 # persist checkbox states in cache
 observeEvent(input$allowMultipleContigsChk, {
@@ -181,6 +182,10 @@ observeEvent(input$allowMultipleGenomesChk, {
 
 observeEvent(input$allowMultipleSegmentsChk, {
   cache_set("allow_multiple_segments", input$allowMultipleSegmentsChk)
+})
+
+observeEvent(input$allowMultipleCsegmentsChk, {
+  cache_set("allow_multiple_csegments", input$allowMultipleCsegmentsChk)
 })
 
 
@@ -247,6 +252,93 @@ observeEvent(input$removeSegmentsFromListBtn, {
   if (nrow(get_state_segments()) > 0) {
     state$zoom <- NULL
   }
+})
+
+# helper function to resolve csegments to member segments
+resolve_csegments_to_segments <- function(csegment_ids, assembly) {
+  if (length(csegment_ids) == 0) return(character())
+  mapping <- get_cluster_mapping(assembly)
+  if (is.null(mapping)) return(character())
+  segments <- mapping$segment[mapping$csegment %in% csegment_ids]
+  unique(segments)
+}
+
+observeEvent(input$gotoCsegmentsBtn, {
+  rows <- input$csegmentTable_rows_selected
+  if (is.null(rows) || length(rows) == 0) return()
+  
+  cseg_table <- get_csegments(state$assembly)
+  if (is.null(cseg_table)) return()
+  
+  selected_csegments <- cseg_table$csegment[rows]
+  
+  # resolve to member segments
+  segment_ids <- resolve_csegments_to_segments(selected_csegments, state$assembly)
+  if (length(segment_ids) == 0) return()
+  
+  all_segments <- get_segments(state$assembly)
+  current_segment_ids <- get_state_segments()$segment
+  
+  if (identical(sort(segment_ids), sort(current_segment_ids))) return()
+  
+  regions_module_output$push_undo_state()
+  new_segments <- all_segments[all_segments$segment %in% segment_ids, ]
+  state$segments <- new_segments
+  state$zoom <- NULL
+})
+
+observeEvent(input$addCsegmentsBtn, {
+  rows <- input$csegmentTable_rows_selected
+  if (is.null(rows) || length(rows) == 0) return()
+  
+  cseg_table <- get_csegments(state$assembly)
+  if (is.null(cseg_table)) return()
+  
+  selected_csegments <- cseg_table$csegment[rows]
+  
+  # resolve to member segments
+  segment_ids <- resolve_csegments_to_segments(selected_csegments, state$assembly)
+  if (length(segment_ids) == 0) return()
+  
+  all_segments <- get_segments(state$assembly)
+  current_segment_ids <- get_state_segments()$segment
+  new_segment_ids <- segment_ids[!segment_ids %in% current_segment_ids]
+  
+  if (length(new_segment_ids) == 0) return()
+  
+  regions_module_output$push_undo_state()
+  new_segments <- all_segments[all_segments$segment %in% new_segment_ids, ]
+  state$segments <- rbind(get_state_segments(), new_segments)
+  state$zoom <- NULL
+})
+
+observeEvent(input$removeCsegmentsFromListBtn, {
+  rows <- input$csegmentTable_rows_selected
+  if (is.null(rows) || length(rows) == 0) return()
+  
+  cseg_table <- get_csegments(state$assembly)
+  if (is.null(cseg_table)) return()
+  
+  selected_csegments <- cseg_table$csegment[rows]
+  
+  # resolve to member segments
+  segment_ids <- resolve_csegments_to_segments(selected_csegments, state$assembly)
+  if (length(segment_ids) == 0) return()
+  
+  current_segments <- get_state_segments()
+  segments_to_remove <- segment_ids[segment_ids %in% current_segments$segment]
+  
+  if (length(segments_to_remove) == 0) return()
+  
+  regions_module_output$push_undo_state()
+  state$segments <- current_segments[!current_segments$segment %in% segments_to_remove, ]
+  if (nrow(get_state_segments()) > 0) {
+    state$zoom <- NULL
+  }
+})
+
+observeEvent(input$clearCsegmentSelectionBtn, {
+  DT::selectRows(csegmentTableProxy, NULL)
 })
 
 

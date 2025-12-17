@@ -123,8 +123,22 @@ get_session <- function() {
   return(NULL)
 }
 
+# flag to prevent feedback loop when programmatically updating inputs
+updating_alignment_inputs <- reactiveVal(FALSE)
+reset_alignment_inputs_flag <- reactiveVal(0)
+
+# observer to reset the flag after updates
+observe({
+  reset_alignment_inputs_flag()
+  if (updating_alignment_inputs()) {
+    invalidateLater(150)
+    updating_alignment_inputs(FALSE)
+  }
+})
+
 # update profile dropdown choices based on available alignment objects
 observe({
+  refresh_trigger()  # establish reactive dependency on profile refresh
   aln_list <- cache_get_if_exists("aln_obj", list())
   session <- get_session()
   
@@ -211,11 +225,24 @@ load_read_from_profile <- function(profile_id, read_id) {
 
 # handle text input changes for read_id
 observeEvent(input$alignment_read_id_input, {
+  # skip if we're programmatically updating
+  if (updating_alignment_inputs()) {
+    return()
+  }
+  
   profile_id <- input$alignment_profile_select
   read_id <- input$alignment_read_id_input
   
   # only process if both profile and read_id are provided
   if (is.null(profile_id) || profile_id == "" || is.null(read_id) || read_id == "") {
+    return()
+  }
+  
+  # check if this matches current selection to avoid redundant updates
+  current_read_id <- cache_get_if_exists("selected_read_id", NULL)
+  current_profile_id <- state$clicked_profile_id
+  if (!is.null(current_read_id) && !is.null(current_profile_id) &&
+      current_read_id == read_id && current_profile_id == profile_id) {
     return()
   }
   
@@ -226,11 +253,24 @@ observeEvent(input$alignment_read_id_input, {
 
 # handle profile dropdown changes
 observeEvent(input$alignment_profile_select, {
+  # skip if we're programmatically updating
+  if (updating_alignment_inputs()) {
+    return()
+  }
+  
   profile_id <- input$alignment_profile_select
   read_id <- input$alignment_read_id_input
   
   # only process if both profile and read_id are provided
   if (is.null(profile_id) || profile_id == "" || is.null(read_id) || read_id == "") {
+    return()
+  }
+  
+  # check if this matches current selection to avoid redundant updates
+  current_read_id <- cache_get_if_exists("selected_read_id", NULL)
+  current_profile_id <- state$clicked_profile_id
+  if (!is.null(current_read_id) && !is.null(current_profile_id) &&
+      current_read_id == read_id && current_profile_id == profile_id) {
     return()
   }
   
@@ -271,15 +311,39 @@ observeEvent(eventExpr = plotly::event_data("plotly_click"), {
   profile_id <- key_parts[1]
   read_id <- paste(key_parts[-1], collapse = ":")  # handle read_ids with colons
   
+  # check if this is already selected to avoid redundant work
+  current_read_id <- cache_get_if_exists("selected_read_id", NULL)
+  current_profile_id <- state$clicked_profile_id
+  if (!is.null(current_read_id) && !is.null(current_profile_id) &&
+      current_read_id == read_id && current_profile_id == profile_id) {
+    return()
+  }
+  
+  # verify profile exists in alignment objects and get choices for dropdown
+  aln_list <- cache_get_if_exists("aln_obj", list())
+  if (is.null(aln_list) || !is.list(aln_list) || !is.element(profile_id, names(aln_list))) {
+    cat(sprintf("profile %s not found in alignment objects, skipping\n", profile_id))
+    return()
+  }
+  
+  # set flag to prevent input observers from firing
+  updating_alignment_inputs(TRUE)
+  
   # update UI inputs to reflect clicked read
   session <- get_session()
   if (!is.null(session)) {
-    updateSelectInput(session, "alignment_profile_select", selected = profile_id)
+    # ensure dropdown choices include the clicked profile, then set selection
+    profile_ids <- names(aln_list)
+    choices <- setNames(profile_ids, profile_ids)
+    updateSelectInput(session, "alignment_profile_select", choices = choices, selected = profile_id)
     updateTextInput(session, "alignment_read_id_input", value = read_id)
   }
   
-  # load the read data
+  # load the read data (only once, not from input observers)
   load_read_from_profile(profile_id, read_id)
+  
+  # trigger flag reset observer
+  reset_alignment_inputs_flag(reset_alignment_inputs_flag() + 1)
 })
 
 # ---- Alignment Plot Renderer ----

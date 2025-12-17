@@ -6,15 +6,24 @@
 #########################################################################
 
 compute_segment_degrees <- function(assembly, min_support_val, min_percent_val, lib = NULL) {
-  count_mat <- load_seg_adj_count(assembly)
-  total_mat <- load_seg_adj_total(assembly)
-  associated_mat <- load_seg_adj_associated(assembly)
+  # mode-aware loading
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  
+  if (mode == "csegments") {
+    count_mat <- load_cseg_adj_count(assembly)
+    total_mat <- load_cseg_adj_total(assembly)
+    associated_mat <- load_cseg_adj_associated(assembly)
+  } else {
+   count_mat <- load_seg_adj_count(assembly)
+   total_mat <- load_seg_adj_total(assembly)
+   associated_mat <- load_seg_adj_associated(assembly)
+  }
 
   if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
     return(list())
   }
   
-  if (!"seg_src" %in% names(count_mat) || !"seg_tgt" %in% names(count_mat)) {
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
     return(list())
   }
   
@@ -30,8 +39,97 @@ compute_segment_degrees <- function(assembly, min_support_val, min_percent_val, 
     return(list())
   }
   
-  degrees <- as.list(table(filtered$seg_src))
-  return(degrees)
+  # count unique neighbors (matching hover degree calculation)
+  degrees_src <- sapply(split(filtered$tgt, filtered$src), function(x) length(unique(x)))
+  degrees_tgt <- sapply(split(filtered$src, filtered$tgt), function(x) length(unique(x)))
+  all_segments <- unique(c(filtered$src, filtered$tgt))
+  rr <- data.frame(ids = all_segments)
+  idx_src <- match(rr$ids, names(degrees_src))
+  idx_tgt <- match(rr$ids, names(degrees_tgt))
+  degrees <- (ifelse(is.na(idx_src), 0, degrees_src[idx_src]) + 
+              ifelse(is.na(idx_tgt), 0, degrees_tgt[idx_tgt]))
+  names(degrees) <- all_segments
+
+  return(as.list(degrees))
+}
+
+#########################################################################
+# helper: compute csegment degrees from filtered adjacency data
+#########################################################################
+
+compute_csegment_degrees <- function(assembly, min_support_val, min_percent_val, lib = NULL) {
+  count_mat <- load_cseg_adj_count(assembly)
+  total_mat <- load_cseg_adj_total(assembly)
+  associated_mat <- load_cseg_adj_associated(assembly)
+  if (is.null(count_mat) || is.null(total_mat) || is.null(associated_mat)) {
+    return(numeric())
+  }
+  if (!"src" %in% names(count_mat) || !"tgt" %in% names(count_mat)) {
+    return(numeric())
+  }
+  edge_metrics <- aggregate_edge_metrics(count_mat, count_mat, total_mat, associated_mat, lib = lib)
+  if (is.null(edge_metrics) || nrow(edge_metrics) == 0) {
+    return(numeric())
+  }
+  filtered <- edge_metrics[edge_metrics$support >= min_support_val & 
+                          edge_metrics$percent >= min_percent_val, ]
+  if (nrow(filtered) == 0) {
+    return(numeric())
+  }
+  # count unique neighbors (matching hover degree calculation)
+  degrees_src <- sapply(split(filtered$tgt, filtered$src), function(x) length(unique(x)))
+  degrees_tgt <- sapply(split(filtered$src, filtered$tgt), function(x) length(unique(x)))
+  all_segments <- unique(c(filtered$src, filtered$tgt))
+  rr <- data.frame(ids = all_segments)
+  idx_src <- match(rr$ids, names(degrees_src))
+  idx_tgt <- match(rr$ids, names(degrees_tgt))
+  degrees <- (ifelse(is.na(idx_src), 0, degrees_src[idx_src]) + 
+              ifelse(is.na(idx_tgt), 0, degrees_tgt[idx_tgt]))
+  names(degrees) <- all_segments
+  
+  degrees
+}
+
+#########################################################################
+# helper: degree-based color mapping functions
+#########################################################################
+
+# shared degree color thresholds
+degree_color_thresholds <- list(
+  gray = 2,      # 0-2: grey
+  light_green = 6,  # 3-6: light green
+  orange = 20    # 7-20: orange, >20: red
+)
+
+# shared function to map degree to color
+degree_to_color <- function(deg) {
+  ifelse(deg <= degree_color_thresholds$gray, "#E0E0E0",  # grey
+    ifelse(deg <= degree_color_thresholds$light_green, "#90EE90",  # light green
+      ifelse(deg <= degree_color_thresholds$orange, "#FF8C00",  # orange
+        "#FF0000")))  # red
+}
+
+# color mapping for segment degrees
+colors_by_segment_degree <- function(seg_degree_vec, ids) {
+  deg <- ifelse(ids %in% names(seg_degree_vec), seg_degree_vec[ids], 0)
+  degree_to_color(deg)
+}
+
+# color mapping for csegment degrees
+colors_by_csegment_degree <- function(cseg_degree_vec, assembly, ids) {
+  # IDs can be either segments or csegments - convert segments to csegments if needed
+  ids_to_lookup <- ids
+  mapping_table <- get_cluster_mapping(assembly)
+  if (!is.null(mapping_table)) {
+    are_segments <- ids %in% mapping_table$segment
+    if (any(are_segments)) {
+      ids_to_lookup[are_segments] <- mapping_table$csegment[match(ids[are_segments], mapping_table$segment)]
+    }
+    ids_to_lookup[is.na(ids_to_lookup)] <- ids[is.na(ids_to_lookup)]
+  }
+  
+  deg <- ifelse(ids_to_lookup %in% names(cseg_degree_vec), cseg_degree_vec[ids_to_lookup], 0)
+  degree_to_color(deg)
 }
 
 #########################################################################
@@ -77,16 +175,27 @@ observe({
     register_color_mapping_f("order_grayscale", function(ids) rep("#E0E0E0", length(ids)))
   }
   
-  # register "degree" mapping (rainbow only)
+  # register degree mapping (both segment and csegment)
   if (!is.null(assembly)) {
     edge_lib <- if (!is.null(input$graphEdgeLibs)) input$graphEdgeLibs else "all"
     if (edge_lib == "all") edge_lib <- NULL
-    degrees <- compute_segment_degrees(assembly, min_support_val, min_percent_val, lib = edge_lib)
-    degree_vec <- unlist(degrees)
-    register_color_mapping_f("degree", function(ids) {
-      deg <- ifelse(ids %in% names(degree_vec), degree_vec[ids], 0)
-      ifelse(deg == 0, "#E0E0E0", ifelse(deg == 1, "#4A90E2", ifelse(deg == 2, "#27AE60", "#E67E22")))
-    })
+    
+    # compute both segment and csegment degrees
+    seg_degrees <- compute_segment_degrees(assembly, min_support_val, min_percent_val, lib = edge_lib)
+    seg_degree_vec <- unlist(seg_degrees)
+    cseg_degree_vec <- compute_csegment_degrees(assembly, min_support_val, min_percent_val, lib = edge_lib)
+    
+    # register the appropriate mapping based on current mode
+    current_mode <- tryCatch(graph_mode(), error = function(e) "segments")
+    if (current_mode == "csegments") {
+      register_color_mapping_f("degree", function(ids) {
+        colors_by_csegment_degree(cseg_degree_vec, assembly, ids)
+      })
+    } else {
+      register_color_mapping_f("degree", function(ids) {
+        colors_by_segment_degree(seg_degree_vec, ids)
+      })
+    }
   }
   
   # register user-defined scheme mappings
@@ -118,10 +227,28 @@ observe({
 })
 
 #########################################################################
+# direct degree color functions (bypass registry for graph nodes)
+#########################################################################
+
+get_csegment_degree_colors_direct <- function(csegment_ids, assembly, min_support_val, min_percent_val, lib = NULL) {
+  if (length(csegment_ids) == 0) {
+    return(setNames(character(0), character(0)))
+  }
+  
+  cseg_degree_vec <- compute_csegment_degrees(assembly, min_support_val, min_percent_val, lib = lib)
+  
+  # directly map csegment IDs to colors (no conversion needed)
+  deg <- ifelse(csegment_ids %in% names(cseg_degree_vec), cseg_degree_vec[csegment_ids], 0)
+  colors <- degree_to_color(deg)
+  
+  return(setNames(colors, csegment_ids))
+}
+
+#########################################################################
 # batch color function (for organizer and graph)
 #########################################################################
 
-get_segment_colors <- function(segment_ids, assembly, ordered_segments = NULL) {
+get_segment_colors <- function(segment_ids) {
   if (length(segment_ids) == 0) {
     return(setNames(character(0), character(0)))
   }
@@ -139,9 +266,17 @@ get_segment_colors <- function(segment_ids, assembly, ordered_segments = NULL) {
 # update dropdown choices when assembly changes
 observeEvent(state$assembly, {
   schemes <- get_segment_color_schemes()
-  current <- get_segment_color_scheme()
   
-  if (!current %in% schemes) {
+  # load cached color scheme based on current mode
+  mode <- tryCatch(graph_mode(), error = function(e) "segments")
+  cache_key <- if (mode == "csegments") "csegment.color_scheme" else "segment.color_scheme"
+  cached_scheme <- cache_get_if_exists(cache_key, NULL)
+  
+  current <- get_segment_color_scheme()
+  if (!is.null(cached_scheme) && cached_scheme %in% schemes) {
+    current <- cached_scheme
+    set_segment_color_scheme(cached_scheme)
+  } else if (!current %in% schemes) {
     set_segment_color_scheme("order_rainbow")
     current <- "order_rainbow"
   }
@@ -155,8 +290,33 @@ observeEvent(state$assembly, {
 observeEvent(input$segmentColorScheme, {
   if (!is.null(input$segmentColorScheme)) {
     set_segment_color_scheme(input$segmentColorScheme)
+    
+    # cache the color scheme based on current mode
+    mode <- tryCatch(graph_mode(), error = function(e) "segments")
+    cache_key <- if (mode == "csegments") "csegment.color_scheme" else "segment.color_scheme"
+    cache_set(cache_key, input$segmentColorScheme)
+    
     current_val <- refresh_trigger()
     refresh_trigger(current_val + 1)
   }
 })
+
+# update color scheme when mode changes
+observeEvent(input$graphMode, {
+  if (!is.null(input$graphMode)) {
+    mode <- input$graphMode
+    cache_key <- if (mode == "csegments") "csegment.color_scheme" else "segment.color_scheme"
+    cached_scheme <- cache_get_if_exists(cache_key, NULL)
+    
+    if (!is.null(cached_scheme)) {
+      schemes <- get_segment_color_schemes()
+      if (cached_scheme %in% schemes) {
+        set_segment_color_scheme(cached_scheme)
+        updateSelectInput(session, "segmentColorScheme",
+                         choices = schemes,
+                         selected = cached_scheme)
+      }
+    }
+  }
+}, ignoreInit = TRUE)
 

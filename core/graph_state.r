@@ -3,7 +3,11 @@
 
 # graph selection state
 selected_graph_segments <- reactiveVal(character())
+selected_graph_csegments <- reactiveVal(character())
 selected_graph_edge <- reactiveVal(NULL)
+
+# graph mode: "segments" or "csegments"
+graph_mode <- reactiveVal("segments")
 
 # trigger to force graph re-render when selection changes
 graph_selection_trigger <- reactiveVal(0)

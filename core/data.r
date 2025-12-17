@@ -10,6 +10,9 @@
 .data_env$register_fasta_f <- NULL
 .data_env$register_seg_bins_f <- NULL
 .data_env$register_seg_adj_f <- NULL
+.data_env$register_csegments_f <- NULL
+.data_env$register_cseg_adj_f <- NULL
+.data_env$register_cluster_mapping_f <- NULL
 .data_env$assemblies <- NULL
 .data_env$regions_dir <- NULL
 
@@ -162,6 +165,21 @@ register_seg_adj_f <- function(f) {
   .data_env$register_seg_adj_f <- f
 }
 
+register_csegments_f <- function(f) {
+  cat(sprintf("registering csegments function\n"))
+  .data_env$register_csegments_f <- f
+}
+
+register_cseg_adj_f <- function(f) {
+  cat(sprintf("registering cseg_adj function\n"))
+  .data_env$register_cseg_adj_f <- f
+}
+
+register_cluster_mapping_f <- function(f) {
+  cat(sprintf("registering cluster_mapping function\n"))
+  .data_env$register_cluster_mapping_f <- f
+}
+
 # Get contigs using the registered function
 get_contigs <- function(assembly = NULL) {
   if (is.null(.data_env$register_contigs_f)) {
@@ -260,5 +278,39 @@ get_seg_adj <- function(assembly = NULL) {
   key <- sprintf("global.seg_adj.%s", if (is.null(assembly)) "default" else assembly)
   cache(key, {
     .data_env$register_seg_adj_f(assembly)
+  })
+}
+
+# get csegments using the registered function (returns NULL if not registered)
+get_csegments <- function(assembly = NULL) {
+  if (is.null(.data_env$register_csegments_f)) {
+    return(NULL)
+  }
+  key <- sprintf("global.csegments.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_csegments_f(assembly)
+  })
+}
+
+# get csegment adjacency using the registered function (returns NULL if not registered)
+get_cseg_adj <- function(assembly = NULL) {
+  if (is.null(.data_env$register_cseg_adj_f)) {
+    return(NULL)
+  }
+  key <- sprintf("global.cseg_adj.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_cseg_adj_f(assembly)
+  })
+}
+
+# get cluster mapping using the registered function (returns NULL if not registered)
+get_cluster_mapping <- function(assembly = NULL) {
+  
+  if (is.null(.data_env$register_cluster_mapping_f)) {
+    return(NULL)
+  }
+  key <- sprintf("global.cluster_mapping.%s", if (is.null(assembly)) "default" else assembly)
+  cache(key, {
+    .data_env$register_cluster_mapping_f(assembly)
   })
 }
