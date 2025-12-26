@@ -35,7 +35,7 @@ cache_set("navigate_up_down_type", navigate_up_down_type)
 ########################################################
 
 aids <- get_data("ASSEMBLY_TABLE")$ASSEMBLY_ID
-aids <- c("BAA", "BAM", "EBC", "BAH", "EAL", "EAA", "EAV", "EBQ")
+aids <- c("AAK", "EAP", "BAA", "BAM", "EBC", "BAH", "EAL", "EAA", "EAV", "EBQ")
 
 # Sort assembly IDs to prioritize EBC
 aids <- aids[order(aids != "EBC")]
@@ -79,7 +79,50 @@ register_genomes_f(function(assembly = NULL) {
     }
     
     rr = data.frame(gid = df$bin, df[,-match(c("bin","domain"), names(df))])
+    
+    # load sweeps table (global, no tag)
+    sweeps_df <- get_data("EVO_HOST_SWEEPS_CLASSIFIED", null.on.missing = TRUE)
+    if (!is.null(sweeps_df)) {
+        # filter by assembly and join on host_bin = gid
+        sweeps_assembly <- sweeps_df[sweeps_df$aid == assembly, ]
+        if (nrow(sweeps_assembly) > 0) {
+            # merge on gid = host_bin
+            rr <- merge(rr, sweeps_assembly, by.x = "gid", by.y = "host_bin", all.x = TRUE, sort = FALSE)
+            # rename and select fields
+            if ("var_sweep_class_label" %in% names(rr)) {
+                rr$sweep_class <- rr$var_sweep_class_label
+            }
+            if ("num_rearrange" %in% names(rr)) {
+                rr$rearrange <- rr$num_rearrange
+            }
+            if ("num_sweeping_rearrange" %in% names(rr)) {
+                rr$sweeping_rearrange <- rr$num_sweeping_rearrange
+            }
+            if ("num_sweeping_locals" %in% names(rr)) {
+                rr$sweeping_locals <- rr$num_sweeping_locals
+            }
+            if ("num_sweeping_elements" %in% names(rr)) {
+                rr$sweeping_elements <- rr$num_sweeping_elements
+            }
+            if ("num_local_variants" %in% names(rr)) {
+                rr$local_variants <- rr$num_local_variants
+            }
+            if ("num_associated_elements" %in% names(rr)) {
+                rr$associated_elements <- rr$num_associated_elements
+            }
+            # remove original columns we don't need
+            cols_to_remove <- c("aid", "host_bin", "num_rearrange", "num_sweeping_rearrange", 
+                              "num_sweeping_locals", "num_sweeping_elements", "num_local_variants",
+                              "num_associated_elements", "var_sweep_class_label", "var_sweep_class_id")
+            cols_to_remove <- cols_to_remove[cols_to_remove %in% names(rr)]
+            if (length(cols_to_remove) > 0) {
+                rr <- rr[, !names(rr) %in% cols_to_remove]
+            }
+        }
+    }
+    
     rr = rr[order(-rr$length),]
+    return(rr)
 })
 
 # Register segment map function
@@ -498,6 +541,22 @@ register_tab(
   get_seg_adj_count_f = function(assembly) get_data("BINNING_SEG_ADJ_count", tag = assembly, null.on.missing = TRUE),
   get_bin_segment_table_f = function(assembly) get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly, null.on.missing = TRUE),
   get_host_table_f = function(assembly) get_data("BINNING_HOST_TABLE", tag = assembly, null.on.missing = TRUE)
+)
+
+########################################################
+# register poly tab
+########################################################
+
+# poly tab - unified locals, rearrangements, and elements
+register_tab(
+  tab_id = "poly",
+  tab_label = "Poly",
+  tab_code = "tabs/poly/poly_tab.r",
+  library_ids = c("early", "pre", "post", "late"),
+  get_unify_table_f = function(assembly) get_data("EVO_UNIFY_TABLE_ASSEMBLY", tag = assembly, null.on.missing = TRUE),
+  get_unify_support_f = function(assembly) get_data("EVO_UNIFY_SUPPORT_ASSEMBLY", tag = assembly, null.on.missing = TRUE),
+  get_unify_coverage_f = function(assembly) get_data("EVO_UNIFY_COVERAGE_ASSEMBLY", tag = assembly, null.on.missing = TRUE),
+  get_abundance_f = function(assembly) get_data("BINNING_ABUNDANCE_LR_MAT", tag = assembly, null.on.missing = TRUE)
 )
 
 ########################################################

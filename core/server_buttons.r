@@ -101,6 +101,10 @@ observeEvent(input$gotoGenomesBtn, {
     genomes_data <- get_genomes(state$assembly)
     segment_map_data <- get_segment_map(state$assembly)
     selected_gids <- genomes_data$gid[rows]
+    
+    # update last selected genome (use first selected if multiple)
+    last_selected_genome(selected_gids[1])
+    
     selected_segment_ids <- segment_map_data$segment[segment_map_data$gid %in% selected_gids]
     current_segment_ids <- get_state_segments()$segment
     if (!identical(sort(selected_segment_ids), sort(current_segment_ids))) {

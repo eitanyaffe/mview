@@ -58,10 +58,34 @@ output$contigTable <- renderDT({
 })
 
 output$genomeTable <- renderDT({
+    # depend on field selection trigger to ensure updates
+    genome_fields_trigger()
+    
     # determine selection mode based on checkbox state
     selection_mode <- if (!is.null(input$allowMultipleGenomesChk) && !input$allowMultipleGenomesChk) "single" else "multiple"
     
-    datatable(get_genomes(state$assembly), selection = list(mode = selection_mode, target = "row"))
+    # get genome data
+    genomes_df <- get_genomes(state$assembly)
+    
+    # filter fields based on selection
+    selected_fields <- get_selected_genome_fields(state$assembly)
+    genomes_df <- filter_genome_table_fields(genomes_df, selected_fields)
+    
+    # format column names for display
+    col_names <- get_genome_column_names(names(genomes_df))
+    
+    datatable(
+        genomes_df, 
+        selection = list(mode = selection_mode, target = "row"),
+        colnames = col_names,
+        rownames = FALSE,
+        escape = FALSE,
+        options = list(
+          columnDefs = list(
+            list(className = "dt-left", targets = "_all")
+          )
+        )
+    )
 })
 
 output$segmentTable <- renderDT({

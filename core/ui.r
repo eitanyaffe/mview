@@ -285,7 +285,12 @@ ui <- fluidPage(
       verbatimTextOutput("project_info"),
       shiny::selectInput("regions_module-assembly_select", "Assembly:",
         choices = get_assemblies(),
-        selected = get_assemblies()[1],
+        selected = {
+          assemblies <- get_assemblies()
+          default_assembly <- if (length(assemblies) > 0) assemblies[1] else ""
+          cached_assembly <- cache_get_if_exists("assembly.selected", default_assembly)
+          if (cached_assembly %in% assemblies) cached_assembly else default_assembly
+        },
         multiple = FALSE,
         width = "100%"
       ),

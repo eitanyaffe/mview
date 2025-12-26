@@ -3,6 +3,7 @@ get_server <- function() {
         source("core/server_state.r", local = TRUE)
         source("core/server_profiles.r", local = TRUE)
         source("core/server_tables.r", local = TRUE)
+        source("core/genome_fields.r", local = TRUE)
         source("core/server_buttons.r", local = TRUE)
         source("core/server_views.r", local = TRUE)
         source("core/server_parameters.r", local = TRUE)

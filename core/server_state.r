@@ -114,6 +114,10 @@ state <- reactiveValues(
   mouse_coords = NULL
 )
 
+# reactive variable for last selected genome (gid)
+# updated when user clicks goto on a genome
+last_selected_genome <- reactiveVal(NULL)
+
 # Project info output
 output$project_info <- renderText({
   sprintf("Project: %s", get_project_id())
@@ -207,6 +211,7 @@ output$current_region_display <- renderText({
 observeEvent(input$`regions_module-assembly_select`, {
   if (!identical(state$assembly, input$`regions_module-assembly_select`)) {
     state$assembly <- input$`regions_module-assembly_select`
+    cache_set("assembly.selected", state$assembly)
   }
 })
 
@@ -216,5 +221,13 @@ observe({
   selected <- state$assembly
   if (!is.null(selected) && !identical(current_input, selected)) {
     updateSelectInput(session, "regions_module-assembly_select", selected = selected)
+  }
+})
+
+# persist assembly changes that originate outside the dropdown
+observe({
+  current_assembly <- state$assembly
+  if (!is.null(current_assembly) && current_assembly != "") {
+    cache_set("assembly.selected", current_assembly)
   }
 })

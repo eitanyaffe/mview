@@ -6,12 +6,19 @@ output$mainTabsPanel <- renderUI({
   # genomes tab (first)
   genomes_tab <- tabPanel(
     "Genomes (G)",
-    checkboxInput("allowMultipleGenomesChk", "allow multiple", 
-                  value = cache_get_if_exists("allow_multiple_genomes", FALSE)),
-    actionButton("gotoGenomesBtn", "goto"),
-    actionButton("addGenomesBtn", "add"),
-    actionButton("removeGenomesFromListBtn", "remove"),
-    actionButton("clearGenomeSelectionBtn", "clear selection"),
+    div(
+      style = "display: flex; align-items: center; gap: 5px; margin-bottom: 5px;",
+      checkboxInput("allowMultipleGenomesChk", "allow multiple", 
+                    value = cache_get_if_exists("allow_multiple_genomes", FALSE)),
+      actionButton("genomeFieldsBtn", "", 
+                   icon = icon("bars"),
+                   class = "btn-sm",
+                   title = "Select fields to display"),
+      actionButton("gotoGenomesBtn", "goto"),
+      actionButton("addGenomesBtn", "add"),
+      actionButton("removeGenomesFromListBtn", "remove"),
+      actionButton("clearGenomeSelectionBtn", "clear selection")
+    ),
     DTOutput("genomeTable")
   )
   
