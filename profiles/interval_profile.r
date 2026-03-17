@@ -11,6 +11,10 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
     intervals <- NULL
     if (is.function(profile$intervals_f)) {
       intervals <- profile$intervals_f(assembly)
+    } else if (is.character(profile$intervals_f)) {
+      if (cache_exists(profile$intervals_f)) {
+        intervals <- cache_get(profile$intervals_f)
+      }
     } else if (is.data.frame(profile$intervals_f)) {
       intervals <- profile$intervals_f
     } else {
@@ -32,8 +36,20 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
       assembly_intervals <- intervals
     }
 
-    # filter intervals using context
-    filtered_intervals <- cxt_filter_intervals(assembly_intervals, merge_adjacent = profile$merge_adjacent)
+    # use pre-computed xlim vcoords when available (e.g. regions); otherwise convert from contig coords
+    if ("xlim_start" %in% names(assembly_intervals) && !all(is.na(assembly_intervals$xlim_start))) {
+      xlim <- cxt_get_xlim()
+      visible <- !is.na(assembly_intervals$xlim_start) &
+                 assembly_intervals$xlim_end >= xlim[1] &
+                 assembly_intervals$xlim_start <= xlim[2]
+      filtered_intervals <- assembly_intervals[visible, , drop = FALSE]
+      if (nrow(filtered_intervals) > 0) {
+        filtered_intervals$gstart <- filtered_intervals$xlim_start
+        filtered_intervals$gend   <- filtered_intervals$xlim_end
+      }
+    } else {
+      filtered_intervals <- cxt_filter_intervals(assembly_intervals, merge_adjacent = profile$merge_adjacent)
+    }
     
     if (is.null(filtered_intervals) || nrow(filtered_intervals) == 0) {
       return(list(plot = gg, legends = list()))

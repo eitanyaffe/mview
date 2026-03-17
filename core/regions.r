@@ -123,13 +123,15 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             contig = character(),
             start = integer(),
             end = integer(),
+            xlim_start = numeric(),
+            xlim_end = numeric(),
             desc = character(),
             id = character(),
             stringsAsFactors = FALSE
           ))
         }
         
-        # Convert regions with single segment to segment format
+        # Convert regions to intervals: one row per contig spanned by the region's segments
         result_rows <- list()
         for (i in seq_len(nrow(rt))) {
           row <- rt[i, ]
@@ -138,11 +140,8 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           }
           
           segment_ids <- trimws(strsplit(row$segments, ",")[[1]])
-          if (length(segment_ids) != 1) {
-            next  # Only single-segment regions
-          }
           
-          # Get segment info
+          # Get segment info for this assembly
           all_segments <- tryCatch({
             get_segments(row$assembly)
           }, error = function(e) {
@@ -153,20 +152,26 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             next
           }
           
-          seg <- all_segments[all_segments$segment == segment_ids[1], ]
-          if (nrow(seg) == 0) {
+          segs <- all_segments[all_segments$segment %in% segment_ids, ]
+          if (nrow(segs) == 0) {
             next
           }
           
-          result_rows[[length(result_rows) + 1]] <- data.frame(
-            assembly = row$assembly,
-            contig = seg$contig[1],
-            start = seg$start[1],
-            end = seg$end[1],
-            desc = row$description,
-            id = row$id,
-            stringsAsFactors = FALSE
-          )
+          # one bounding-box interval per contig, preserving xlim as vcoords
+          for (ctg in unique(segs$contig)) {
+            ctg_segs <- segs[segs$contig == ctg, ]
+            result_rows[[length(result_rows) + 1]] <- data.frame(
+              assembly = row$assembly,
+              contig = ctg,
+              start = min(ctg_segs$start),
+              end = max(ctg_segs$end),
+              xlim_start = if (!is.na(row$xlim_start)) row$xlim_start else NA_real_,
+              xlim_end   = if (!is.na(row$xlim_end))   row$xlim_end   else NA_real_,
+              desc = row$description,
+              id = as.character(row$id),
+              stringsAsFactors = FALSE
+            )
+          }
         }
         
         if (length(result_rows) == 0) {
@@ -175,6 +180,8 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             contig = character(),
             start = integer(),
             end = integer(),
+            xlim_start = numeric(),
+            xlim_end = numeric(),
             desc = character(),
             id = character(),
             stringsAsFactors = FALSE
