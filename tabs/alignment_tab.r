@@ -158,11 +158,14 @@ observe({
   }
   
   choices <- setNames(profile_ids, profile_ids)
-  current_selection <- input$alignment_profile_select
   
-  # if current selection is not in choices, use first available
-  if (is.null(current_selection) || !is.element(current_selection, profile_ids)) {
-    current_selection <- profile_ids[1]
+  # use clicked_profile_id as authoritative source to avoid stale input$alignment_profile_select
+  current_selection <- if (!is.null(state$clicked_profile_id) && is.element(state$clicked_profile_id, profile_ids)) {
+    state$clicked_profile_id
+  } else if (is.null(input$alignment_profile_select) || !is.element(input$alignment_profile_select, profile_ids)) {
+    profile_ids[1]
+  } else {
+    input$alignment_profile_select
   }
   
   if (!is.null(session)) {
