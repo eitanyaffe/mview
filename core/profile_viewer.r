@@ -676,14 +676,18 @@ plot_profiles_ggplot <- function() {
       bottom_plot_name <- names(ggplot_list)[length(ggplot_list)]
       bottom_plot <- ggplot_list[[bottom_plot_name]]
       
+      # use profile's annotations_y if specified, otherwise fall back to -Inf
+      bottom_profile <- profiles[[bottom_plot_name]]
+      ann_y <- if (!is.null(bottom_profile$attr$annotations_y)) bottom_profile$attr$annotations_y else -Inf
+      
       # Add coordinate labels as text annotations
       bottom_plot <- bottom_plot + 
         ggplot2::annotate("text", 
                          x = coord_annotations$x, 
-                         y = -Inf, 
+                         y = ann_y, 
                          label = coord_annotations$label,
                          angle = 90, 
-                         hjust = 0, 
+                         hjust = 1, 
                          vjust = 0.5,
                          size = 3)
       
@@ -699,6 +703,10 @@ plot_profiles_ggplot <- function() {
       }
     }
   }
+
+  # add bottom margin so tick labels extending below the axis panel are not clipped
+  combined_plot <- combined_plot +
+    patchwork::plot_annotation(theme = ggplot2::theme(plot.margin = ggplot2::margin(2, 5, 15, 5, "mm")))
 
   return(list(plot = combined_plot, total_height = total_height, legends = legends))
 }

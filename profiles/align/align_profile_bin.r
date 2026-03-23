@@ -42,7 +42,7 @@ get_current_bin_size <- function(xlim, bin_type, target_bins = 1024,
 align_query_bin_mode <- function(aln, bin_type, target_bins = 1024, 
   seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", 
   clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, 
-  max_alignment_length = 0, min_indel_length = 3, 
+  max_alignment_length = 0, min_indel_length = 3, min_seg_support = 2,
   binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
 {
   intervals <- cxt_get_zoom_view()
@@ -80,7 +80,8 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
                        max_mutations_percent = max_mutations_percent,
                        min_alignment_length = min_alignment_length,
                        max_alignment_length = max_alignment_length,
-                       min_indel_length = min_indel_length
+                       min_indel_length = min_indel_length,
+                       min_seg_support = min_seg_support
                      ), algo = "md5"))
 
   
@@ -94,7 +95,8 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
       max_mutations_percent = as.numeric(max_mutations_percent), 
       min_alignment_length = as.integer(min_alignment_length), 
       max_alignment_length = as.integer(max_alignment_length), 
-      min_indel_length = as.integer(min_indel_length))
+      min_indel_length = as.integer(min_indel_length),
+      min_seg_support = as.integer(min_seg_support))
   })
 
   if (!is.null(df) && nrow(df) > 0) {
@@ -573,8 +575,9 @@ align_profile_bin <- function(profile, aln, gg) {
   seg_threshold <- if (!is.null(profile$seg_threshold)) profile$seg_threshold else 0.2
   non_ref_threshold <- if (!is.null(profile$non_ref_threshold)) profile$non_ref_threshold else 0.9
   num_threads <- if (!is.null(profile$num_threads)) profile$num_threads else 0
+  min_seg_support <- if (!is.null(profile$min_seg_support)) profile$min_seg_support else 2
   
-  df <- align_query_bin_mode(aln, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length), binsizes = profile$binsizes)
+  df <- align_query_bin_mode(aln, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length), min_seg_support = as.integer(min_seg_support), binsizes = profile$binsizes)
   if (is.null(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }

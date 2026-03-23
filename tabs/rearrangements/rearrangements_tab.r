@@ -406,6 +406,10 @@ observeEvent(input$gotoRearrangementsBtn, {
   # convert to global coordinates using context services
   # use out_clip as the coordinate for rearrangements
   selected_events$gcoord <- cxt_contig2global(selected_events$contig, selected_events$out_clip)
+  if (any(is.na(selected_events$gcoord))) {
+    showNotification("Selected event(s) are not in the current view", type = "warning")
+    return()
+  }
   
   # calculate spanning range with appropriate margin
   min_coord <- min(selected_events$gcoord)

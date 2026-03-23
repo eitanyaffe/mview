@@ -1275,6 +1275,10 @@ observeEvent(input$polyGotoSiteBtn, {
   # convert to global coordinates (now safe since segments are set)
   gstart <- cxt_contig2global(contig_name, min(coord1, coord2))
   gend <- cxt_contig2global(contig_name, max(coord1, coord2))
+  if (is.na(gstart) || is.na(gend)) {
+    showNotification("Selected variant is not in the current view", type = "warning")
+    return()
+  }
   
   # add 5kb margin on both sides
   margin <- 5000
@@ -1381,8 +1385,13 @@ observeEvent(input$polyGotoElementBtn, {
     # now that segments are set, we can convert coordinates
     gstart <- cxt_contig2global(seg_contig, seg_start)
     gend <- cxt_contig2global(seg_contig, seg_end)
-    
-    all_gcoords <- c(all_gcoords, gstart, gend)
+    if (!is.na(gstart) && !is.na(gend))
+      all_gcoords <- c(all_gcoords, gstart, gend)
+  }
+  
+  if (length(all_gcoords) == 0) {
+    showNotification("No segments are in the current view", type = "warning")
+    return()
   }
   
   # calculate spanning range with 10% margin

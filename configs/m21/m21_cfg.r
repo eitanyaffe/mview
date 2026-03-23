@@ -73,6 +73,24 @@ register_genomes_f(function(assembly = NULL) {
     
     rr = data.frame(gid = df$bin, df[,-match(c("bin","domain"), names(df))])
     
+    # load abundance table (global, no tag) and add per-timepoint columns
+    abundance_df <- get_data("EVO_HOST_ABUNDANCE", null.on.missing = TRUE)
+    if (!is.null(abundance_df)) {
+        abundance_assembly <- abundance_df[abundance_df$aid == assembly, ]
+        if (nrow(abundance_assembly) > 0) {
+            ix <- match(rr$gid, abundance_assembly$bin)
+            if (any(is.na(ix))) {
+                missing <- rr$gid[is.na(ix)]
+                stop(sprintf("error: missing abundance for %d genomes, e.g. %s",
+                             length(missing), paste(head(missing, 5), collapse = ", ")))
+            }
+            abundance_cols <- names(abundance_assembly)[!names(abundance_assembly) %in% c("aid", "bin")]
+            for (col in abundance_cols) {
+                rr[[col]] <- abundance_assembly[[col]][ix]
+            }
+        }
+    }
+
     # load sweeps table (global, no tag)
     sweeps_df <- get_data("EVO_HOST_SWEEPS_CLASSIFIED", null.on.missing = TRUE)
     if (!is.null(sweeps_df)) {
@@ -113,8 +131,18 @@ register_genomes_f(function(assembly = NULL) {
             }
         }
     }
-    
-    rr = rr[order(-rr$length),]
+
+    # sort by minimum abundance across timepoints, descending
+    if (!is.null(abundance_df) && exists("abundance_cols") && length(abundance_cols) > 0) {
+        abund_cols_present <- abundance_cols[abundance_cols %in% names(rr)]
+        if (length(abund_cols_present) > 0) {
+            rr$min_abundance <- apply(rr[, abund_cols_present, drop = FALSE], 1, min, na.rm = TRUE)
+            rr = rr[order(-rr$min_abundance), ]
+            rr$min_abundance <- NULL
+        }
+    } else {
+        rr = rr[order(-rr$length), ]
+    }
     return(rr)
 })
 
@@ -262,6 +290,7 @@ view_register("early", view_file, timepoints = c("early"), show_self_align = FAL
 view_register("pre", view_file, timepoints = c("pre"), show_self_align = FALSE)
 view_register("post", view_file, timepoints = c("post"), show_self_align = FALSE)
 view_register("late", view_file, timepoints = c("late"), show_self_align = FALSE)
+view_register("pre / late", view_file, timepoints = c("pre", "late"), show_self_align = FALSE)
 view_register("pre / post", view_file, timepoints = c("pre", "post"), show_self_align = FALSE)
 view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"), show_self_align = FALSE)
 view_register("all", view_file, timepoints = c("early", "pre", "post", "late"), show_self_align = FALSE)

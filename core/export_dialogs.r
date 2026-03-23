@@ -631,14 +631,14 @@ observeEvent(input$confirm_export_view, {
     }
     
     # restore original state
-    state$contigs <- original_contigs
+    state$segments <- original_segments
     state$zoom <- original_zoom
     state$assembly <- original_assembly
     
     showNotification(paste("Exported", success_count, "of", length(context_options), "contexts to:", output_dir), type = "message", duration = 5)
     
   }, error = function(e) {
-    showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
+    message("export failed: ", e$message)
   })
 })
 
@@ -739,6 +739,6 @@ observeEvent(input$confirm_export_regions, {
                      type = "message", duration = 8)
     
   }, error = function(e) {
-    showNotification(paste("Export failed:", e$message), type = "error", duration = 10)
+    message("export failed: ", e$message)
   })
 })

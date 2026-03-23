@@ -135,6 +135,11 @@ default_alignment_params <- list(
     type = "double",
     default = 0.9
   ),
+  min_seg_support = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 2
+  ),
   num_threads = list(
     group_id = "align_bin",
     type = "integer",

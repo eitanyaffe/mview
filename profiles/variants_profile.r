@@ -24,6 +24,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     
     # filter variants using context coordinates (similar to filter_coords)
     filtered_variants <- cxt_filter_coords(variants)
+
     if (is.null(filtered_variants) || nrow(filtered_variants) == 0) {
       return(list(plot = gg, legends = list()))
     }
@@ -117,7 +118,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     # add variant ID labels to the right of lines
     xlim <- cxt_get_xlim()
     label_offset <- (xlim[2] - xlim[1]) * 0.017
-    
+
     # non-selected labels
     if (nrow(non_selected) > 0) {
       non_selected_hover <- hover_text[!filtered_variants$is_selected]
@@ -161,6 +162,9 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     
     gg <- gg +
       ggplot2::ylim(-0.5, 0.5)
+    
+    # allow labels slightly past xlim (matches plotly interactive behavior)
+    gg <- suppressWarnings(gg + ggplot2::coord_cartesian(xlim = xlim, clip = "off"))
     
     return(list(plot = gg, legends = list()))
   }

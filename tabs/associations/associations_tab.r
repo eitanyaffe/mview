@@ -841,6 +841,10 @@ observeEvent(input$associationsGotoSegmentTrigger, {
   # convert to global coordinates using context services
   gstart <- cxt_contig2global(contig_name, seg_start)
   gend <- cxt_contig2global(contig_name, seg_end)
+  if (is.na(gstart) || is.na(gend)) {
+    showNotification("Selected segment is not in the current view", type = "warning")
+    return()
+  }
   
   # calculate zoom with margin
   span <- gend - gstart

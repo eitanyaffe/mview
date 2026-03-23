@@ -71,7 +71,7 @@ axis_profile <- function(id = "simple_axis",
     }, error = function(e) NULL)
   }
 
-  # compute tick annotations for current view (used by hover/click handlers)
+  # compute tick annotations for current view (used by plotly interactive and PDF export)
   get_annotations_f <- function(profile) {
     contig_df <- cxt_get_entire_view()
     if (is.null(contig_df) || nrow(contig_df) == 0) return(NULL)
@@ -79,11 +79,9 @@ axis_profile <- function(id = "simple_axis",
     zoom_xlim <- cxt_get_xlim()
     if (is.null(zoom_xlim)) zoom_xlim <- c(min(contig_df$vstart), max(contig_df$vend))
     
-    # filter to visible contigs using virtual coords
     visible <- contig_df[contig_df$vstart < zoom_xlim[2] & contig_df$vend > zoom_xlim[1], , drop = FALSE]
     if (nrow(visible) != 1) return(NULL)
 
-    # compute local visible range
     vstart <- visible$vstart[1]
     local_start <- visible$start[1]
     local_end <- visible$end[1]
@@ -96,7 +94,6 @@ axis_profile <- function(id = "simple_axis",
     local_ticks <- compute_local_ticks(local_visible_start, local_visible_end, nice_interval)
     if (length(local_ticks) == 0) return(NULL)
 
-    # convert to virtual coords for plotting
     global_ticks <- vstart + local_ticks - local_start
     data.frame(
       x = global_ticks,
@@ -107,6 +104,7 @@ axis_profile <- function(id = "simple_axis",
 
   plot_f <- function(profile, gg) {
     contig_df <- cxt_get_entire_view()
+
     if (is.null(contig_df) || nrow(contig_df) == 0) return(list(plot = gg, legends = list()))
 
     # get zoom range in virtual coords
@@ -160,6 +158,7 @@ axis_profile <- function(id = "simple_axis",
           local_ticks <- compute_local_ticks(local_visible_start, local_visible_end, nice_interval)
           if (length(local_ticks) > 0) {
             global_ticks <- vstart + local_ticks - local_start
+            tick_labels <- format(local_ticks, big.mark = ",", scientific = FALSE)
             tick_data <- data.frame(x = global_ticks, y = 0.8, xend = global_ticks, yend = 0.75)
             gg <- gg + ggplot2::geom_segment(data = tick_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend), 
                                               color = "black", size = 0.3)
@@ -191,7 +190,8 @@ axis_profile <- function(id = "simple_axis",
       }
     }
 
-    list(plot = gg + ggplot2::coord_cartesian(ylim = c(0.35, 0.9), clip = "off"), legends = list())
+    # include xlim so patchwork aligns axis panel with all other panels
+    list(plot = suppressWarnings(gg + ggplot2::coord_cartesian(xlim = zoom_xlim, ylim = c(0.35, 0.9), clip = "off")), legends = list())
   }
 
   profile_create(
@@ -199,7 +199,7 @@ axis_profile <- function(id = "simple_axis",
     name = name,
     type = "axis",
     height = height, is_fixed = is_fixed,
-    attr = list(hide_y_label = TRUE, hide_y_ticks = TRUE),
+    attr = list(hide_y_label = TRUE, hide_y_ticks = TRUE, annotations_y = 0.73),
     params = params,
     data_f = data_f,
     plot_f = plot_f,

@@ -182,7 +182,7 @@ cxt_set_view <- function(selected_segments) {
   
   # ensure strand column exists (default to '+')
   if (!"strand" %in% names(plotted_segments)) {
-    plotted_segments$strand <- "+"
+    plotted_segments$strand <- rep("+", nrow(plotted_segments))
   }
   
   cat(sprintf("[cxt_set_view] Setting view with %d segments (from %d input segments)\n", 
@@ -307,17 +307,24 @@ cxt_get_segments <- function(limit_to_zoom = FALSE) {
 ################################################################################
 
 # Convert contig coords to global vcoords
+# returns NA for coords not in plotted segments
 cxt_contig2global <- function(contigs, coords) {
+  n <- length(contigs)
   if (is.null(.context_env$current_context)) {
     warning("cxt_contig2global: no current context")
-    return(rep(NA_real_, length(contigs)))
+    return(rep(NA_real_, n))
   }
   
-  df <- data.frame(contig = contigs, coord = coords, stringsAsFactors = FALSE)
-  df_minimal <- df[c("contig", "coord")]
-  result_minimal <- context_contig2view_point(.context_env$current_context, df_minimal)
-  result <- merge_context_result(df, result_minimal)
-  result$vcoord
+  in_view <- cxt_coords_in_view(contigs, coords)
+  result <- rep(NA_real_, n)
+  if (!all(in_view))
+    warning(sprintf("cxt_contig2global: %d coord(s) not in plotted segments, returning NA", sum(!in_view)))
+  if (!any(in_view))
+    return(result)
+  df <- data.frame(contig = contigs[in_view], coord = coords[in_view], stringsAsFactors = FALSE)
+  result_minimal <- context_contig2view_point(.context_env$current_context, df)
+  result[in_view] <- merge_context_result(df, result_minimal)$vcoord
+  result
 }
 
 # Convert global vcoords to contig coords

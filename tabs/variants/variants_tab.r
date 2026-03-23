@@ -281,6 +281,10 @@ observeEvent(input$gotoVariantsBtn, {
   
   # convert to global coordinates using context services
   selected_vars$gcoord <- cxt_contig2global(selected_vars$contig, selected_vars$coord)
+  if (any(is.na(selected_vars$gcoord))) {
+    showNotification("Selected variant(s) are not in the current view", type = "warning")
+    return()
+  }
   
   # calculate spanning range with appropriate margin
   min_coord <- min(selected_vars$gcoord)

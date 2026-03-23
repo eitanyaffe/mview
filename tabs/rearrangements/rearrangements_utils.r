@@ -219,8 +219,8 @@ filter_rearrangements_by_region <- function(rearrange_data, contigs, zoom, assem
       # convert event coordinates to global using context services
       events_df$gcoord <- cxt_contig2global(events_df[[contig_col]], events_df$out_clip)
       
-      # filter by zoom range
-      keep_zoom <- events_df$gcoord >= zoom[1] & events_df$gcoord <= zoom[2]
+      # filter by zoom range (NA gcoords are not in view, exclude them)
+      keep_zoom <- !is.na(events_df$gcoord) & events_df$gcoord >= zoom[1] & events_df$gcoord <= zoom[2]
       events_df <- events_df[keep_zoom, ]
       
       # remove temporary gcoord column
