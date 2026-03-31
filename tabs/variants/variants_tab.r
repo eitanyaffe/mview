@@ -1,5 +1,6 @@
 # load variant utilities (only loaded when variants tab is registered)
 source("tabs/variants/variants_utils.r", local = TRUE)
+source("profiles/align/align_utils.r")
 source("core/frequency_plots.r")
 
 # validate and extract tab parameters
@@ -12,32 +13,47 @@ if (is.null(tab)) {
 is_dynamic <- tab$is.dynamic %||% TRUE  # default to dynamic for backward compatibility
 
 if (is_dynamic) {
-  # dynamic mode: requires alignment functions
   required_params <- c("min_reads", "min_coverage", "min_libraries", "get_aln_f", "library_ids")
   missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
   if (length(missing_params) > 0) {
     stop(sprintf("variants tab (dynamic mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
   }
 } else {
-  # static mode: requires file getter functions
-  required_params <- c("library_ids", "get_variants_table_f", "get_variants_support_f", "get_variants_coverage_f")
+  required_params <- c("get_variants_table_f", "get_variants_support_f", "get_variants_coverage_f")
   missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
   if (length(missing_params) > 0) {
     stop(sprintf("variants tab (static mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
   }
+  if (is.null(tab$library_ids) && is.null(tab$library_id_map)) {
+    stop("variants tab (static mode) requires either library_ids or library_id_map")
+  }
 }
 
-# extract common parameters
-library_ids <- tab$library_ids
-if (!is.character(library_ids) || length(library_ids) == 0) {
-  stop("library_ids must be a non-empty character vector")
+# extract library configuration
+use_library_id_map <- !is.null(tab$library_id_map)
+if (use_library_id_map) {
+  library_id_map <- tab$library_id_map
+} else {
+  library_ids_param <- tab$library_ids
+  if (!is.character(library_ids_param) || length(library_ids_param) == 0) {
+    stop("library_ids must be a non-empty character vector")
+  }
+  library_id_map <- data.frame(aid = "*", set_name = "default", stringsAsFactors = FALSE)
+  library_id_map$set_ids <- list(library_ids_param)
 }
+
+has_multiple_sets <- nrow(library_id_map) > 1
+all_library_ids <- unique(unlist(library_id_map$set_ids))
+library_ids <- library_id_map$set_ids[[1]]
 
 # optional gene parameters
 get_gene_table_f <- tab$get_gene_table_f
 codon_table_path <- tab$codon_table_path
 get_fasta_f <- tab$get_fasta_f
 use_genes <- tab$use_genes
+
+# optional sample map for matrix individual indicators and dividers
+sample_map <- tab$sample_map
 
 # extract mode-specific parameters
 if (is_dynamic) {
@@ -75,6 +91,12 @@ set_tab_panel_f(function() {
       column(3,
         wellPanel(
           h5("Variant Controls"),
+          if (has_multiple_sets) {
+            selectInput("variantSampleSet", "Sample Set:",
+                       choices = setNames(library_id_map$set_name, library_id_map$set_name),
+                       selected = cache_get_if_exists("variant_sample_set", library_id_map$set_name[1]),
+                       width = "100%")
+          },
           if (is_dynamic) {
             list(
               actionButton("updateVariantsBtn", "Update Variants", class = "btn-primary", width = "100%"),
@@ -83,12 +105,42 @@ set_tab_panel_f(function() {
           },
           verbatimTextOutput("variantCountText", placeholder = TRUE),
           br(),
+          h5("Selected Variant"),
+          textInput("selectedVariantId", label = NULL,
+                    value = "", placeholder = "variant ID", width = "100%"),
+          br(),
           checkboxInput("autoUpdateProfilesChk", "Auto-update profiles", 
                        value = cache_get_if_exists("auto_update_profiles", FALSE), width = "100%"),
           br(), br(),
           h5("Filtering"),
           numericInput("variantSpanFilter", "Min Span:", 
-                      value = 0.5, min = 0, max = 1, step = 0.1, width = "100%")
+                      value = cache_get_if_exists("variant.span_filter", 0), min = 0, max = 1, step = 0.1, width = "100%"),
+          numericInput("variantMinSupportFilter", "Min Support:",
+                      value = cache_get_if_exists("variant.min_support_filter", 2), min = 0, step = 1, width = "100%"),
+          br(),
+          h6("Types"),
+          checkboxGroupInput("variantTypeFilter", label = NULL,
+            choices  = c("Substitution" = "sub", "Insertion" = "ins", "Deletion" = "del", "Clip" = "clip"),
+            selected = cache_get_if_exists("variant.type_filter", c("sub", "ins", "del", "clip")),
+            inline   = FALSE),
+          br(),
+          h5("Sort By"),
+          selectInput("variantSortBy", label = NULL,
+            choices  = c("ID" = "id", "Frequency" = "frequency"),
+            selected = cache_get_if_exists("variant.sort_by", "id"),
+            width    = "100%"),
+          conditionalPanel(
+            condition = "input.variantPlotType == 'matrix'",
+            h5("Sample Order"),
+            selectInput("variantColSortBy", label = NULL,
+              choices  = c("ID" = "id", "Frequency" = "frequency"),
+              selected = cache_get_if_exists("variant.col_sort_by", "id"),
+              width    = "100%"),
+            h5("Max Variants"),
+            numericInput("variantMatrixMaxItems", label = NULL,
+              value = cache_get_if_exists("variant.matrix_max_items", 100),
+              min = 1, step = 10, width = "100%")
+          )
         )
       ),
       column(9,
@@ -102,6 +154,7 @@ set_tab_panel_f(function() {
         fluidRow(
           column(12,
             actionButton("gotoVariantsBtn", "Goto", class = "btn-secondary"),
+            actionButton("selectVariantFromTableBtn", "Select from Table", class = "btn-secondary"),
             actionButton("clearVariantsBtn", "Clear Selection", class = "btn-secondary"),
             br(), br()
           )
@@ -118,7 +171,6 @@ set_tab_panel_f(function() {
 # query function that uses appropriate loading method based on mode
 query_variants <- function(assembly, contigs, zoom) {
   if (is_dynamic) {
-    # dynamic mode: use alignment query
     tab_config <- list(
       min_reads = min_reads,
       min_coverage = min_coverage,
@@ -130,19 +182,123 @@ query_variants <- function(assembly, contigs, zoom) {
       get_fasta_f = get_fasta_f,
       codon_table_path = codon_table_path
     )
-    
     return(query_variants_for_context(assembly, contigs, zoom, tab_config))
   } else {
-    # static mode: load from files
     tab_config <- list(
-      library_ids = library_ids,
       get_variants_table_f = get_variants_table_f,
       get_variants_support_f = get_variants_support_f,
       get_variants_coverage_f = get_variants_coverage_f
     )
-    
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     return(load_variants_from_files(assembly, contigs, zoom, tab_config))
   }
+}
+
+# ---- Active Library Set ----
+
+get_active_library_ids <- reactive({
+  if (!has_multiple_sets) return(library_ids)
+  selected_set <- input$variantSampleSet
+  if (is.null(selected_set)) return(library_ids)
+  assembly <- state$assembly %||% "*"
+  valid_sets <- library_id_map[library_id_map$aid == "*" | library_id_map$aid == assembly, ]
+  idx <- which(valid_sets$set_name == selected_set)
+  if (length(idx) == 0) return(valid_sets$set_ids[[1]])
+  valid_sets$set_ids[[idx[1]]]
+})
+
+# subset columns to active set and apply span filter
+apply_and_store_filters <- function() {
+  raw_data <- state$raw_variant_data
+  if (is.null(raw_data) || is.null(raw_data$support)) {
+    return()
+  }
+  
+  active_ids <- get_active_library_ids()
+  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0)
+  min_support_filter <- input$variantMinSupportFilter %||% cache_get_if_exists("variant.min_support_filter", 2)
+  type_filter <- input$variantTypeFilter %||% cache_get_if_exists("variant.type_filter", c("sub", "ins", "del", "clip"))
+
+  available_cols <- intersect(active_ids, colnames(raw_data$support))
+  if (length(available_cols) == 0) {
+    state$filtered_variant_data <- NULL
+    state$variants <- NULL
+    cache_set("variants.current", NULL)
+    return()
+  }
+  
+  subset_data <- list(
+    variants = raw_data$variants,
+    support = raw_data$support[, available_cols, drop = FALSE],
+    coverage = raw_data$coverage[, available_cols, drop = FALSE],
+    library_ids = available_cols
+  )
+  
+  filtered_data <- filter_variants_by_span(subset_data, span_filter)
+  filtered_data <- filter_variants_by_min_support(filtered_data, min_support_filter)
+  filtered_data <- filter_variants_by_types(filtered_data, type_filter)
+  state$filtered_variant_data <- filtered_data
+  
+  if (!is.null(filtered_data$variants) && nrow(filtered_data$variants) > 0) {
+    colored_variants <- add_variant_colors(filtered_data$variants)
+    state$variants <- colored_variants
+    cache_set("variants.current", colored_variants)
+  } else {
+    state$variants <- NULL
+    cache_set("variants.current", NULL)
+  }
+
+  # restore selection from the text input after filtering
+  current_id <- trimws(input$selectedVariantId %||% "")
+  if (nchar(current_id) > 0 && !is.null(filtered_data$variants)) {
+    matching_rows <- which(filtered_data$variants$variant_id == current_id)
+    if (length(matching_rows) > 0) {
+      selected_vars <- filtered_data$variants[matching_rows[1], ]
+      selected_vars$id <- selected_vars$variant_id
+      selected_variants(selected_vars)
+      cache_set("variants.selected", selected_vars)
+    } else {
+      selected_variants(NULL)
+      cache_set("variants.selected", NULL)
+    }
+  } else {
+    selected_variants(NULL)
+    cache_set("variants.selected", NULL)
+  }
+  
+  if (input$autoUpdateProfilesChk %||% FALSE) {
+    if (exists("refresh_trigger")) {
+      current_val <- refresh_trigger()
+      refresh_trigger(current_val + 1)
+    }
+  } else {
+    if (exists("invalidate_plot") && is.function(invalidate_plot)) {
+      invalidate_plot()
+    }
+  }
+}
+
+# observer for sample set changes
+if (has_multiple_sets) {
+  observeEvent(input$variantSampleSet, {
+    cache_set("variant_sample_set", input$variantSampleSet)
+    active_ids <- get_active_library_ids()
+    
+    updateSelectInput(session, "variantXLib",
+                      choices = setNames(active_ids, active_ids),
+                      selected = active_ids[1])
+    updateSelectInput(session, "variantYLib",
+                      choices = setNames(active_ids, active_ids),
+                      selected = if (length(active_ids) > 1) active_ids[2] else active_ids[1])
+    
+    if (!is.null(state$raw_variant_data)) {
+      apply_and_store_filters()
+    }
+  })
 }
 
 # ---- Event Handlers ----
@@ -150,96 +306,55 @@ query_variants <- function(assembly, contigs, zoom) {
 # reactive value to track selected variants for highlighting
 selected_variants <- reactiveVal(NULL)
 
-# observer for table row selection
-observeEvent(input$variantsTable_rows_selected, {
+# apply selection by variant ID; update_text=TRUE when called from button/plot (not text input)
+apply_variant_selection <- function(variant_id, update_text = TRUE) {
   variant_data <- state$filtered_variant_data
-  selected_rows <- input$variantsTable_rows_selected
-  
-  # always check if we have any selected rows
-  if (is.null(selected_rows) || length(selected_rows) == 0) {
-    # explicitly clear selection when no rows are selected
+  if (is.null(variant_id) || nchar(trimws(variant_id)) == 0) {
     selected_variants(NULL)
     cache_set("variants.selected", NULL)
-    
-    # refresh plots to remove highlighting only if auto-update is enabled
-    if (input$autoUpdateProfilesChk %||% FALSE) {
-      if (exists("refresh_trigger")) {
-        current_val <- refresh_trigger()
-        refresh_trigger(current_val + 1)
-      }
-    } else {
-      # mark plots as needing refresh when highlighting changes but auto-update is disabled
-      # but only if there was a previous selection (don't invalidate on startup with no selection)
-      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
-        previous_selection <- selected_variants()
-        if (!is.null(previous_selection)) {
-          invalidate_plot()
-        }
-      }
-    }
-    return()
-  }
-  
-  if (!is.null(variant_data) && !is.null(variant_data$variants)) {
-    # filter valid row indices
-    valid_rows <- selected_rows[selected_rows <= nrow(variant_data$variants)]
-    
-    if (length(valid_rows) > 0) {
-      # get the selected variants info
-      selected_vars <- variant_data$variants[valid_rows, ]
-      selected_variants(selected_vars)
-      # store in cache for profile access
-      cache_set("variants.selected", selected_vars)
-      
-      # refresh plots to show highlighting only if auto-update is enabled
-      if (input$autoUpdateProfilesChk %||% FALSE) {
-        if (exists("refresh_trigger")) {
-          current_val <- refresh_trigger()
-          refresh_trigger(current_val + 1)
-        }
+    if (update_text) updateTextInput(session, "selectedVariantId", value = "")
+  } else {
+    if (!is.null(variant_data) && !is.null(variant_data$variants)) {
+      matching_rows <- which(variant_data$variants$variant_id == variant_id)
+      if (length(matching_rows) > 0) {
+        selected_vars <- variant_data$variants[matching_rows[1], ]
+        selected_vars$id <- selected_vars$variant_id
+        selected_variants(selected_vars)
+        cache_set("variants.selected", selected_vars)
+        if (update_text) updateTextInput(session, "selectedVariantId", value = variant_id)
+        # sync table highlight
+        proxy <- DT::dataTableProxy("variantsTable")
+        DT::selectRows(proxy, matching_rows[1])
       } else {
-        # mark plots as needing refresh when highlighting changes but auto-update is disabled
-        if (exists("invalidate_plot") && is.function(invalidate_plot)) {
-          invalidate_plot()
-        }
-      }
-    } else {
-      # clear selection when no valid rows are selected
-      selected_variants(NULL)
-      cache_set("variants.selected", NULL)
-      
-      # refresh plots to remove highlighting
-      if (exists("refresh_trigger")) {
-        current_val <- refresh_trigger()
-        refresh_trigger(current_val + 1)
-      }
-    }
-  }
-}, ignoreNULL = FALSE)
-
-# additional observer to ensure highlighting is cleared when table selection changes
-observeEvent(input$variantsTable_state, {
-  # get current state
-  state_info <- input$variantsTable_state
-  if (!is.null(state_info) && !is.null(state_info$selected)) {
-    selected_rows <- state_info$selected
-    
-    # if no rows are selected, ensure highlighting is cleared
-    if (is.null(selected_rows) || length(selected_rows) == 0) {
-      current_selection <- selected_variants()
-      if (!is.null(current_selection)) {
         selected_variants(NULL)
         cache_set("variants.selected", NULL)
-        
-        # refresh plots to remove highlighting
-        if (exists("refresh_trigger")) {
-          current_val <- refresh_trigger()
-          refresh_trigger(current_val + 1)
-        }
       }
     }
   }
-}, ignoreNULL = FALSE)
+  if (input$autoUpdateProfilesChk %||% FALSE) {
+    if (exists("refresh_trigger")) refresh_trigger(refresh_trigger() + 1)
+  } else {
+    if (exists("invalidate_plot") && is.function(invalidate_plot)) invalidate_plot()
+  }
+}
+
+# select from table button
+observeEvent(input$selectVariantFromTableBtn, {
+  selected_rows <- input$variantsTable_rows_selected
+  variant_data  <- state$filtered_variant_data
+  if (!is.null(selected_rows) && length(selected_rows) > 0 &&
+      !is.null(variant_data) && !is.null(variant_data$variants)) {
+    valid_row <- selected_rows[selected_rows <= nrow(variant_data$variants)][1]
+    if (!is.na(valid_row)) {
+      apply_variant_selection(variant_data$variants$variant_id[valid_row], update_text = TRUE)
+    }
+  }
+})
+
+# text input: user typed a variant ID
+observeEvent(input$selectedVariantId, {
+  apply_variant_selection(input$selectedVariantId, update_text = FALSE)
+}, ignoreInit = TRUE)
 
 # observer for auto-update profiles checkbox
 observeEvent(input$autoUpdateProfilesChk, {
@@ -257,27 +372,26 @@ observeEvent(input$autoUpdateProfilesChk, {
 # goto button handler  
 observeEvent(input$gotoVariantsBtn, {
   variant_data <- state$filtered_variant_data
-  selected_rows <- input$variantsTable_rows_selected
-  
-  if (is.null(selected_rows) || length(selected_rows) == 0) {
-    showNotification("Please select variants to navigate to", type = "warning")
+  current_id   <- trimws(input$selectedVariantId %||% "")
+
+  if (nchar(current_id) == 0) {
+    showNotification("Please select a variant to navigate to", type = "warning")
     return()
   }
-  
+
   if (is.null(variant_data) || is.null(variant_data$variants)) {
     showNotification("No variant data available", type = "error")
     return()
   }
-  
-  # filter valid row indices
-  valid_rows <- selected_rows[selected_rows <= nrow(variant_data$variants)]
-  if (length(valid_rows) == 0) {
-    showNotification("Invalid variant selection", type = "error")
+
+  matching_rows <- which(variant_data$variants$variant_id == current_id)
+  if (length(matching_rows) == 0) {
+    showNotification("Selected variant not found in current data", type = "warning")
     return()
   }
-  
+
   # get selected variants
-  selected_vars <- variant_data$variants[valid_rows, ]
+  selected_vars <- variant_data$variants[matching_rows, ]
   
   # convert to global coordinates using context services
   selected_vars$gcoord <- cxt_contig2global(selected_vars$contig, selected_vars$coord)
@@ -290,7 +404,7 @@ observeEvent(input$gotoVariantsBtn, {
   min_coord <- min(selected_vars$gcoord)
   max_coord <- max(selected_vars$gcoord)
   
-  if (length(valid_rows) == 1) {
+  if (length(matching_rows) == 1) {
     # single variant: minimum 10kb window
     window_size <- 10000  # 10kb minimum window
     center <- selected_vars$gcoord[1]
@@ -316,56 +430,25 @@ observeEvent(input$gotoVariantsBtn, {
 
 # clear selection button handler  
 observeEvent(input$clearVariantsBtn, {
-  # clear table selection by using DT proxy
   proxy <- DT::dataTableProxy("variantsTable")
   DT::selectRows(proxy, NULL)
-  
-  # also clear the reactive selection
   selected_variants(NULL)
   cache_set("variants.selected", NULL)
-  
+  updateTextInput(session, "selectedVariantId", value = "")
+  if (exists("invalidate_plot") && is.function(invalidate_plot)) invalidate_plot()
   showNotification("Cleared variant selection", type = "message")
 })
 
 # common function to update variants data
 update_variants_data <- function() {
-  # query variants
   variant_data <- query_variants(state$assembly, get_state_contigs(), state$zoom)
-  
-  # store raw data
   state$raw_variant_data <- variant_data
   
-  # clear any previous variant selection when updating
   selected_variants(NULL)
   cache_set("variants.selected", NULL)
   
-  # apply span filter and store filtered data
   if (!is.null(variant_data)) {
-    filtered_data <- filter_variants_by_span(variant_data, input$variantSpanFilter %||% 0.5)
-    state$filtered_variant_data <- filtered_data
-    
-    # add colors and store variants dataframe in global state and cache for profiles
-    if (!is.null(filtered_data$variants)) {
-      colored_variants <- add_variant_colors(filtered_data$variants)
-      state$variants <- colored_variants
-      cache_set("variants.current", colored_variants)
-    } else {
-      state$variants <- NULL
-      cache_set("variants.current", NULL)
-    }
-    
-    # refresh profile plots only if auto-update is enabled
-    if (input$autoUpdateProfilesChk %||% FALSE) {
-      if (exists("refresh_trigger")) {
-        current_val <- refresh_trigger()
-        refresh_trigger(current_val + 1)
-      }
-    } else {
-      # mark plots as needing refresh when auto-update is disabled
-      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
-        invalidate_plot()
-      }
-    }
+    apply_and_store_filters()
   } else {
     state$filtered_variant_data <- NULL
     state$variants <- NULL
@@ -385,42 +468,48 @@ if (is_dynamic) {
     if (!is.null(state$assembly)) {
       update_variants_data()
     }
-  }, ignoreNULL = FALSE, ignoreInit = FALSE)
+  }, ignoreNULL = FALSE, ignoreInit = FALSE, priority = -1)
 }
 
 # span filter change handler
 observeEvent(input$variantSpanFilter, {
-  # reapply filter when span changes
+  cache_set("variant.span_filter", input$variantSpanFilter)
   if (!is.null(state$raw_variant_data)) {
-    # clear selection when filter changes
-    selected_variants(NULL)
-    cache_set("variants.selected", NULL)
-    filtered_data <- filter_variants_by_span(state$raw_variant_data, input$variantSpanFilter)
-    state$filtered_variant_data <- filtered_data
-    
-    # add colors and update variants dataframe in global state and cache for profiles
-    if (!is.null(filtered_data$variants)) {
-      colored_variants <- add_variant_colors(filtered_data$variants)
-      state$variants <- colored_variants
-      cache_set("variants.current", colored_variants)
-    } else {
-      state$variants <- NULL
-      cache_set("variants.current", NULL)
-    }
-    
-    # refresh profile plots only if auto-update is enabled
-    if (input$autoUpdateProfilesChk %||% FALSE) {
-      if (exists("refresh_trigger")) {
-        current_val <- refresh_trigger()
-        refresh_trigger(current_val + 1)
-      }
-    } else {
-      # mark plots as needing refresh when auto-update is disabled
-      if (exists("invalidate_plot") && is.function(invalidate_plot)) {
-        invalidate_plot()
-      }
-    }
+    apply_and_store_filters()
   }
+})
+
+# min support filter change handler
+observeEvent(input$variantMinSupportFilter, {
+  cache_set("variant.min_support_filter", input$variantMinSupportFilter)
+  if (!is.null(state$raw_variant_data)) {
+    apply_and_store_filters()
+  }
+})
+
+# variant type filter change handler
+observeEvent(input$variantTypeFilter, {
+  cache_set("variant.type_filter", input$variantTypeFilter)
+  if (!is.null(state$raw_variant_data)) {
+    apply_and_store_filters()
+  }
+}, ignoreNULL = FALSE)
+
+# sort-by change handlers
+observeEvent(input$variantSortBy, {
+  cache_set("variant.sort_by", input$variantSortBy)
+})
+
+observeEvent(input$variantColSortBy, {
+  cache_set("variant.col_sort_by", input$variantColSortBy)
+})
+
+observeEvent(input$variantMatrixColorBy, {
+  cache_set("variant_frequency_plot_matrix_color_by", input$variantMatrixColorBy)
+})
+
+observeEvent(input$variantMatrixMaxItems, {
+  cache_set("variant.matrix_max_items", input$variantMatrixMaxItems)
 })
 
 # ---- Output Renderers ----
@@ -472,15 +561,7 @@ output$variantsTable <- renderDT({
 
   # truncate long sequences for display
   if ("sequence" %in% names(display_df)) {
-    display_df$sequence <- sapply(display_df$sequence, function(seq) {
-      if (is.na(seq) || nchar(seq) <= 10) {
-        return(seq)
-      } else {
-        first_5 <- substr(seq, 1, 5)
-        last_5 <- substr(seq, nchar(seq) - 4, nchar(seq))
-        return(paste0(first_5, "...", last_5))
-      }
-    })
+    display_df$sequence <- format_long_sequence_for_display(display_df$sequence)
   }
   
   # store original descriptions for hover and truncate for display
@@ -488,16 +569,20 @@ output$variantsTable <- renderDT({
     # store original descriptions
     display_df$desc_full <- display_df$desc
     
-    # truncate for display
+    # truncate for display (indels: prefix + count; other long: middle ellipsis)
     display_df$desc <- sapply(display_df$desc, function(desc) {
-      if (is.na(desc) || nchar(desc) <= 15) {
+      if (is.na(desc)) {
         return(desc)
-      } else {
-        # truncate middle for long descriptions (keep first and last 5 characters)
-        first_5 <- substr(desc, 1, 5)
-        last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
-        return(paste0(first_5, "...", last_5))
       }
+      if (grepl("^\\+|^-", desc)) {
+        return(format_indel_desc_for_hover(desc))
+      }
+      if (nchar(desc) <= 15) {
+        return(desc)
+      }
+      first_5 <- substr(desc, 1, 5)
+      last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
+      paste0(first_5, "...", last_5)
     })
   }
   
@@ -505,7 +590,8 @@ output$variantsTable <- renderDT({
   if ("frequency" %in% names(display_df)) {
     display_df$frequency <- round(display_df$frequency, 3)
   }
-  
+
+
   # if is_genic is missing, derive it from gene_desc when available
   if (!("is_genic" %in% names(display_df)) && ("gene_desc" %in% names(display_df))) {
     display_df$is_genic <- display_df$gene_desc != "none"
@@ -624,24 +710,19 @@ get_selected_variants <- function() {
 }
 
 output$variantFrequencyPlot <- plotly::renderPlotly({
-  
-  # get current data
   raw_data <- state$filtered_variant_data
+  active_ids <- get_active_library_ids()
   
-  # get current settings with defaults
   plot_type <- input$variantPlotType %||% "temporal"
   plot_value <- input$variantPlotValue %||% "frequency"
-  x_lib <- input$variantXLib %||% library_ids[1]
-  y_lib <- input$variantYLib %||% (if(length(library_ids) > 1) library_ids[2] else library_ids[1])
+  x_lib <- input$variantXLib %||% active_ids[1]
+  y_lib <- input$variantYLib %||% (if(length(active_ids) > 1) active_ids[2] else active_ids[1])
   jitter_enabled <- input$variantJitter %||% FALSE
   
-  # get selected items
   selected_items <- get_selected_variants()
   
-  # check if we have data
   has_data <- !is.null(raw_data) && !is.null(raw_data$variants)
   
-  # prepare items dataframe if we have data
   items_df <- NULL
   if (has_data) {
     items_df <- add_variant_colors(raw_data$variants)
@@ -649,17 +730,25 @@ output$variantFrequencyPlot <- plotly::renderPlotly({
     items_df$label <- paste(items_df$type, items_df$contig, items_df$coord, sep = " ")
   }
   
-  # render the plot using the cleaned internal function
   no_data_message <- if (is_dynamic) {
     "Click 'Update' to load variants"
   } else {
     "Select contigs to load variants"
   }
   
+  sort_by          <- input$variantSortBy %||% cache_get_if_exists("variant.sort_by", "id")
+  col_sort_by      <- input$variantColSortBy %||% cache_get_if_exists("variant.col_sort_by", "id")
+  matrix_color_by  <- input$variantMatrixColorBy %||%
+                        cache_get_if_exists("variant_frequency_plot_matrix_color_by", "value")
+  matrix_max_items <- input$variantMatrixMaxItems %||%
+                        cache_get_if_exists("variant.matrix_max_items", 100)
+
   render_frequency_plot_internal(has_data, items_df, raw_data$support, raw_data$coverage,
-                                plot_type, plot_value, x_lib, y_lib, 
-                                jitter_enabled, selected_items, library_ids, 
-                                no_data_message)
+                                plot_type, plot_value, x_lib, y_lib,
+                                jitter_enabled, selected_items, active_ids,
+                                no_data_message, max_items = matrix_max_items, sort_by = sort_by,
+                                col_sort_by = col_sort_by, sample_map = sample_map,
+                                matrix_color_by = matrix_color_by)
 })
 
 # frequency plot observers for caching
@@ -686,37 +775,27 @@ observeEvent(input$variantJitter, {
 # click observers for frequency plot interaction
 observeEvent(plotly::event_data("plotly_click", source = "scatter_plot"), {
   event_data <- plotly::event_data("plotly_click", source = "scatter_plot")
-  if (!is.null(event_data) && !is.null(event_data$key)) {
-    variant_data <- state$filtered_variant_data
-    if (!is.null(variant_data) && !is.null(variant_data$variants)) {
-      matching_rows <- which(variant_data$variants$variant_id == event_data$key)
-      if (length(matching_rows) > 0) {
-        proxy <- DT::dataTableProxy("variantsTable")
-        DT::selectRows(proxy, matching_rows[1])
-      }
-    }
-  }
+  if (!is.null(event_data) && !is.null(event_data$key))
+    apply_variant_selection(event_data$key, update_text = TRUE)
 })
 
 observeEvent(plotly::event_data("plotly_click", source = "temporal_plot"), {
   event_data <- plotly::event_data("plotly_click", source = "temporal_plot")
-  if (!is.null(event_data) && !is.null(event_data$key)) {
-    variant_data <- state$filtered_variant_data
-    if (!is.null(variant_data) && !is.null(variant_data$variants)) {
-      matching_rows <- which(variant_data$variants$variant_id == event_data$key)
-      if (length(matching_rows) > 0) {
-        proxy <- DT::dataTableProxy("variantsTable")
-        DT::selectRows(proxy, matching_rows[1])
-      }
-    }
-  }
+  if (!is.null(event_data) && !is.null(event_data$key))
+    apply_variant_selection(event_data$key, update_text = TRUE)
+})
+
+observeEvent(plotly::event_data("plotly_click", source = "matrix_plot"), {
+  event_data <- plotly::event_data("plotly_click", source = "matrix_plot")
+  if (!is.null(event_data) && !is.null(event_data$y))
+    apply_variant_selection(event_data$y, update_text = TRUE)
 })
 
 # export function for PDF generation
 variants_export_pdf <- function(region_info) {
-  # load data fresh for export region (bypass state to avoid stale data)
+  active_ids <- get_active_library_ids()
+  
   if (is_dynamic) {
-    # dynamic mode: query fresh data from alntools
     tab_config <- list(
       min_reads = min_reads,
       min_coverage = min_coverage,
@@ -730,25 +809,37 @@ variants_export_pdf <- function(region_info) {
     )
     raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
   } else {
-    # static mode: load fresh data from files
     tab_config <- list(
-      library_ids = library_ids,
       get_variants_table_f = get_variants_table_f,
       get_variants_support_f = get_variants_support_f,
       get_variants_coverage_f = get_variants_coverage_f
     )
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     raw_data <- load_variants_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
-    # filter to zoom coordinates
     raw_data <- filter_variants_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
   }
   
-  # apply current filters
-  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)
+  # subset to active set and apply span, support, and type filters
+  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0)
+  min_support_filter <- input$variantMinSupportFilter %||% cache_get_if_exists("variant.min_support_filter", 2)
+  type_filter <- input$variantTypeFilter %||% cache_get_if_exists("variant.type_filter", c("sub", "ins", "del", "clip"))
+
+  if (!is.null(raw_data) && !is.null(raw_data$support)) {
+    available_cols <- intersect(active_ids, colnames(raw_data$support))
+    if (length(available_cols) > 0) {
+      raw_data$support <- raw_data$support[, available_cols, drop = FALSE]
+      raw_data$coverage <- raw_data$coverage[, available_cols, drop = FALSE]
+    }
+  }
   
-  # filter the data
   filtered_data <- filter_variants_by_span(raw_data, span_filter)
+  filtered_data <- filter_variants_by_min_support(filtered_data, min_support_filter)
+  filtered_data <- filter_variants_by_types(filtered_data, type_filter)
   
-  # cache filtered variants for profile access during export
   if (!is.null(filtered_data) && !is.null(filtered_data$variants)) {
     colored_variants <- add_variant_colors(filtered_data$variants)
     cache_set("variants.current", colored_variants)
@@ -756,17 +847,14 @@ variants_export_pdf <- function(region_info) {
     cache_set("variants.current", NULL)
   }
   
-  # get current plot settings
   plot_type <- input$variantPlotType %||% "temporal"
   plot_value <- input$variantPlotValue %||% "frequency"
-  x_lib <- input$variantXLib %||% library_ids[1]
-  y_lib <- input$variantYLib %||% (if(length(library_ids) > 1) library_ids[2] else library_ids[1])
+  x_lib <- input$variantXLib %||% active_ids[1]
+  y_lib <- input$variantYLib %||% (if(length(active_ids) > 1) active_ids[2] else active_ids[1])
   jitter_enabled <- input$variantJitter %||% FALSE
   
-  # check if we have data
   has_data <- !is.null(filtered_data) && !is.null(filtered_data$variants)
   
-  # prepare items dataframe if we have data
   items_df <- NULL
   if (has_data) {
     items_df <- add_variant_colors(filtered_data$variants)
@@ -774,18 +862,30 @@ variants_export_pdf <- function(region_info) {
     items_df$label <- paste(items_df$type, items_df$contig, items_df$coord, sep = " ")
   }
   
-  # create the plot using the unified export function
+  col_sort_by     <- cache_get_if_exists("variant.col_sort_by", "id")
+  sort_by         <- cache_get_if_exists("variant.sort_by", "id")
+  matrix_color_by <- cache_get_if_exists("variant_frequency_plot_matrix_color_by", "value")
+
+  matrix_max_items <- cache_get_if_exists("variant.matrix_max_items", 100)
+
+  selected_vid <- cache_get_if_exists("variants.selected", NULL)
+  selected_vid <- if (!is.null(selected_vid)) selected_vid$variant_id[1] else NULL
+
   return(create_frequency_plot_for_export(has_data, items_df, filtered_data$support, filtered_data$coverage,
-                                         plot_type, plot_value, x_lib, y_lib, 
-                                         jitter_enabled, library_ids, 
-                                         title = "Variants"))
+                                         plot_type, plot_value, x_lib, y_lib,
+                                         jitter_enabled, active_ids,
+                                         title = "Variants", max_items = matrix_max_items,
+                                         col_sort_by = col_sort_by, sort_by = sort_by,
+                                         matrix_color_by = matrix_color_by,
+                                         sample_map = sample_map,
+                                         selected_variant_id = selected_vid))
 }
 
 # export function for table generation
 variants_export_table <- function(region_info) {
-  # load data fresh for export region (bypass state to avoid stale data)
+  active_ids <- get_active_library_ids()
+  
   if (is_dynamic) {
-    # dynamic mode: query fresh data from alntools
     tab_config <- list(
       min_reads = min_reads,
       min_coverage = min_coverage,
@@ -799,25 +899,37 @@ variants_export_table <- function(region_info) {
     )
     raw_data <- query_variants_for_context(region_info$assembly, region_info$contigs, region_info$context_zoom, tab_config)
   } else {
-    # static mode: load fresh data from files
     tab_config <- list(
-      library_ids = library_ids,
       get_variants_table_f = get_variants_table_f,
       get_variants_support_f = get_variants_support_f,
       get_variants_coverage_f = get_variants_coverage_f
     )
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     raw_data <- load_variants_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
-    # filter to zoom coordinates
     raw_data <- filter_variants_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
   }
   
-  # apply current filters
-  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0.5)
+  # subset to active set and apply span, support, and type filters
+  span_filter <- input$variantSpanFilter %||% cache_get_if_exists("variant.span_filter", 0)
+  min_support_filter <- input$variantMinSupportFilter %||% cache_get_if_exists("variant.min_support_filter", 2)
+  type_filter <- input$variantTypeFilter %||% cache_get_if_exists("variant.type_filter", c("sub", "ins", "del", "clip"))
+
+  if (!is.null(raw_data) && !is.null(raw_data$support)) {
+    available_cols <- intersect(active_ids, colnames(raw_data$support))
+    if (length(available_cols) > 0) {
+      raw_data$support <- raw_data$support[, available_cols, drop = FALSE]
+      raw_data$coverage <- raw_data$coverage[, available_cols, drop = FALSE]
+    }
+  }
   
-  # filter the data
   filtered_data <- filter_variants_by_span(raw_data, span_filter)
+  filtered_data <- filter_variants_by_min_support(filtered_data, min_support_filter)
+  filtered_data <- filter_variants_by_types(filtered_data, type_filter)
   
-  # return the filtered variants dataframe (or NULL if no data)
   if (!is.null(filtered_data) && !is.null(filtered_data$variants)) {
     return(filtered_data$variants)
   }

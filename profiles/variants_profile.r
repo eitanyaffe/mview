@@ -1,3 +1,5 @@
+source("profiles/align/align_utils.r")
+
 # default parameters for variants profile
 default_variants_params <- list(
   height = list(
@@ -50,16 +52,20 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
     # create hover text (same format as frequency plot)
     position_label <- paste0(filtered_variants$contig, ":", filtered_variants$coord)
     
-    # truncate descriptions for hover text (same logic as frequency plot)
+    # shorten indel desc for hover; other long desc: middle ellipsis
     description_display <- sapply(filtered_variants$desc, function(desc) {
-      if (is.na(desc) || nchar(desc) <= 15) {
+      if (is.na(desc)) {
         return(desc)
-      } else {
-        # truncate middle for hover (keep first and last 5 characters)
-        first_5 <- substr(desc, 1, 5)
-        last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
-        return(paste0(first_5, "...", last_5))
       }
+      if (grepl("^\\+|^-", desc)) {
+        return(format_indel_desc_for_hover(desc))
+      }
+      if (nchar(desc) <= 15) {
+        return(desc)
+      }
+      first_5 <- substr(desc, 1, 5)
+      last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
+      paste0(first_5, "...", last_5)
     })
     
     hover_text <- paste0(

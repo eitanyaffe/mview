@@ -50,25 +50,27 @@ if (!exists("get_shared_red_scale")) {
 
 # mutation density legend (discrete thresholds)
 create_mutation_density_legend <- function() {
-  colors <- get_alignment_color_definitions()
-  labels <- c("0", "≤ 0.01%", "≤ 0.1%", "≤ 1%", "≤ 10%", "> 10%")
-  red_palette <- colors$red_palette
-  legend_data <- data.frame(
-    y = seq_along(labels), x = 1,
-    color = red_palette[seq_along(labels)], label = labels,
-    stringsAsFactors = FALSE
-  )
-  ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
-    ggplot2::geom_rect(
-      ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
-      color = "black", size = 0.4
-    ) +
-    ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.6) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::labs(title = "mutations per bp") +
-    ggplot2::theme_void() +
-    ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
-    ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(labels) + 0.5))
+  cache("legend_mutation_density", {
+    colors <- get_alignment_color_definitions()
+    labels <- c("0", "≤ 0.01%", "≤ 0.1%", "≤ 1%", "≤ 10%", "> 10%")
+    red_palette <- colors$red_palette
+    legend_data <- data.frame(
+      y = seq_along(labels), x = 1,
+      color = red_palette[seq_along(labels)], label = labels,
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
+      ggplot2::geom_rect(
+        ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
+        color = "black", size = 0.4
+      ) +
+      ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.6) +
+      ggplot2::scale_fill_identity() +
+      ggplot2::labs(title = "mutations per bp") +
+      ggplot2::theme_void() +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
+      ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(labels) + 0.5))
+  })
 }
 
 # fixed range gradient legend (0 to max_val)
@@ -103,76 +105,78 @@ create_gradient_legend <- function(title, colors, max_val, n_steps = 10, as_perc
 
 # stacked mutation rates categories legend (discrete)
 create_stacked_mutation_rates_legend <- function() {
-  colors <- get_alignment_color_definitions()
-  red_colors <- colors$red_palette
-  categories <- c(">10%", "1%-10%", "0.1%-1%", "0.01%-0.1%", "0.001%-0.01%", "0")
-  colors <- c(red_colors[6], red_colors[5], red_colors[4], red_colors[3], red_colors[2], red_colors[1])
-  legend_data <- data.frame(
-    y = seq_along(categories), x = 1,
-    color = colors, label = categories,
-    stringsAsFactors = FALSE
-  )
-  ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
-    ggplot2::geom_rect(
-      ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
-      color = "black", size = 0.3
-    ) +
-    ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.4) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::labs(title = "mutation rate bins") +
-    ggplot2::theme_void() +
-    ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
-    ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(categories) + 0.5))
+  cache("legend_stacked_mutation_rates", {
+    colors <- get_alignment_color_definitions()
+    red_colors <- colors$red_palette
+    categories <- c(">10%", "1%-10%", "0.1%-1%", "0.01%-0.1%", "0.001%-0.01%", "0")
+    colors <- c(red_colors[6], red_colors[5], red_colors[4], red_colors[3], red_colors[2], red_colors[1])
+    legend_data <- data.frame(
+      y = seq_along(categories), x = 1,
+      color = colors, label = categories,
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
+      ggplot2::geom_rect(
+        ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
+        color = "black", size = 0.3
+      ) +
+      ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.4) +
+      ggplot2::scale_fill_identity() +
+      ggplot2::labs(title = "mutation rate bins") +
+      ggplot2::theme_void() +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
+      ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(categories) + 0.5))
+  })
 }
 
 # detailed variant colors legend (12 substitutions + indels)
 create_detailed_variant_legend <- function() {
-  colors <- get_alignment_color_definitions()
-  all_colors <- c(colors$substitution_colors, colors$indel_colors)
-  all_labels <- names(all_colors)
-  
-  legend_data <- data.frame(
-    y = seq_along(all_labels), x = 1,
-    color = all_colors, label = all_labels,
-    stringsAsFactors = FALSE
-  )
-  
-  ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
-    ggplot2::geom_rect(
-      ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
-      color = "black", size = 0.3
-    ) +
-    ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.2) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::labs(title = "variant types (detailed)") +
-    ggplot2::theme_void() +
-    ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
-    ggplot2::coord_cartesian(xlim = c(0.5, 3.5), ylim = c(0.5, length(all_labels) + 0.5))
+  cache("legend_detailed_variant", {
+    colors <- get_alignment_color_definitions()
+    all_colors <- c(colors$substitution_colors, colors$indel_colors)
+    all_labels <- names(all_colors)
+    legend_data <- data.frame(
+      y = seq_along(all_labels), x = 1,
+      color = all_colors, label = all_labels,
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
+      ggplot2::geom_rect(
+        ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
+        color = "black", size = 0.3
+      ) +
+      ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.2) +
+      ggplot2::scale_fill_identity() +
+      ggplot2::labs(title = "variant types (detailed)") +
+      ggplot2::theme_void() +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
+      ggplot2::coord_cartesian(xlim = c(0.5, 3.5), ylim = c(0.5, length(all_labels) + 0.5))
+  })
 }
 
 # simplified variant colors legend (3 types)
 create_simplified_variant_legend <- function() {
-  color_defs <- get_alignment_color_definitions()
-  colors <- color_defs$simplified_colors
-  labels <- names(colors)
-  
-  legend_data <- data.frame(
-    y = seq_along(labels), x = 1,
-    color = colors, label = labels,
-    stringsAsFactors = FALSE
-  )
-  
-  ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
-    ggplot2::geom_rect(
-      ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
-      color = "black", size = 0.4
-    ) +
-    ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.6) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::labs(title = "variant types (simplified)") +
-    ggplot2::theme_void() +
-    ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
-    ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(labels) + 0.5))
+  cache("legend_simplified_variant", {
+    color_defs <- get_alignment_color_definitions()
+    colors <- color_defs$simplified_colors
+    labels <- names(colors)
+    legend_data <- data.frame(
+      y = seq_along(labels), x = 1,
+      color = colors, label = labels,
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
+      ggplot2::geom_rect(
+        ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
+        color = "black", size = 0.4
+      ) +
+      ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.6) +
+      ggplot2::scale_fill_identity() +
+      ggplot2::labs(title = "variant types (simplified)") +
+      ggplot2::theme_void() +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
+      ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(labels) + 0.5))
+  })
 }
 
 

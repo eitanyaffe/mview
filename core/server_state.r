@@ -133,7 +133,13 @@ output$basic_info <- renderText({
 
   # zoom region information
   zoom_info <- if (is.null(state$zoom)) {
-    "Zoom: full range"
+    cdf_full <- tryCatch(cxt_get_entire_view(), error = function(e) NULL)
+    if (!is.null(cdf_full) && nrow(cdf_full) > 0) {
+      full_span <- round(max(cdf_full$vend) - min(cdf_full$vstart))
+      c("Zoom: full range", sprintf("Window: %s", format_bp(full_span)))
+    } else {
+      "Zoom: full range"
+    }
   } else {
     window_size <- round(state$zoom[2]) - round(state$zoom[1])
     window_size_text <- format_bp(window_size)

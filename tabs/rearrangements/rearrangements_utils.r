@@ -301,7 +301,6 @@ load_rearrangements_from_files <- function(assembly, contigs, zoom, tab_config) 
   }
   
   # extract required parameters from tab config
-  library_ids <- tab_config$library_ids
   get_rearrange_events_f <- tab_config$get_rearrange_events_f
   get_rearrange_support_f <- tab_config$get_rearrange_support_f
   get_rearrange_coverage_f <- tab_config$get_rearrange_coverage_f
@@ -311,6 +310,9 @@ load_rearrangements_from_files <- function(assembly, contigs, zoom, tab_config) 
     events_table <- get_rearrange_events_f(assembly)
     if (is.null(events_table) || nrow(events_table) == 0) {
       return(NULL)
+    }
+    if (!"contig_id" %in% colnames(events_table) && "contig" %in% colnames(events_table)) {
+      events_table$contig_id <- events_table$contig
     }
     
     # validate events table columns
@@ -402,23 +404,33 @@ load_rearrangements_from_files <- function(assembly, contigs, zoom, tab_config) 
       return(NULL)
     }
     
-    # map actual columns to configured library_ids (in order)
-    num_libs <- min(length(actual_lib_cols), length(library_ids))
-    if (num_libs < length(library_ids)) {
-      warning(sprintf("fewer library columns (%d) than configured library_ids (%d)", 
-                     length(actual_lib_cols), length(library_ids)))
+    all_library_ids <- tab_config$all_library_ids
+    if (!is.null(all_library_ids)) {
+      available_libs <- intersect(all_library_ids, actual_lib_cols)
+      if (length(available_libs) == 0) {
+        warning("no matching library columns in rearrangement support/coverage matrices")
+        return(NULL)
+      }
+    } else {
+      library_ids <- tab_config$library_ids
+      if (is.null(library_ids) || length(library_ids) == 0) {
+        warning("rearrangements tab_config: library_ids required when all_library_ids is not set")
+        return(NULL)
+      }
+      # backward compat: positional rename to match configured library_ids
+      num_libs <- min(length(actual_lib_cols), length(library_ids))
+      if (num_libs < length(library_ids)) {
+        warning(sprintf("fewer library columns (%d) than configured library_ids (%d)",
+                       length(actual_lib_cols), length(library_ids)))
+      }
+      old_names <- actual_lib_cols[1:num_libs]
+      new_names <- library_ids[1:num_libs]
+      for (i in 1:num_libs) {
+        colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
+        colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
+      }
+      available_libs <- new_names
     }
-    
-    # rename columns in both matrices
-    old_names <- actual_lib_cols[1:num_libs]
-    new_names <- library_ids[1:num_libs]
-    
-    for (i in 1:num_libs) {
-      colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
-      colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
-    }
-    
-    available_libs <- new_names
     
     support_matrix_final <- as.matrix(support_filtered[, available_libs, drop = FALSE])
     coverage_matrix_final <- as.matrix(coverage_filtered[, available_libs, drop = FALSE])

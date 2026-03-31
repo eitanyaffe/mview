@@ -88,7 +88,7 @@ align_profile_pileup <- function(profile, aln, gg) {
   if (profile$show_hover) {
     df$hover_text <- paste0(
       "Position: ", df$coord, "\n",
-      "Variant: ", df$variant, "\n",
+      "Variant: ", format_indel_desc_for_hover(df$variant), "\n",
       "Count: ", df$count, " / ", df$coverage, "\n",
       "Fraction: ", sprintf("%.3f", df$count / df$coverage)
     )

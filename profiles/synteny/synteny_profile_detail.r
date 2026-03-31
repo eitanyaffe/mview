@@ -103,7 +103,7 @@ synteny_profile_detail <- function(profile, data_list, gg, current_binsize) {
             mutation_plot_data$hover_text <- paste0(
               "Library: ", format_library_name(mutation_plot_data$library), "\n",
               "Position: ", mutation_plot_data$contig, ":", mutation_plot_data$coord, "\n",
-              "Variant: ", mutation_plot_data$variant_desc, "\n",
+              "Variant: ", format_indel_desc_for_hover(mutation_plot_data$variant_desc), "\n",
               "Frequency: ", sprintf("%.2f%%", mutation_plot_data$frequency * 100), "\n",
               "Coverage: ", mutation_plot_data$coverage
             )

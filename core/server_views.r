@@ -34,6 +34,9 @@ observeEvent(input$view_id,
     cache_set("recent_view", input$view_id)
     
     set_view(input$view_id)
+
+    # re-invalidate the plot observer (it ran before set_view due to higher priority)
+    refresh_trigger(refresh_trigger() + 1)
   },
   ignoreInit = TRUE
 )

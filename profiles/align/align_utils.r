@@ -298,6 +298,56 @@ create_simplified_variant_legend <- function() {
     ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, length(labels) + 0.5))
 }
 
+# shorten +seq / -seq for hovers: full string if <10 nt; else first 10 nt, ellipsis, and bp count
+format_indel_desc_for_hover <- function(x) {
+  if (length(x) > 1) {
+    return(sapply(x, format_indel_desc_for_hover))
+  }
+  if (length(x) != 1 || is.na(x)) {
+    return(x)
+  }
+  s <- as.character(x)
+  if (!nzchar(s)) {
+    return(s)
+  }
+  if (grepl("^\\+", s)) {
+    seq <- substr(s, 2, nchar(s))
+    n <- nchar(seq)
+    if (n < 10) {
+      return(s)
+    }
+    return(paste0("+", substr(seq, 1, 10), "... (", n, " bp inserted)"))
+  }
+  if (grepl("^-", s)) {
+    seq <- substr(s, 2, nchar(s))
+    n <- nchar(seq)
+    if (n < 10) {
+      return(s)
+    }
+    return(paste0("-", substr(seq, 1, 10), "... (", n, " bp deleted)"))
+  }
+  return(s)
+}
+
+# plain sequence column (no +/- prefix): shorten long strings for tables
+format_long_sequence_for_display <- function(x) {
+  if (length(x) > 1) {
+    return(sapply(x, format_long_sequence_for_display))
+  }
+  if (length(x) != 1 || is.na(x)) {
+    return(x)
+  }
+  s <- as.character(x)
+  if (!nzchar(s)) {
+    return(s)
+  }
+  n <- nchar(s)
+  if (n < 10) {
+    return(s)
+  }
+  paste0(substr(s, 1, 10), "... (", n, " bp)")
+}
+
 # ============================================================================
 # UNIFIED MUTATION PLOTTING FUNCTION
 # ============================================================================

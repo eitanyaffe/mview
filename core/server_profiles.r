@@ -105,6 +105,8 @@ invalidate_plot <- function() {
 }
 
 # Observer to update cached ggplot objects when data/profiles change
+# priority > tab observers: cxt_set_view / cxt_set_zoom must run before code that
+# calls cxt_coords_in_view (e.g. filter_variants_by_region in variants tab)
 observe({
   refresh_trigger()  # establish reactive dependency on manual refresh trigger
   
@@ -118,12 +120,20 @@ observe({
   
   req(input$view_id)
 
+  input$segment_boundary_mode
+  if (!is.null(input$segment_boundary_mode)) {
+    cache_set("segment_boundary_mode", input$segment_boundary_mode)
+  }
+
+  # skip profile rendering when no segments are selected
+  req(nrow(get_state_segments()) > 0)
+
   # Update the cached plotly objects
   update_gg_objects(profile_plotly_objects)
   
   # mark plots as up to date after successful plotting
   plot_updated(TRUE)
-})
+}, priority = 10)
 
 # Observer to render plots when cached objects OR container height changes
 observe({

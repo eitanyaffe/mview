@@ -22,18 +22,31 @@ if (is_dynamic) {
   }
 } else {
   # static mode: requires file getter functions
-  required_params <- c("library_ids", "get_rearrange_events_f", "get_rearrange_support_f", "get_rearrange_coverage_f")
+  required_params <- c("get_rearrange_events_f", "get_rearrange_support_f", "get_rearrange_coverage_f")
   missing_params <- required_params[!sapply(required_params, function(p) p %in% names(tab))]
   if (length(missing_params) > 0) {
     stop(sprintf("rearrangements tab (static mode) missing required parameters: %s", paste(missing_params, collapse = ", ")))
   }
+  if (is.null(tab$library_ids) && is.null(tab$library_id_map)) {
+    stop("rearrangements tab (static mode) requires either library_ids or library_id_map")
+  }
 }
 
 # extract common parameters
-library_ids <- tab$library_ids
-if (!is.character(library_ids) || length(library_ids) == 0) {
-  stop("library_ids must be a non-empty character vector")
+use_library_id_map <- !is.null(tab$library_id_map)
+if (use_library_id_map) {
+  library_id_map <- tab$library_id_map
+} else {
+  library_ids_param <- tab$library_ids
+  if (!is.character(library_ids_param) || length(library_ids_param) == 0) {
+    stop("library_ids must be a non-empty character vector")
+  }
+  library_id_map <- data.frame(aid = "*", set_name = "default", stringsAsFactors = FALSE)
+  library_id_map$set_ids <- list(library_ids_param)
 }
+has_multiple_sets <- nrow(library_id_map) > 1
+all_library_ids <- unique(unlist(library_id_map$set_ids))
+library_ids <- library_id_map$set_ids[[1]]
 
 # extract mode-specific parameters
 if (is_dynamic) {
@@ -64,6 +77,9 @@ if (is_dynamic) {
   }
 }
 
+# optional sample map for matrix individual indicators and dividers
+sample_map <- tab$sample_map
+
 # set the tab panel UI
 set_tab_panel_f(function() {
   tabPanel(
@@ -73,6 +89,12 @@ set_tab_panel_f(function() {
       column(3,
         wellPanel(
           h5("Rearrangement Controls"),
+          if (has_multiple_sets) {
+            selectInput("rearrangementSampleSet", "Sample Set:",
+                       choices = setNames(library_id_map$set_name, library_id_map$set_name),
+                       selected = cache_get_if_exists("rearrange_sample_set", library_id_map$set_name[1]),
+                       width = "100%")
+          },
           if (is_dynamic) {
             list(
               h5("Query Parameters"),
@@ -103,9 +125,11 @@ set_tab_panel_f(function() {
           br(),
           h5("Filtering"),
           numericInput("rearrangementSpanFilter", "Min Span:", 
-                      value = 0, min = 0, max = 1, step = 0.2, width = "100%"),
+                      value = cache_get_if_exists("rearrange.span_filter", 0),
+                      min = 0, max = 1, step = 0.2, width = "100%"),
           numericInput("rearrangementSupportFilter", "Min Total Support:", 
-                      value = 1, min = 1, step = 1, width = "100%")
+                      value = cache_get_if_exists("rearrange.support_filter", 1),
+                      min = 1, step = 1, width = "100%")
         )
       ),
       column(9,
@@ -149,19 +173,70 @@ query_rearrangements <- function(assembly, contigs, zoom) {
   } else {
     # static mode: load from files
     tab_config <- list(
-      library_ids = library_ids,
       get_rearrange_events_f = get_rearrange_events_f,
       get_rearrange_support_f = get_rearrange_support_f,
       get_rearrange_coverage_f = get_rearrange_coverage_f
     )
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     
     return(load_rearrangements_from_files(assembly, contigs, zoom, tab_config))
   }
 }
 
+# ---- Active Library Set ----
+
+get_active_rearrange_library_ids <- reactive({
+  if (!has_multiple_sets) return(library_ids)
+  selected_set <- input$rearrangementSampleSet
+  if (is.null(selected_set)) return(library_ids)
+  assembly <- state$assembly %||% "*"
+  valid_sets <- library_id_map[library_id_map$aid == "*" | library_id_map$aid == assembly, ]
+  idx <- which(valid_sets$set_name == selected_set)
+  if (length(idx) == 0) return(valid_sets$set_ids[[1]])
+  valid_sets$set_ids[[idx[1]]]
+})
+
+# subset columns to active set and apply span/support filters
+apply_and_store_rearrange_filters <- function() {
+  raw_data <- state$raw_rearrange_data
+  if (is.null(raw_data)) {
+    return()
+  }
+  
+  active_ids <- get_active_rearrange_library_ids()
+  span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0)
+  support_filter <- input$rearrangementSupportFilter %||% cache_get_if_exists("rearrange.support_filter", 1)
+  
+  available_cols <- intersect(active_ids, colnames(raw_data$support))
+  if (length(available_cols) == 0) {
+    state$filtered_rearrange_data <- NULL
+    state$rearrangements <- NULL
+    cache_set("rearrangements.current", NULL)
+    return()
+  }
+  
+  subset_data <- list(
+    events = raw_data$events,
+    read_events = raw_data$read_events,
+    support = raw_data$support[, available_cols, drop = FALSE],
+    coverage = raw_data$coverage[, available_cols, drop = FALSE],
+    library_ids = available_cols
+  )
+  
+  process_filtered_rearrangements(subset_data, span_filter, support_filter, clear_selection = TRUE)
+}
+
 # filter rearrangements by span (frequency range)
 filter_rearrangements_by_span <- function(rearrange_data, min_span) {
   if (is.null(rearrange_data) || is.null(rearrange_data$support) || is.null(rearrange_data$coverage)) {
+    return(rearrange_data)
+  }
+  # 0 or negative = no span filter (matches variants tab)
+  if (is.null(min_span) || !is.finite(min_span) || min_span <= 0) {
     return(rearrange_data)
   }
   
@@ -171,6 +246,9 @@ filter_rearrangements_by_span <- function(rearrange_data, min_span) {
   
   # avoid division by zero
   freq_matrix <- ifelse(coverage_matrix > 0, support_matrix / coverage_matrix, 0)
+  if (ncol(freq_matrix) < 2) {
+    return(rearrange_data)
+  }
   
   # calculate span (max - min frequency) for each event
   event_spans <- apply(freq_matrix, 1, function(row) {
@@ -285,10 +363,6 @@ process_filtered_rearrangements <- function(raw_data, span_filter, support_filte
     colored_events <- add_rearrangement_colors(filtered_data$events)
     state$rearrangements <- colored_events
     cache_set("rearrangements.current", colored_events)
-    
-    # debug: print column names and row count for troubleshooting
-    cat(sprintf("cached rearrangements: %d events with columns: %s\n", 
-                nrow(colored_events), paste(colnames(colored_events), collapse = ", ")))
   } else {
     state$rearrangements <- NULL
     cache_set("rearrangements.current", NULL)
@@ -454,13 +528,9 @@ observeEvent(input$clearRearrangementsBtn, {
 
 # common function to update rearrangements data
 update_rearrangements_data <- function() {
-  # query rearrangements
   rearrange_data <- query_rearrangements(state$assembly, get_state_contigs(), state$zoom)
-  
-  # store raw data
   state$raw_rearrange_data <- rearrange_data
-  
-  process_filtered_rearrangements(rearrange_data, input$rearrangementSpanFilter %||% 0.5, input$rearrangementSupportFilter %||% 1, clear_selection = TRUE)
+  apply_and_store_rearrange_filters()
 }
 
 # update button handler (only for dynamic mode)
@@ -475,19 +545,38 @@ if (is_dynamic) {
     if (!is.null(state$assembly)) {
       update_rearrangements_data()
     }
-  }, ignoreNULL = FALSE, ignoreInit = FALSE)
+  }, ignoreNULL = FALSE, ignoreInit = FALSE, priority = -1)
+}
+
+# observer for sample set changes
+if (has_multiple_sets) {
+  observeEvent(input$rearrangementSampleSet, {
+    cache_set("rearrange_sample_set", input$rearrangementSampleSet)
+    active_ids <- get_active_rearrange_library_ids()
+    
+    updateSelectInput(session, "rearrangementXLib",
+                      choices = setNames(active_ids, active_ids),
+                      selected = active_ids[1])
+    updateSelectInput(session, "rearrangementYLib",
+                      choices = setNames(active_ids, active_ids),
+                      selected = if (length(active_ids) > 1) active_ids[2] else active_ids[1])
+    
+    if (!is.null(state$raw_rearrange_data)) {
+      apply_and_store_rearrange_filters()
+    }
+  })
 }
 
 # span filter change handler
 observeEvent(input$rearrangementSpanFilter, {
   cache_set("rearrange.span_filter", input$rearrangementSpanFilter)
-  process_filtered_rearrangements(state$raw_rearrange_data, input$rearrangementSpanFilter, input$rearrangementSupportFilter %||% 1, clear_selection = TRUE)
+  apply_and_store_rearrange_filters()
 })
 
 # support filter change handler
 observeEvent(input$rearrangementSupportFilter, {
   cache_set("rearrange.support_filter", input$rearrangementSupportFilter)
-  process_filtered_rearrangements(state$raw_rearrange_data, input$rearrangementSpanFilter %||% 0.5, input$rearrangementSupportFilter, clear_selection = TRUE)
+  apply_and_store_rearrange_filters()
 })
 
 # ---- Output Renderers ----
@@ -615,8 +704,9 @@ output$rearrangementFrequencyPlot <- plotly::renderPlotly({
   # get current settings with defaults
   plot_type <- input$rearrangementPlotType %||% "temporal"
   plot_value <- input$rearrangementPlotValue %||% "frequency"
-  x_lib <- input$rearrangementXLib %||% library_ids[1]
-  y_lib <- input$rearrangementYLib %||% (if(length(library_ids) > 1) library_ids[2] else library_ids[1])
+  active_ids <- get_active_rearrange_library_ids()
+  x_lib <- input$rearrangementXLib %||% active_ids[1]
+  y_lib <- input$rearrangementYLib %||% (if(length(active_ids) > 1) active_ids[2] else active_ids[1])
   jitter_enabled <- input$rearrangementJitter %||% FALSE
   
   # get selected items
@@ -640,10 +730,14 @@ output$rearrangementFrequencyPlot <- plotly::renderPlotly({
     "Select contigs to load rearrangements"
   }
   
+  matrix_color_by <- input$rearrangementMatrixColorBy %||%
+                       cache_get_if_exists("rearrangement_frequency_plot_matrix_color_by", "value")
+
   render_frequency_plot_internal(has_data, items_df, raw_data$support, raw_data$coverage,
-                                plot_type, plot_value, x_lib, y_lib, 
-                                jitter_enabled, selected_items, library_ids, 
-                                no_data_message)
+                                plot_type, plot_value, x_lib, y_lib,
+                                jitter_enabled, selected_items, active_ids,
+                                no_data_message, sample_map = sample_map,
+                                matrix_color_by = matrix_color_by)
 })
 
 # frequency plot observers for caching
@@ -665,6 +759,10 @@ observeEvent(input$rearrangementYLib, {
 
 observeEvent(input$rearrangementJitter, {
   cache_set("rearrangement_frequency_plot_jitter", input$rearrangementJitter)
+})
+
+observeEvent(input$rearrangementMatrixColorBy, {
+  cache_set("rearrangement_frequency_plot_matrix_color_by", input$rearrangementMatrixColorBy)
 })
 
 # parameter observers for caching
@@ -738,18 +836,22 @@ rearrangements_export_pdf <- function(region_info) {
   } else {
     # static mode: load fresh data from files
     tab_config <- list(
-      library_ids = library_ids,
       get_rearrange_events_f = get_rearrange_events_f,
       get_rearrange_support_f = get_rearrange_support_f,
       get_rearrange_coverage_f = get_rearrange_coverage_f
     )
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     raw_data <- load_rearrangements_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
     # filter to zoom coordinates
     raw_data <- filter_rearrangements_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
   }
   
   # apply current filters
-  span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0.5)
+  span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0)
   support_filter <- input$rearrangementSupportFilter %||% cache_get_if_exists("rearrange.support_filter", 1)
   
   # filter the data
@@ -807,18 +909,22 @@ rearrangements_export_table <- function(region_info) {
   } else {
     # static mode: load fresh data from files
     tab_config <- list(
-      library_ids = library_ids,
       get_rearrange_events_f = get_rearrange_events_f,
       get_rearrange_support_f = get_rearrange_support_f,
       get_rearrange_coverage_f = get_rearrange_coverage_f
     )
+    if (use_library_id_map) {
+      tab_config$all_library_ids <- all_library_ids
+    } else {
+      tab_config$library_ids <- library_ids
+    }
     raw_data <- load_rearrangements_from_files(region_info$assembly, region_info$contigs, NULL, tab_config)
     # filter to zoom coordinates
     raw_data <- filter_rearrangements_by_region(raw_data, region_info$contigs, region_info$context_zoom, region_info$assembly)
   }
   
   # apply current filters
-  span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0.5)
+  span_filter <- input$rearrangementSpanFilter %||% cache_get_if_exists("rearrange.span_filter", 0)
   support_filter <- input$rearrangementSupportFilter %||% cache_get_if_exists("rearrange.support_filter", 1)
   
   # filter the data

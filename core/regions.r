@@ -117,21 +117,16 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
       
       # convert regions table to segments format (for display/export)
       convert_regions_to_segments <- function(rt) {
+        empty_result <- data.frame(
+          assembly = character(), contig = character(),
+          start = integer(), end = integer(),
+          desc = character(), id = character(),
+          stringsAsFactors = FALSE
+        )
         if (is.null(rt) || nrow(rt) == 0) {
-          return(data.frame(
-            assembly = character(),
-            contig = character(),
-            start = integer(),
-            end = integer(),
-            xlim_start = numeric(),
-            xlim_end = numeric(),
-            desc = character(),
-            id = character(),
-            stringsAsFactors = FALSE
-          ))
+          return(empty_result)
         }
         
-        # Convert regions to intervals: one row per contig spanned by the region's segments
         result_rows <- list()
         for (i in seq_len(nrow(rt))) {
           row <- rt[i, ]
@@ -141,51 +136,65 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
           
           segment_ids <- trimws(strsplit(row$segments, ",")[[1]])
           
-          # Get segment info for this assembly
           all_segments <- tryCatch({
             get_segments(row$assembly)
           }, error = function(e) {
             return(NULL)
           })
-          
           if (is.null(all_segments)) {
             next
           }
           
+          # preserve saved order of segment_ids
           segs <- all_segments[all_segments$segment %in% segment_ids, ]
+          seg_order <- match(segs$segment, segment_ids)
+          segs <- segs[order(seg_order), ]
           if (nrow(segs) == 0) {
             next
           }
           
-          # one bounding-box interval per contig, preserving xlim as vcoords
-          for (ctg in unique(segs$contig)) {
-            ctg_segs <- segs[segs$contig == ctg, ]
-            result_rows[[length(result_rows) + 1]] <- data.frame(
-              assembly = row$assembly,
-              contig = ctg,
-              start = min(ctg_segs$start),
-              end = max(ctg_segs$end),
-              xlim_start = if (!is.na(row$xlim_start)) row$xlim_start else NA_real_,
-              xlim_end   = if (!is.na(row$xlim_end))   row$xlim_end   else NA_real_,
-              desc = row$description,
-              id = as.character(row$id),
-              stringsAsFactors = FALSE
-            )
+          # build vcoord layout for the region's segments
+          seg_lengths <- segs$end - segs$start
+          seg_vstart <- c(0, cumsum(seg_lengths[-length(seg_lengths)]))
+          seg_vend <- cumsum(seg_lengths)
+          
+          xlim_s <- if (!is.na(row$xlim_start)) row$xlim_start else 0
+          xlim_e <- if (!is.na(row$xlim_end))   row$xlim_end   else max(seg_vend)
+          
+          # vectorized clip of segments to xlim window
+          clip_vs <- pmax(xlim_s, seg_vstart)
+          clip_ve <- pmin(xlim_e, seg_vend)
+          keep <- clip_ve > clip_vs
+          if (!any(keep)) next
+          
+          clip_vs <- clip_vs[keep]
+          clip_ve <- clip_ve[keep]
+          sv <- seg_vstart[keep]
+          cl_contig <- segs$contig[keep]
+          cl_start <- as.integer(segs$start[keep] + (clip_vs - sv))
+          cl_end   <- as.integer(segs$start[keep] + (clip_ve - sv))
+          
+          # merge intervals adjacent in vcoord space on the same contig
+          n_cl <- length(cl_start)
+          if (n_cl > 1) {
+            new_group <- c(TRUE, cl_contig[-1] != cl_contig[-n_cl] | clip_vs[-1] > clip_ve[-n_cl] + 1)
+            grp <- cumsum(new_group)
+            cl_contig <- tapply(cl_contig, grp, function(x) x[1])
+            cl_start  <- as.integer(tapply(cl_start, grp, min))
+            cl_end    <- as.integer(tapply(cl_end, grp, max))
           }
+          
+          n_out <- length(cl_start)
+          result_rows[[length(result_rows) + 1]] <- data.frame(
+            assembly = rep(row$assembly, n_out), contig = cl_contig,
+            start = cl_start, end = cl_end,
+            desc = rep(row$description, n_out), id = rep(as.character(row$id), n_out),
+            stringsAsFactors = FALSE
+          )
         }
         
         if (length(result_rows) == 0) {
-          return(data.frame(
-            assembly = character(),
-            contig = character(),
-            start = integer(),
-            end = integer(),
-            xlim_start = numeric(),
-            xlim_end = numeric(),
-            desc = character(),
-            id = character(),
-            stringsAsFactors = FALSE
-          ))
+          return(empty_result)
         }
         
         do.call(rbind, result_rows)

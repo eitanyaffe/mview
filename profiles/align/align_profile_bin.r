@@ -135,10 +135,11 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
       }
     }
     
-    # normalize each category to percentage of total
+    # normalize each category to mean coverage scale
+    mean_cov <- mean(total_counts[total_counts > 0])
     for (cat in categories) {
       if (!is.null(df[[cat]])) {
-        df[[cat]] <- ifelse(total_counts > 0, (df[[cat]] / total_counts) * 100, 0)
+        df[[cat]] <- ifelse(total_counts > 0, (df[[cat]] / total_counts) * mean_cov, 0)
       }
     }
   }
@@ -183,15 +184,16 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
       
       # create hover text only if enabled
       if (profile$show_hover) {
+        desc_h <- format_indel_desc_for_hover(category_data$description)
         if (normalize) {
           category_data$hover_text <- paste0(
             sprintf("%.1f%%", category_data$count), " of reads\n",
-            "Category: ", category_data$description, "\n"
+            "Category: ", desc_h, "\n"
           )
         } else {
           category_data$hover_text <- paste0(
             category_data$count, " out of ", category_data$read_count, " reads\n",
-            "Category: ", category_data$description, "\n"
+            "Category: ", desc_h, "\n"
           )
         }
       } else {
@@ -206,6 +208,11 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
   }
   
   if (nrow(stacked_data) > 0) {
+    if ("is_low_cov" %in% colnames(df)) {
+      low_cov_gstarts <- df$gstart[df$is_low_cov]
+      stacked_data$fill_color[stacked_data$gstart %in% low_cov_gstarts] <- "#ececec"
+    }
+
     # add stacked rectangles
     gg <- gg + ggplot2::geom_rect(
       data = stacked_data,
@@ -228,6 +235,7 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
 plot_mutation_density_bins <- function(gg, df, profile) {
   # mutation density visualization
   df$fill_color <- get_mutation_colors(df$mut_density)
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -261,6 +269,7 @@ plot_mutation_density_bins <- function(gg, df, profile) {
 plot_median_mutation_density_bins <- function(gg, df, profile) {
   # median mutation density visualization
   df$fill_color <- get_mutation_colors(df$median_mutation_density)
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -309,6 +318,7 @@ plot_segregating_sites_bins <- function(gg, df, profile) {
     max_val = max_density_scale,
     num_steps = 20
   )
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -359,6 +369,7 @@ plot_nonref_sites_bins <- function(gg, df, profile) {
     max_val = max_density_scale,
     num_steps = 20
   )
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -409,6 +420,7 @@ plot_seg_clip_sites_bins <- function(gg, df, profile) {
     max_val = max_density_scale,
     num_steps = 20
   )
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -459,6 +471,7 @@ plot_nonref_clip_sites_bins <- function(gg, df, profile) {
     max_val = max_density_scale,
     num_steps = 20
   )
+  if ("is_low_cov" %in% colnames(df)) df$fill_color[df$is_low_cov] <- "#ececec"
   
   # create hover text only if enabled
   if (profile$show_hover) {
@@ -605,6 +618,9 @@ align_profile_bin <- function(profile, aln, gg) {
   # Calculate metrics
   df$cov <- ifelse(df$length > 0, df$sequenced_bp / df$length, 0)
   df$mut_density <- ifelse(df$sequenced_bp > 0, df$mutation_count / df$sequenced_bp, 0)
+
+  min_total_coverage <- if (!is.null(profile$min_total_coverage)) as.numeric(profile$min_total_coverage) else 4
+  df$is_low_cov <- normalize_distrib_bins & (df$cov < min_total_coverage)
 
   # choose and call appropriate visualization function
   if (bin_style == "by_mut_density") {

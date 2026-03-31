@@ -275,12 +275,13 @@ plot_summary_stacked_mutations <- function(gg, summary_data, profile) {
       
       # create hover text
       if (profile$show_hover) {
+        desc_h <- format_indel_desc_for_hover(category_data$description)
         # both total and segment hover information
         category_data$hover_text <- paste0(
           "Position: ", category_data$contig, ":", category_data$start, "-", category_data$end, "\n",
           "Total libraries: ", category_data$lib_count, "\n",
           "This segment: ", category_data$count, " libraries\n",
-          "Category: ", category_data$description
+          "Category: ", desc_h
         )
       } else {
         category_data$hover_text <- ""

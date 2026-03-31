@@ -453,7 +453,7 @@ output$alignmentPlot <- plotly::renderPlotly({
       "Type: ", mutations$type, "\n",
       "Read coord: ", mutations$read_coord, "\n",
       "Contig coord: ", mutations$contig_coord, "\n",
-      "Desc: ", mutations$desc
+      "Desc: ", format_indel_desc_for_hover(mutations$desc)
     )
     
     gg <- gg + ggplot2::geom_segment(

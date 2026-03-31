@@ -21,3 +21,5 @@ tabs/rearrangements/rearrangements_tab_old.r
 tools/alntools/alntools
 /configs/c60/regions_old2
 /configs/m21/regions/versions
+/.cursor
+/configs/m21_uni/regions/versions

@@ -3,6 +3,9 @@
 
 # Load shared utilities for mutation coloring and legends
 source("profiles/align/align_utils.r")
+source("profiles/align/align_profile_full.r")
+source("profiles/align/align_profile_pileup.r")
+source("profiles/align/align_profile_bin.r")
 
 default_alignment_params <- list(
   # align_general - parameters used across multiple modes
@@ -150,6 +153,11 @@ default_alignment_params <- list(
     type = "integer",
     default = 250
   ),
+  min_total_coverage = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 4
+  ),
   normalize_distrib_bins = list(
     group_id = "align_bin",
     type = "boolean",
@@ -179,6 +187,7 @@ default_alignment_params <- list(
 )
 
 align_profile <- function(id, name, is_fixed = FALSE,
+                          attr = list(),
                           aln_f = NULL,
                           bin_type = "auto",
                           plot_style = "auto",
@@ -203,6 +212,7 @@ align_profile <- function(id, name, is_fixed = FALSE,
                           full_mutation_lwd = 0.5,
                           force_max_y = 0,
                           show_hover = TRUE,
+                          min_total_coverage = 4,
                           binsizes = c(500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000),
                           params = default_alignment_params,
                           auto_register = TRUE) {
@@ -254,16 +264,18 @@ align_profile <- function(id, name, is_fixed = FALSE,
     }
     aln_list[[profile$id]] <- aln
     cache_set("aln_obj", aln_list)
-    
-    contigs <- cxt_get_contigs()
-    if (any(!is.element(contigs, aln_get_contigs(aln)$contig_id))) {
-      warning("contigs not found in alignment")
+
+    if (is.null(aln) || !inherits(aln, "externalptr")) {
+      warning(sprintf("align_profile '%s': no alignment available (individual/timepoint combination may not exist).", name))
       return(list(plot = gg, legends = list()))
     }
 
-
-    if (is.null(aln) || !inherits(aln, "externalptr")) {
-      warning(sprintf("align_profile '%s': Invalid AlignmentStore pointer.", name))
+    contigs <- cxt_get_contigs()
+    # cache aln_get_contigs per pointer — alignment file never changes during a session
+    aln_contigs_key <- paste0("aln_contigs_", format(aln))
+    aln_contigs <- cache(aln_contigs_key, aln_get_contigs(aln)$contig_id)
+    if (any(!is.element(contigs, aln_contigs))) {
+      warning("contigs not found in alignment")
       return(list(plot = gg, legends = list()))
     }
 
@@ -283,7 +295,8 @@ align_profile <- function(id, name, is_fixed = FALSE,
 
   # Create profile
   profile_create(
-    id = id, name = name, type = "align", 
+    id = id, name = name, type = "align",
+    attr = attr,
     height = params$height$default, is_fixed = is_fixed,
     params = params, plot_f = plot_f,
     auto_register = auto_register,
@@ -311,6 +324,7 @@ align_profile <- function(id, name, is_fixed = FALSE,
     full_mutation_lwd = full_mutation_lwd,
     force_max_y = force_max_y,
     show_hover = show_hover,
+    min_total_coverage = min_total_coverage,
     binsizes = binsizes
   )
 }

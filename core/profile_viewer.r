@@ -3,6 +3,11 @@
 # This file handles the plotting logic for all registered profiles.
 # For each profile, it calls pre_plot, profile$plot_f, and post_plot, and collects the results.
 
+# resolve profile title: call title_f() if present, otherwise use static title string
+get_profile_title <- function(profile) {
+  if (is.function(profile$attr$title_f)) profile$attr$title_f() else profile$attr$title
+}
+
 library(plotly)
 library(patchwork)
 
@@ -22,7 +27,7 @@ pre_plot <- function(profile) {
 
   # Only add y-label if not hidden
   if (!isTRUE(profile$attr$hide_y_label)) {
-    gg <- gg + ggplot2::labs(y = profile$attr$title)
+    gg <- gg + ggplot2::labs(y = get_profile_title(profile))
   } else {
     gg <- gg + ggplot2::theme(axis.title.y = ggplot2::element_blank())
   }
@@ -51,17 +56,28 @@ pre_plot <- function(profile) {
   gg
 }
 
+# segment boundary overlay: cache key segment_boundary_mode — "all" | "merged" | "off"
+get_segment_boundary_mode <- function() {
+  mode <- cache_get_if_exists("segment_boundary_mode", "merged")
+  if (!mode %in% c("all", "merged", "off")) {
+    return("merged")
+  }
+  mode
+}
+
 #' Post-plot function: can add overlays (e.g. vlines) on top of the profile plot
 #' @param gg The ggplot object after profile$plot_f
 #' @param profile The profile object
 #' @return The ggplot object with overlays added
 post_plot <- function(gg, profile) {
-  # Add vertical lines between contigs (at contig ends, not starts)
-  cdf <- cxt_get_entire_view()
-  
+  mode <- get_segment_boundary_mode()
+  if (identical(mode, "off")) {
+    return(gg)
+  }
+  merge_adjacent <- !identical(mode, "all")
+  cdf <- cxt_get_entire_view(merge_adjacent = merge_adjacent)
   if (!is.null(cdf) && nrow(cdf) > 1) {
-    # Only draw lines at the END of each contig (except the last one)
-    contig_ends <- cdf$vend[-nrow(cdf)]  # all except last
+    contig_ends <- cdf$vend[-nrow(cdf)]
     gg <- gg + ggplot2::geom_vline(xintercept = contig_ends, color = "gray")
   }
   gg
@@ -77,6 +93,8 @@ update_gg_objects <- function(profile_plotly_objects) {
     profile_plotly_objects(NULL)
     return()
   }
+
+  cat("--------------------------------------------------\n")
 
   plotly_list <- list()
   legends <- list()
@@ -338,7 +356,7 @@ plot_profiles_cached <- function(plotly_objects_result, container_height_px = NU
         annotations[[length(annotations) + 1]] <- list(
           x = 0.01, xref = "paper", xanchor = "right", xshift = -30,
           y = y_mid, yref = "paper", yanchor = "middle",
-          text = profile$attr$title, textangle = 0,
+          text = get_profile_title(profile), textangle = 0,
           showarrow = FALSE, align = "right", font = list(size = 12)
         )
       }
@@ -524,7 +542,7 @@ plot_profiles <- function() {
         annotations[[length(annotations) + 1]] <- list(
           x = 0.01, xref = "paper", xanchor = "right", xshift = -30,
           y = y_mid, yref = "paper", yanchor = "middle",
-          text = profile$attr$title, textangle = 0,
+          text = get_profile_title(profile), textangle = 0,
           showarrow = FALSE, align = "right", font = list(size = 12)
         )
       }
@@ -609,7 +627,7 @@ plot_profiles_ggplot <- function() {
     # Apply styling for PDF export (ensure it's not overridden)
     if (!isTRUE(profile$attr$hide_y_label)) {
       gg_final <- gg_final + 
-        ggplot2::labs(y = profile$attr$title) +
+        ggplot2::labs(y = get_profile_title(profile)) +
         ggplot2::theme(
           axis.title.y = ggplot2::element_text(angle = 0, hjust = 1, vjust = 0.5),
           axis.text.x = ggplot2::element_blank(),

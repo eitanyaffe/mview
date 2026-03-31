@@ -98,6 +98,19 @@ output$mainTabsPanel <- renderUI({
     ),
     p("These settings control the minimum and maximum allowed height for the combined profile plots."),
     br(),
+    h4("Segment boundaries"),
+    selectInput(
+      inputId = "segment_boundary_mode",
+      label = "Vertical guides between segments",
+      choices = c(
+        "Non-adjacent only" = "merged",
+        "Every segment" = "all",
+        "Hidden" = "off"
+      ),
+      selected = cache_get_if_exists("segment_boundary_mode", "merged")
+    ),
+    p("Non-adjacent only is the former default; Every segment includes boundaries between merged adjacent pieces."),
+    br(),
     h4("Legend Settings"),
     numericInput(
       inputId = "legend_scale",

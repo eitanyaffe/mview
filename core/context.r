@@ -221,6 +221,7 @@ cxt_set_zoom <- function(xlim) {
     cat("[cxt_set_zoom] Resetting zoom to full range\n")
   }
   
+  
   # Update context with same segments but new zoom
   context_update_selected_segments(.context_env$current_context, 
                                   .context_env$current_segments, 

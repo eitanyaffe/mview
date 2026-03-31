@@ -325,7 +325,7 @@ align_profile_full <- function(profile, aln, gg) {
         mutations$hover_text <- paste0(
           "Read: ", mutations$read_id, "\n",
           "Position: ", mutations$coord, "\n",
-          "Type: ", mutations$desc
+          "Type: ", format_indel_desc_for_hover(mutations$desc)
         )
       } else {
         mutations$hover_text <- ""

@@ -156,6 +156,10 @@ filter_variants_by_span <- function(variant_data, min_span) {
   if (is.null(variant_data) || is.null(variant_data$support) || is.null(variant_data$coverage)) {
     return(variant_data)
   }
+  # 0 or negative = no span filter (default UI 0 shows all loaded variants)
+  if (is.null(min_span) || !is.finite(min_span) || min_span <= 0) {
+    return(variant_data)
+  }
   
   # calculate frequency for each variant across libraries
   support_matrix <- variant_data$support
@@ -163,6 +167,11 @@ filter_variants_by_span <- function(variant_data, min_span) {
   
   # avoid division by zero
   freq_matrix <- ifelse(coverage_matrix > 0, support_matrix / coverage_matrix, 0)
+  
+  # with a single library column, span is always 0 — do not filter (same as "no span contrast")
+  if (ncol(freq_matrix) < 2) {
+    return(variant_data)
+  }
   
   # calculate span (max - min frequency) for each variant
   variant_spans <- apply(freq_matrix, 1, function(row) {
@@ -229,6 +238,52 @@ add_variant_colors <- function(variants_df) {
   }
   
   return(variants_df)
+}
+
+# filter variants by minimum total support count
+filter_variants_by_min_support <- function(variant_data, min_support) {
+  if (is.null(variant_data) || is.null(variant_data$variants)) {
+    return(variant_data)
+  }
+  if (is.null(min_support) || !is.finite(min_support) || min_support <= 0) {
+    return(variant_data)
+  }
+  if (!("total_support" %in% names(variant_data$variants))) {
+    return(variant_data)
+  }
+
+  keep <- !is.na(variant_data$variants$total_support) & variant_data$variants$total_support >= min_support
+
+  list(
+    variants = variant_data$variants[keep, ],
+    support  = variant_data$support[keep, , drop = FALSE],
+    coverage = variant_data$coverage[keep, , drop = FALSE],
+    library_ids = variant_data$library_ids
+  )
+}
+
+# filter variants by allowed type set (sub, ins, del, clip)
+filter_variants_by_types <- function(variant_data, selected_types) {
+  if (is.null(variant_data) || is.null(variant_data$variants)) {
+    return(variant_data)
+  }
+  if (is.null(selected_types) || length(selected_types) == 0) {
+    return(variant_data)
+  }
+
+  all_types <- c("sub", "ins", "del", "clip")
+  if (setequal(selected_types, all_types)) {
+    return(variant_data)
+  }
+
+  keep <- variant_data$variants$type %in% selected_types
+
+  list(
+    variants    = variant_data$variants[keep, ],
+    support     = variant_data$support[keep, , drop = FALSE],
+    coverage    = variant_data$coverage[keep, , drop = FALSE],
+    library_ids = variant_data$library_ids
+  )
 }
 
 # filter variants by region (contigs and zoom coordinates)
@@ -353,8 +408,6 @@ load_variants_from_files <- function(assembly, contigs, zoom, tab_config) {
     rownames(support_filtered) <- support_filtered$variant_id
     rownames(coverage_filtered) <- coverage_filtered$variant_id
     
-    # rename support/coverage matrix columns to match configured library_ids
-    # skip first column (variant_id) and map remaining columns to library_ids
     support_cols <- colnames(support_filtered)
     actual_lib_cols <- support_cols[support_cols != "variant_id"]
     
@@ -363,23 +416,32 @@ load_variants_from_files <- function(assembly, contigs, zoom, tab_config) {
       return(NULL)
     }
     
-    # map actual columns to configured library_ids (in order)
-    num_libs <- min(length(actual_lib_cols), length(library_ids))
-    if (num_libs < length(library_ids)) {
-      warning(sprintf("fewer library columns (%d) than configured library_ids (%d)", 
-                     length(actual_lib_cols), length(library_ids)))
+    all_library_ids <- tab_config$all_library_ids
+    if (!is.null(all_library_ids)) {
+      # select columns by name (used with library_id_map)
+      available_libs <- intersect(all_library_ids, actual_lib_cols)
+      if (length(available_libs) == 0) {
+        warning("no matching library columns in support/coverage matrices")
+        return(NULL)
+      }
+    } else {
+      # backward compat: positional rename to match configured library_ids
+      num_libs <- min(length(actual_lib_cols), length(library_ids))
+      if (num_libs < length(library_ids)) {
+        warning(sprintf("fewer library columns (%d) than configured library_ids (%d)", 
+                       length(actual_lib_cols), length(library_ids)))
+      }
+      
+      old_names <- actual_lib_cols[1:num_libs]
+      new_names <- library_ids[1:num_libs]
+      
+      for (i in 1:num_libs) {
+        colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
+        colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
+      }
+      
+      available_libs <- new_names
     }
-    
-    # rename columns in both matrices
-    old_names <- actual_lib_cols[1:num_libs]
-    new_names <- library_ids[1:num_libs]
-    
-    for (i in 1:num_libs) {
-      colnames(support_filtered)[colnames(support_filtered) == old_names[i]] <- new_names[i]
-      colnames(coverage_filtered)[colnames(coverage_filtered) == old_names[i]] <- new_names[i]
-    }
-    
-    available_libs <- new_names
     
     support_matrix_final <- as.matrix(support_filtered[, available_libs, drop = FALSE])
     coverage_matrix_final <- as.matrix(coverage_filtered[, available_libs, drop = FALSE])

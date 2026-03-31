@@ -110,10 +110,15 @@ load_export_utilities <- function() {
 create_export_dirs <- function(output_dir, context_options, single_region_mode = FALSE) {
   context_dirs <- list()
   exportable_tabs <- get_exportable_tabs()
+  single_context <- length(context_options) == 1
   
   for (context_option in context_options) {
-    context_folder <- context_to_folder_name(context_option)
-    context_dir <- file.path(output_dir, context_folder)
+    if (single_context) {
+      context_dir <- output_dir
+    } else {
+      context_folder <- context_to_folder_name(context_option)
+      context_dir <- file.path(output_dir, context_folder)
+    }
     if (!dir.exists(context_dir)) {
       dir.create(context_dir, recursive = TRUE)
     }
@@ -173,26 +178,34 @@ create_export_dirs <- function(output_dir, context_options, single_region_mode =
 }
 
 # export a single region in a specific context using new tab-based system
-export_region <- function(region_data, context_option, dirs, export_params, use_simple_names = FALSE) {
-  # set state for this region
-  if (!is.null(region_data$contigs) && region_data$contigs != "") {
-    contig_list <- trimws(strsplit(region_data$contigs, ",")[[1]])
-    # get segments for these contigs
-    segments <- get_segments(state$assembly)
-    selected_segments <- segments[segments$contig %in% contig_list, ]
-    state$segments <- selected_segments
+export_region <- function(region_data, context_option, dirs, export_params, use_simple_names = FALSE, region_index = NULL) {
+  # set assembly
+  if (!is.null(region_data$assembly) && !is.na(region_data$assembly) && region_data$assembly != "") {
+    state$assembly <- region_data$assembly
   }
 
+  # set segments from segment IDs (new format uses 'segments' column)
+  if (!is.null(region_data$segments) && !is.na(region_data$segments) && region_data$segments != "") {
+    segment_ids <- trimws(strsplit(region_data$segments, ",")[[1]])
+    all_segments <- get_segments(state$assembly)
+    selected_segments <- all_segments[all_segments$segment %in% segment_ids, ]
+    seg_order <- match(selected_segments$segment, segment_ids)
+    state$segments <- selected_segments[order(seg_order), ]
+  }
+
+  # set zoom from xlim columns (new format uses 'xlim_start'/'xlim_end')
   region_zoom <- NULL
-  if (!is.null(region_data$zoom_start) && !is.null(region_data$zoom_end) && 
-      !is.na(region_data$zoom_start) && !is.na(region_data$zoom_end)) {
-    region_zoom <- c(region_data$zoom_start, region_data$zoom_end)
+  if (!is.null(region_data$xlim_start) && !is.null(region_data$xlim_end) &&
+      !is.na(region_data$xlim_start) && !is.na(region_data$xlim_end)) {
+    region_zoom <- c(region_data$xlim_start, region_data$xlim_end)
   }
   state$zoom <- region_zoom
 
-  if (!is.null(region_data$assembly) && region_data$assembly != "") {
-    state$assembly <- region_data$assembly
-  }
+
+  # synchronously update context — the reactive observer in server_profiles.r
+  # won't fire during the export loop, so we must call these explicitly
+  cxt_set_assembly(state$assembly)
+  cxt_set_view(state$segments)
 
   # calculate context zoom for this region and context
   context_zoom <- calculate_context_zoom(region_zoom, context_option, get_contigs(state$assembly))
@@ -202,15 +215,15 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
     return(FALSE)
   }
   
-  # save current zoom and set export zoom temporarily
-  saved_zoom <- state$zoom
-  if (!is.null(context_zoom)) {
-    cxt_set_zoom(context_zoom)
-  }
+  # set zoom for this context window (NULL resets to full range)
+  cxt_set_zoom(context_zoom)
   
   # generate region name
   region_name <- if (!is.null(region_data$id)) region_data$id else "region"
   region_name <- sanitize_filename(region_name)
+  if (!use_simple_names && !is.null(region_index)) {
+    region_name <- paste0(region_index, "_", region_name)
+  }
 
   # create region_info for tabs
   region_info <- list(
@@ -310,11 +323,6 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   # NOW plot profiles (after cache has been populated by tab export functions)
   plot_result <- plot_profiles_ggplot()
   
-  # restore original zoom
-  if (!is.null(saved_zoom)) {
-    cxt_set_zoom(saved_zoom)
-  }
-  
   if (is.null(plot_result) || is.null(plot_result$plot)) return(FALSE)
 
   # save profiles
@@ -398,6 +406,23 @@ observeEvent(input$plotViewBtn, {
         p("Creates folders for each context and tab type.", style = "color: #666; font-size: 0.9em;")
       ),
       column(4,
+        h5("Views to Export"),
+        div(style = "max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 4px;",
+          checkboxGroupInput("pdf_views", NULL,
+            choices = get_view_ids(),
+            selected = {
+              cached <- cache_get_if_exists("export_views", NULL)
+              view_ids <- get_view_ids()
+              if (!is.null(cached)) {
+                valid <- cached[cached %in% view_ids]
+                if (length(valid) > 0) valid else input$view_id
+              } else {
+                input$view_id
+              }
+            },
+            width = "100%")
+        ),
+        br(),
         h5("Tabs to Export"),
         tab_checkboxes
       )
@@ -459,9 +484,29 @@ observeEvent(input$plotRegionsBtn, {
         p(id = "pdf_regions_full_path", paste("Full path:", file.path(getwd(), "plots", cache_get_if_exists("export_regions_output_dir", "all_regions"))), 
           style = "color: #666; font-size: 0.9em; word-break: break-all;"),
         br(),
+        h5("Limit"),
+        numericInput("pdf_regions_max_n", "Max regions (0 = all):",
+                    value = cache_get_if_exists("export_regions_max_n", 0), min = 0, step = 1),
         p("Creates context folders, each with subfolders for profiles and tab types.", style = "color: #666; font-size: 0.9em;")
       ),
       column(4,
+        h5("Views to Export"),
+        div(style = "max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 4px;",
+          checkboxGroupInput("pdf_regions_views", NULL,
+            choices = get_view_ids(),
+            selected = {
+              cached <- cache_get_if_exists("export_views", NULL)
+              view_ids <- get_view_ids()
+              if (!is.null(cached)) {
+                valid <- cached[cached %in% view_ids]
+                if (length(valid) > 0) valid else input$view_id
+              } else {
+                input$view_id
+              }
+            },
+            width = "100%")
+        ),
+        br(),
         h5("Tabs to Export"),
         tab_checkboxes
       )
@@ -572,6 +617,14 @@ observeEvent(input$confirm_export_view, {
     cache_set("export_width", width)
     cache_set("export_height", height)
     
+    # get selected views
+    selected_views <- input$pdf_views
+    if (is.null(selected_views) || length(selected_views) == 0) {
+      selected_views <- input$view_id
+    }
+    cache_set("export_views", selected_views)
+    multi_view <- length(selected_views) > 1
+    
     # validate that at least one context is selected
     if (length(context_options) == 0) {
       showNotification("Please select at least one context window", type = "warning")
@@ -598,11 +651,8 @@ observeEvent(input$confirm_export_view, {
     original_segments <- get_state_segments()
     original_zoom <- state$zoom
     original_assembly <- state$assembly
+    original_view_id <- input$view_id
     
-    # create context directories (use flat structure for single region)
-    context_dirs <- create_export_dirs(output_dir, context_options, single_region_mode = TRUE)
-    
-    # create export parameters (include tab inclusions and basic settings)
     export_params <- c(
       list(
         width = width,
@@ -615,27 +665,40 @@ observeEvent(input$confirm_export_view, {
     current_region <- list(
       id = region_name,
       contigs = paste(get_state_contigs(), collapse = ","),
-      zoom_start = if (!is.null(state$zoom)) state$zoom[1] else NULL,
-      zoom_end = if (!is.null(state$zoom)) state$zoom[2] else NULL,
+      xlim_start = if (!is.null(state$zoom)) state$zoom[1] else NULL,
+      xlim_end = if (!is.null(state$zoom)) state$zoom[2] else NULL,
       assembly = state$assembly
     )
     
-    # export for each selected context
     success_count <- 0
-    for (context_option in context_options) {
-      dirs <- context_dirs[[context_option]]
+    total_count <- length(selected_views) * length(context_options)
+    
+    for (view_id in selected_views) {
+      cat(sprintf("exporting view: %s\n", view_id))
+      set_view(view_id)
       
-      if (export_region(current_region, context_option, dirs, export_params, use_simple_names = TRUE)) {
-        success_count <- success_count + 1
+      state$segments <- original_segments
+      state$zoom <- original_zoom
+      state$assembly <- original_assembly
+      
+      view_output_dir <- if (multi_view) file.path(output_dir, sanitize_filename(view_id)) else output_dir
+      context_dirs <- create_export_dirs(view_output_dir, context_options, single_region_mode = TRUE)
+      
+      for (context_option in context_options) {
+        dirs <- context_dirs[[context_option]]
+        if (export_region(current_region, context_option, dirs, export_params, use_simple_names = TRUE)) {
+          success_count <- success_count + 1
+        }
       }
     }
     
-    # restore original state
+    # restore original state and view
     state$segments <- original_segments
     state$zoom <- original_zoom
     state$assembly <- original_assembly
+    set_view(original_view_id)
     
-    showNotification(paste("Exported", success_count, "of", length(context_options), "contexts to:", output_dir), type = "message", duration = 5)
+    showNotification(paste("Exported", success_count, "of", total_count, "view-context combinations to:", output_dir), type = "message", duration = 5)
     
   }, error = function(e) {
     message("export failed: ", e$message)
@@ -652,6 +715,7 @@ observeEvent(input$confirm_export_regions, {
     output_dir_name <- input$pdf_regions_output_dir %||% "all_regions"
     width <- input$pdf_regions_width %||% 10
     height <- input$pdf_regions_height %||% 6
+    max_n <- input$pdf_regions_max_n %||% 0
     
     # get tab inclusion settings dynamically
     exportable_tabs <- get_exportable_tabs()
@@ -669,6 +733,15 @@ observeEvent(input$confirm_export_regions, {
     cache_set("export_regions_output_dir", output_dir_name)
     cache_set("export_width", width)
     cache_set("export_height", height)
+    cache_set("export_regions_max_n", max_n)
+    
+    # get selected views
+    selected_views <- input$pdf_regions_views
+    if (is.null(selected_views) || length(selected_views) == 0) {
+      selected_views <- input$view_id
+    }
+    cache_set("export_views", selected_views)
+    multi_view <- length(selected_views) > 1
     
     # validate that at least one context is selected
     if (length(context_options) == 0) {
@@ -683,6 +756,11 @@ observeEvent(input$confirm_export_regions, {
       return()
     }
     
+    # limit to first N regions if requested
+    if (!is.na(max_n) && max_n > 0) {
+      regions_data <- regions_data[seq_len(min(max_n, nrow(regions_data))), ]
+    }
+    
     # create output directory and subfolders for multi-region export
     output_dir <- file.path("plots", sanitize_filename(output_dir_name))
     if (!dir.exists(output_dir)) {
@@ -693,18 +771,14 @@ observeEvent(input$confirm_export_regions, {
     original_segments <- get_state_segments()
     original_zoom <- state$zoom
     original_assembly <- state$assembly
+    original_view_id <- input$view_id
     
-    # show progress
     total_regions <- nrow(regions_data)
-    total_exports <- total_regions * length(context_options)
-    showNotification(paste("Exporting", total_regions, "regions with", length(context_options), "contexts..."), type = "message", duration = 2)
+    total_exports <- total_regions * length(context_options) * length(selected_views)
+    showNotification(paste("Exporting", total_regions, "regions with", length(context_options), "contexts and", length(selected_views), "views..."), type = "message", duration = 2)
     
     success_count <- 0
     
-    # create context directories
-    context_dirs <- create_export_dirs(output_dir, context_options)
-    
-    # create export parameters (include tab inclusions and basic settings)
     export_params <- c(
       list(
         width = width,
@@ -713,29 +787,39 @@ observeEvent(input$confirm_export_regions, {
       tab_inclusions
     )
     
-    # iterate through regions, then contexts (main loop is regions)
-    for (i in seq_len(nrow(regions_data))) {
-      region <- regions_data[i, ]
+    for (view_id in selected_views) {
+      cat(sprintf("======================================== View: %s ========================================\n", view_id))
+      set_view(view_id)
       
-      cat(sprintf("---------------------------------------- Region %d/%d: %s ----------------------------------------\n", 
-                  i, nrow(regions_data), region$id))
+      state$segments <- original_segments
+      state$zoom <- original_zoom
+      state$assembly <- original_assembly
       
-      # iterate through contexts for this region
-      for (context_option in context_options) {
-        dirs <- context_dirs[[context_option]]
+      view_output_dir <- if (multi_view) file.path(output_dir, sanitize_filename(view_id)) else output_dir
+      context_dirs <- create_export_dirs(view_output_dir, context_options)
+      
+      for (i in seq_len(nrow(regions_data))) {
+        region <- regions_data[i, ]
         
-        if (export_region(region, context_option, dirs, export_params, use_simple_names = FALSE)) {
-          success_count <- success_count + 1
+        cat(sprintf("---------------------------------------- Region %d/%d: %s ----------------------------------------\n", 
+                    i, nrow(regions_data), region$id))
+        
+        for (context_option in context_options) {
+          dirs <- context_dirs[[context_option]]
+          if (export_region(region, context_option, dirs, export_params, use_simple_names = FALSE, region_index = i)) {
+            success_count <- success_count + 1
+          }
         }
       }
     }
     
-    # restore original state
+    # restore original state and view
     state$segments <- original_segments
     state$zoom <- original_zoom
     state$assembly <- original_assembly
+    set_view(original_view_id)
     
-    showNotification(paste("Exported", success_count, "of", total_exports, "region-context combinations to:", output_dir), 
+    showNotification(paste("Exported", success_count, "of", total_exports, "view-region-context combinations to:", output_dir), 
                      type = "message", duration = 8)
     
   }, error = function(e) {
