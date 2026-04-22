@@ -353,6 +353,83 @@ export_region <- function(region_data, context_option, dirs, export_params, use_
   return(TRUE)  # success
 }
 
+# show fasta sequence for the current viewed window
+observeEvent(input$fastaBtn, {
+  assembly <- cxt_get_assembly()
+  if (is.null(assembly)) {
+    showNotification("no assembly loaded", type = "warning")
+    return()
+  }
+
+  sequences <- tryCatch(get_fasta(assembly), error = function(e) NULL)
+  if (is.null(sequences)) {
+    showNotification("fasta not available for this assembly", type = "warning")
+    return()
+  }
+
+  contig_df <- cxt_get_entire_view()
+  if (is.null(contig_df) || nrow(contig_df) == 0) {
+    showNotification("no view available", type = "warning")
+    return()
+  }
+
+  xlim <- cxt_get_xlim()
+
+  # clip each visible segment to the zoom window
+  visible <- contig_df[contig_df$vstart < xlim[2] & contig_df$vend > xlim[1], , drop = FALSE]
+  if (nrow(visible) == 0) {
+    showNotification("no contigs in current view", type = "warning")
+    return()
+  }
+
+  fasta_lines <- c()
+  for (i in seq_len(nrow(visible))) {
+    row <- visible[i, ]
+    local_start <- as.integer(max(row$start, xlim[1] - row$vstart + row$start))
+    local_end   <- as.integer(min(row$end,   xlim[2] - row$vstart + row$start))
+    if (local_start > local_end) next
+
+    # find contig sequence
+    contig_seq <- NULL
+    for (seq_name in names(sequences)) {
+      if (seq_name == row$contig || grepl(paste0("^", row$contig, "($|\\s)"), seq_name)) {
+        contig_seq <- as.character(sequences[[seq_name]])
+        break
+      }
+    }
+    if (is.null(contig_seq)) next
+
+    local_start <- max(1L, local_start)
+    local_end   <- min(nchar(contig_seq), local_end)
+    if (local_start > local_end) next
+
+    seq_str <- substr(contig_seq, local_start, local_end)
+    # wrap at 60 chars per line
+    chunks <- regmatches(seq_str, gregexpr(".{1,60}", seq_str))[[1]]
+    header <- sprintf(">%s %s:%d-%d", assembly, row$contig, local_start, local_end)
+    fasta_lines <- c(fasta_lines, header, chunks)
+  }
+
+  if (length(fasta_lines) == 0) {
+    showNotification("could not extract sequence for current view", type = "warning")
+    return()
+  }
+
+  fasta_text <- paste(fasta_lines, collapse = "\n")
+
+  showModal(modalDialog(
+    title = "FASTA sequence",
+    tags$textarea(
+      fasta_text,
+      rows = 20,
+      style = "width:100%; font-family:monospace; font-size:12px; white-space:pre;"
+    ),
+    easyClose = TRUE,
+    footer = modalButton("Close"),
+    size = "l"
+  ))
+})
+
 # show enhanced export current view dialog
 observeEvent(input$plotViewBtn, {
   exportable_tabs <- get_exportable_tabs()

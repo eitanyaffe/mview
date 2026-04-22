@@ -18,6 +18,23 @@ dir <- paste(Sys.getenv("MAKESHIFT_ROOT"), "export", "long", project_name, "defa
 fns <- list.files(dir, full.names = TRUE, pattern = "*.txt")
 set_lookup(fns)
 
+# load malign csegment metadata (csegment name and consensus length)
+malign_cseg <- local({
+    cseg_path <- tryCatch(get_path("MALIGN_CSEGMENT_FILE"), error = function(e) NULL)
+    if (is.null(cseg_path) || !file.exists(cseg_path)) return(NULL)
+    read.table(cseg_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+})
+
+# copy malign region file into the regions directory
+local({
+    src <- tryCatch(get_path("MALIGN_TRANSFORM_REGION"), error = function(e) NULL)
+    if (!is.null(src) && !is.null(malign_cseg)) {
+        dst <- file.path("configs/c60/regions", paste0(malign_cseg$csegment, "_ref.txt"))
+        file.copy(src, dst, overwrite = TRUE)
+        cat(sprintf("copied region file: %s -> %s\n", src, dst))
+    }
+})
+
 ########################################################
 # set default navigation mode
 ########################################################
@@ -35,16 +52,27 @@ cache_set("navigate_up_down_type", navigate_up_down_type)
 ########################################################
 
 aids <- get_data("ASSEMBLY_TABLE")$ASSEMBLY_ID
-aids <- c("AAK", "EAP", "BAA", "BAM", "EBC", "BAH", "EAL", "EAA", "EAV", "EBQ")
+aids <- sort(c("EBU", "EAB", "AAK", "EAP", "BAA", "BAM", "EBC", "BAH", "EAL", "EAA", "EAV", "EBQ", "DAE"))
 
 # Sort assembly IDs to prioritize EBC
 aids <- aids[order(aids != "EBC")]
+
+# add consensus assembly if available
+if (!is.null(malign_cseg)) {
+    aids <- c(aids, malign_cseg$csegment)
+}
 
 # Set assemblies (as a vector of string IDs)
 set_assemblies(aids)
 
 # Register contigs function
 register_contigs_f(function(assembly = NULL) {
+  if (!is.null(malign_cseg) && assembly == malign_cseg$csegment) {
+    return(data.frame(
+      contig = paste0("ctg_", assembly),
+      length = malign_cseg$consensus_length,
+      coverage = 0, circular = FALSE))
+  }
   df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
   if (is.null(df)) {
     return(NULL)
@@ -54,11 +82,19 @@ register_contigs_f(function(assembly = NULL) {
 
 # Register segments function
 register_segments_f(function(assembly = NULL) {
+  if (!is.null(malign_cseg) && assembly == malign_cseg$csegment) {
+    return(data.frame(
+      segment = paste0("s_", assembly),
+      contig = paste0("ctg_", assembly),
+      start = 1L,
+      end = as.integer(malign_cseg$consensus_length),
+      length = as.integer(malign_cseg$consensus_length),
+      stringsAsFactors = FALSE))
+  }
   df <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly)
   if (is.null(df)) {
     return(NULL)
   }
-  # Return required columns: segment, contig, start, end, length
   data.frame(
     segment = df$segment,
     contig = df$contig,
@@ -71,7 +107,12 @@ register_segments_f(function(assembly = NULL) {
 
 # Register genomes function
 register_genomes_f(function(assembly = NULL) {
-    # df <- get_data("ASSEMBLY_CONTIG_TABLE", tag = assembly)
+    if (!is.null(malign_cseg) && assembly == malign_cseg$csegment) {
+        return(data.frame(
+            gid = paste0("b_", assembly),
+            length = as.integer(malign_cseg$consensus_length),
+            stringsAsFactors = FALSE))
+    }
     df <- get_data("BINNING_HOST_TABLE", tag = assembly)
     
     if (is.null(df)) {
@@ -121,12 +162,31 @@ register_genomes_f(function(assembly = NULL) {
         }
     }
     
-    rr = rr[order(-rr$length),]
+    # join mean_abundance, insert after contamination, and sort by it, otherwise sort by length
+    abund_df <- get_data("BINNING_ABUNDANCE_LR_SUMMARY", tag = assembly, null.on.missing = TRUE)
+    if (!is.null(abund_df) && "mean_abundance" %in% names(abund_df)) {
+        ix <- match(rr$gid, abund_df$bin)
+        rr$mean_abundance <- ifelse(is.na(ix), 0, abund_df$mean_abundance[ix])
+        cont_pos <- match("contamination", names(rr))
+        if (!is.na(cont_pos)) {
+            other_cols <- setdiff(names(rr), "mean_abundance")
+            rr <- rr[, c(other_cols[seq_len(cont_pos)], "mean_abundance", other_cols[seq(cont_pos + 1, length(other_cols))])]
+        }
+        rr <- rr[order(-rr$mean_abundance), ]
+    } else {
+        rr <- rr[order(-rr$length), ]
+    }
     return(rr)
 })
 
 # Register segment map function
 register_segment_map_f(function(assembly = NULL) {
+    if (!is.null(malign_cseg) && assembly == malign_cseg$csegment) {
+        return(data.frame(
+            segment = paste0("s_", assembly),
+            gid = paste0("b_", assembly),
+            stringsAsFactors = FALSE))
+    }
     df <- get_data("BINNING_BIN_SEGMENT_TABLE", tag = assembly)
     if (is.null(df)) {
         return(NULL)
@@ -140,6 +200,12 @@ read_fasta_f <- function(path) {
 }
 
 get_fasta_f <- function(assembly = NULL) {
+  if (!is.null(malign_cseg) && assembly == malign_cseg$csegment) {
+    fasta_path <- get_path("MALIGN_CONSENSUS_FASTA")
+    seqs <- read_fasta_f(fasta_path)
+    names(seqs) <- paste0("ctg_", assembly)
+    return(seqs)
+  }
   get_data("ASSEMBLY_CONTIG_FILE", tag = assembly, read_f = read_fasta_f)
 }
 
@@ -270,12 +336,16 @@ view_register("pre", view_file, timepoints = c("pre"), show_self_align = FALSE)
 view_register("post", view_file, timepoints = c("post"), show_self_align = FALSE)
 view_register("late", view_file, timepoints = c("late"), show_self_align = FALSE)
 view_register("pre / post", view_file, timepoints = c("pre", "post"), show_self_align = FALSE)
+view_register("early / pre", view_file, timepoints = c("early", "pre"), show_self_align = FALSE)
 view_register("pre / post / late", view_file, timepoints = c("pre", "post", "late"), show_self_align = FALSE)
 view_register("all", view_file, timepoints = c("early", "pre", "post", "late"), show_self_align = FALSE)
 
 view_register("other subject", view_file, other_subject_ids = c("EBN"), timepoints = c("pre"), show_self_align = FALSE)
 
 view_register("self-align", view_file, timepoints = NULL, show_self_align = TRUE)
+
+allele_view_file <- "configs/c60/c60_allele_view.r"
+view_register("alleles", allele_view_file)
 
 ########################################################
 # genes
@@ -331,27 +401,42 @@ get_mge_color <- function(prot_desc_vector, mge_groups, mge_colors) {
 # get_genes_f used by gene profile and the gene tab
 get_genes_f <- function(assembly) {
   cache(paste0(assembly, "_genes"), {
-    genes <- get_data("PRODIGAL_GENE_TABLE", tag = assembly)
-    uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = assembly)
-    ix <- match(genes$gene, uniref$gene)
-    fields <- c("uniref", "identity", "coverage", "evalue", "bitscore", "prot_desc", "tax", "uniref_count")
-    for (field in fields) {
-      # set default value based on field type
-      if (is.numeric(uniref[[field]])) {
-        genes[[field]] <- ifelse(is.na(ix), 0, uniref[[field]][ix])
-      } else {
-        genes[[field]] <- ifelse(is.na(ix), "none", uniref[[field]][ix])
+    is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
+    if (is_consensus) {
+      genes <- get_data("MALIGN_ANNOTATE_GENE_TABLE", null.on.missing = TRUE)
+      uniref <- get_data("MALIGN_ANNOTATE_UNIREF_TABLE", null.on.missing = TRUE)
+      if (is.null(genes)) return(NULL)
+      genes$contig <- paste0("ctg_", assembly)
+    } else {
+      genes <- get_data("PRODIGAL_GENE_TABLE", tag = assembly)
+      uniref <- get_data("UNIREF_GENE_TAX_TABLE", tag = assembly)
+    }
+
+    if (!is.null(uniref)) {
+      ix <- match(genes$gene, uniref$gene)
+      fields <- c("uniref", "identity", "coverage", "evalue", "bitscore", "prot_desc", "tax", "uniref_count")
+      for (field in fields) {
+        if (!field %in% names(uniref)) next
+        if (is.numeric(uniref[[field]])) {
+          genes[[field]] <- ifelse(is.na(ix), 0, uniref[[field]][ix])
+        } else {
+          genes[[field]] <- ifelse(is.na(ix), "none", uniref[[field]][ix])
+        }
       }
     }
     
     # add tax color
-    tax_color_map <- get_tax_color(genes$tax)
-    genes$tax_color <- tax_color_map[genes$tax]
+    if ("tax" %in% names(genes)) {
+      tax_color_map <- get_tax_color(genes$tax)
+      genes$tax_color <- tax_color_map[genes$tax]
+    }
     
     # add mge color
-    genes$mge_color <- get_mge_color(genes$prot_desc, mge_groups, mge_colors)
+    if ("prot_desc" %in% names(genes)) {
+      genes$mge_color <- get_mge_color(genes$prot_desc, mge_groups, mge_colors)
+    }
     
-    # build label text for tooltips (same logic as default in profile)
+    # build label text for tooltips
     genes$label <- paste0(
       "Gene: ", genes$gene, "\n",
       if (!is.null(genes$prot_desc)) paste0("Description: ", genes$prot_desc, "\n") else "",
@@ -420,8 +505,8 @@ get_variants_gene_table_f <- function(assembly) {
 
 # load variants table with gene fields
 get_variants_table_f <- function(assembly) {
-  vars_table <- get_data("POLY_VARIANTS_TABLE", tag = assembly)
-  vars_genic <- get_data("POLY_VARIANTS_GENIC", tag = assembly)
+  vars_table <- get_data("POLY_VARIANTS_TABLE", tag = assembly, null.on.missing = TRUE)
+  vars_genic <- get_data("POLY_VARIANTS_GENIC", tag = assembly, null.on.missing = TRUE)
   
   if (is.null(vars_table)) {
     return(NULL)
@@ -447,8 +532,8 @@ register_tab(
   is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
   get_variants_table_f = get_variants_table_f,
-  get_variants_support_f = function(assembly) get_data("POLY_VARIANTS_SUPPORT", tag = assembly),
-  get_variants_coverage_f = function(assembly) get_data("POLY_VARIANTS_COVERAGE", tag = assembly),
+  get_variants_support_f = function(assembly) get_data("POLY_VARIANTS_SUPPORT", tag = assembly, null.on.missing = TRUE),
+  get_variants_coverage_f = function(assembly) get_data("POLY_VARIANTS_COVERAGE", tag = assembly, null.on.missing = TRUE),
   use_genes = TRUE,
   supports_export = TRUE
 )
@@ -483,9 +568,9 @@ register_tab(
   tab_code = "tabs/rearrangements/rearrangements_tab.r",
   is.dynamic = FALSE,  # use pre-computed files
   library_ids = c("early", "pre", "post", "late"),
-  get_rearrange_events_f = function(assembly) get_data("POLY_REARRANGE_EVENTS", tag = assembly),
-  get_rearrange_support_f = function(assembly) get_data("POLY_REARRANGE_SUPPORT", tag = assembly),
-  get_rearrange_coverage_f = function(assembly) get_data("POLY_REARRANGE_COVERAGE", tag = assembly),
+  get_rearrange_events_f = function(assembly) get_data("POLY_REARRANGE_EVENTS", tag = assembly, null.on.missing = TRUE),
+  get_rearrange_support_f = function(assembly) get_data("POLY_REARRANGE_SUPPORT", tag = assembly, null.on.missing = TRUE),
+  get_rearrange_coverage_f = function(assembly) get_data("POLY_REARRANGE_COVERAGE", tag = assembly, null.on.missing = TRUE),
   use_genes = TRUE,
   supports_export = TRUE
 )
@@ -576,4 +661,264 @@ get_bin_segments_f <- function(assembly) {
   seg_table$id <- seg_table$segment
   
   return(seg_table)
+}
+
+########################################################
+# malign allele association and site data functions
+########################################################
+
+get_malign_assoc_f <- function(assembly, binsize = "full") {
+  is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
+  if (binsize == "full") {
+    get_data("MALIGN_SITE_ASSOC", null.on.missing = TRUE)
+  } else if (is_consensus) {
+    id <- paste0("MALIGN_CONSENSUS_ASSOC_BIN", binsize)
+    get_data(id, null.on.missing = TRUE)
+  } else {
+    id <- paste0("MALIGN_SITE_ASSOC_BIN", binsize)
+    get_data(id, null.on.missing = TRUE)
+  }
+}
+
+get_malign_transform_sites_f <- function(assembly) {
+  is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
+  sites <- if (is_consensus) {
+    get_data("MALIGN_CONSENSUS_SITES", null.on.missing = TRUE)
+  } else {
+    get_data("MALIGN_TRANSFORM_SITES", null.on.missing = TRUE)
+  }
+  if (is.null(sites) || nrow(sites) == 0) return(NULL)
+  sites <- sites[sites$ref_aid == assembly & sites$ref_allele_seq != "-", ]
+  if (nrow(sites) == 0) return(NULL)
+  sites
+}
+
+# returns one point per allele site in the ref: contig, coord (ref_start)
+get_allele_density_f <- function(assembly) {
+  sites <- get_malign_transform_sites_f(assembly)
+  if (is.null(sites) || nrow(sites) == 0) return(NULL)
+  data.frame(
+    contig = sites$ref_contig,
+    coord  = sites$ref_start,
+    stringsAsFactors = FALSE
+  )
+}
+
+# returns one point per non-syn site in the ref: contig, coord (ref_start)
+get_nonsyn_density_f <- function(assembly) {
+  sites <- get_malign_transform_sites_f(assembly)
+  if (is.null(sites) || nrow(sites) == 0) return(NULL)
+  ann <- get_malign_annotate_sites_f()
+  if (is.null(ann) || nrow(ann) == 0) return(NULL)
+  nonsyn_ids <- ann$site_id[grepl("non_syn", ann$types, fixed = TRUE)]
+  sites <- sites[sites$site_id %in% nonsyn_ids, ]
+  if (nrow(sites) == 0) return(NULL)
+  data.frame(
+    contig = sites$ref_contig,
+    coord  = sites$ref_start,
+    stringsAsFactors = FALSE
+  )
+}
+
+########################################################
+# malign hotspot data function
+########################################################
+
+get_malign_hotspots_f <- function(assembly) {
+  is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
+  if (!is_consensus) return(NULL)
+  hs <- get_data("MALIGN_HOTSPOT_TABLE", null.on.missing=TRUE)
+  if (is.null(hs) || nrow(hs) == 0) return(NULL)
+  hs$assembly <- assembly
+  hs$contig   <- paste0("ctg_", assembly)
+  hs$id       <- hs$hotspot_id
+  hs$desc     <- sprintf("%s  w=%d  count=%d  p=%.4g",
+                         hs$hotspot_id, hs$window, hs$max_count, hs$p_global)
+  hs
+}
+
+########################################################
+# malign annotate data functions
+########################################################
+
+get_malign_annotate_sites_f <- function() {
+  get_data("MALIGN_ANNOTATE_SITES", null.on.missing = TRUE)
+}
+
+get_malign_annotate_alleles_f <- function() {
+  get_data("MALIGN_ANNOTATE_ALLELES", null.on.missing = TRUE)
+}
+
+# build a hover desc string for a single site, using annotated sites and alleles
+build_malign_site_hover <- function(site_id, n_alleles, ann_sites, ann_alleles) {
+  site_rows   <- ann_sites[ann_sites$site_id == site_id, ]
+  allele_rows <- ann_alleles[ann_alleles$site_id == site_id, ]
+
+  if (nrow(site_rows) == 0)
+    return(paste0("site: ", site_id, "\nalleles: ", n_alleles))
+
+  site_class <- site_rows$class[1]
+
+  # header: id | n | class
+  header <- paste0(site_id, " | n=", n_alleles, " | ", site_class)
+
+  # per-gene summary lines (one per row in site_rows)
+  gene_lines <- character(0)
+  if (site_class == "genic" || (nrow(site_rows) > 0 && site_rows$gene[1] != "none")) {
+    for (i in seq_len(nrow(site_rows))) {
+      sr <- site_rows[i, ]
+      if (sr$gene == "none") next
+      aa_range <- if (sr$aa_start != 0 || sr$aa_end != 0)
+        paste0("aa: ", sr$aa_start, "\u2013", sr$aa_end) else ""
+      types_str <- if ("types" %in% names(sr) && nchar(sr$types) > 0) sr$types else ""
+      gene_lines <- c(gene_lines,
+        paste0(sr$gene, " (", sr$strand, ")",
+               if (nchar(aa_range) > 0) paste0(" | ", aa_range) else "",
+               if (nchar(types_str) > 0) paste0(" | ", types_str) else ""))
+    }
+  } else {
+    # intergenic: flanking genes and types
+    sr <- site_rows[1, ]
+    types_str <- if ("types" %in% names(sr) && nchar(sr$types) > 0) sr$types else ""
+    if (nchar(types_str) > 0)
+      gene_lines <- c(gene_lines, types_str)
+    left_part  <- if (sr$left_gene  != "none") paste0("\u2190 ", sr$left_gene,  " (", sr$distance_left,  " bp)") else ""
+    right_part <- if (sr$right_gene != "none") paste0(sr$right_gene, " \u2192 (", sr$distance_right, " bp)") else ""
+    flanking <- paste(c(left_part, right_part)[nchar(c(left_part, right_part)) > 0], collapse = " | ")
+    if (nchar(flanking) > 0)
+      gene_lines <- c(gene_lines, flanking)
+  }
+
+  # per-allele lines: one row per unique allele_id (take first gene's annotation)
+  allele_lines <- character(0)
+  if (nrow(allele_rows) > 0) {
+    seen <- character(0)
+    for (i in seq_len(nrow(allele_rows))) {
+      ar <- allele_rows[i, ]
+      if (ar$allele_id %in% seen) next
+      seen <- c(seen, ar$allele_id)
+      count_str <- if ("count" %in% names(ar) && !is.na(ar$count) && ar$count != 0)
+        paste0(" n=", ar$count) else ""
+      if (site_class == "genic" && ar$gene != "none" &&
+          ar$codons != "none" && ar$amino_acids != "none") {
+        allele_lines <- c(allele_lines,
+          paste0(ar$allele_id, ": ", ar$sequence,
+                 " [", ar$codons, "\u2192", ar$amino_acids, "]", count_str))
+      } else {
+        allele_lines <- c(allele_lines,
+          paste0(ar$allele_id, ": ", ar$sequence, " (", ar$length, ")", count_str))
+      }
+    }
+  }
+
+  parts <- c(header, gene_lines, "", allele_lines)
+  paste(parts, collapse = "\n")
+}
+
+########################################################
+# malign allele sites data function
+########################################################
+
+# gene-based color per site: gray=intergenic, light blue=syn only, red=frameshift, orange=other genic
+malign_gene_color <- function(site_ids, ann_sites) {
+  vapply(site_ids, function(sid) {
+    rows <- ann_sites[ann_sites$site_id == sid, ]
+    if (nrow(rows) == 0 || !any(rows$class == "genic")) return("#AAAAAA")
+    genic_rows <- rows[rows$class == "genic", ]
+    all_types  <- unlist(strsplit(paste(genic_rows$types, collapse = ","), ","))
+    all_types  <- trimws(all_types[nchar(trimws(all_types)) > 0])
+    if (any(all_types == "frameshift"))                          return("#E74C3C")
+    if (any(all_types == "aa_indel"))                            return("#CC88FF")
+    if (any(all_types == "non_syn"))                             return("#FFA500")
+    if (length(setdiff(all_types, c("syn", "identical"))) == 0) return("#ADD8E6")
+    "#AAAAAA"
+  }, character(1))
+}
+
+# n_alleles-based color: light blue=2, orange=3, red=>3
+malign_nalleles_color <- function(n_alleles) {
+  ifelse(n_alleles == 2, "#ADD8E6",
+         ifelse(n_alleles == 3, "#FFA500", "#E74C3C"))
+}
+
+get_malign_sites_f <- function(assembly) {
+  is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
+
+  sites <- if (is_consensus) {
+    get_data("MALIGN_CONSENSUS_SITES", null.on.missing = TRUE)
+  } else {
+    get_data("MALIGN_TRANSFORM_SITES", null.on.missing = TRUE)
+  }
+
+  # for extent markers: consensus uses consensus_to_global, ref uses global_to_ref
+  extent_map <- if (is_consensus) {
+    get_data("MALIGN_CONSENSUS_TO_GLOBAL", null.on.missing = TRUE)
+  } else {
+    get_data("MALIGN_GLOBAL_TO_REF", null.on.missing = TRUE)
+  }
+
+  ann_sites   <- get_malign_annotate_sites_f()
+  use_ann     <- !is.null(ann_sites) && nrow(ann_sites) > 0
+
+  rows <- list()
+
+  if (!is.null(sites) && nrow(sites) > 0) {
+    sites <- sites[sites$ref_aid == assembly & sites$ref_allele_seq != "-", ]
+    if (nrow(sites) > 0) {
+      fill_gene_color <- if (use_ann)
+        malign_gene_color(sites$site_id, ann_sites)
+      else
+        rep("#AAAAAA", nrow(sites))
+
+      fill_nalleles_color <- malign_nalleles_color(sites$n_alleles)
+
+      rows[["sites"]] <- data.frame(
+        assembly            = sites$ref_aid,
+        contig              = sites$ref_contig,
+        start               = sites$ref_start,
+        end                 = pmax(sites$ref_end, sites$ref_start + 1L),
+        id                  = "",
+        site_id             = sites$site_id,
+        n_alleles           = sites$n_alleles,
+        desc                = "",
+        fill_gene_color     = fill_gene_color,
+        fill_nalleles_color = fill_nalleles_color,
+        stringsAsFactors    = FALSE
+      )
+    }
+  }
+
+  if (!is.null(extent_map) && nrow(extent_map) > 0) {
+    if (is_consensus) {
+      # consensus_to_global: columns consensus_coord, global_coord (no is_gap; all are non-gap)
+      min.coord <- min(extent_map$consensus_coord)
+      max.coord <- max(extent_map$consensus_coord)
+      contig    <- paste0("ctg_", assembly)
+    } else {
+      # global_to_ref: filter by assembly, drop gap rows
+      gtr       <- extent_map[extent_map$ref_aid == assembly, ]
+      non.gap   <- gtr[gtr$is_gap == "F" | gtr$is_gap == FALSE, ]
+      if (nrow(non.gap) == 0) non.gap <- gtr
+      contig    <- non.gap$ref_contig[1]
+      min.coord <- min(non.gap$ref_coord)
+      max.coord <- max(non.gap$ref_coord)
+    }
+    rows[["extent"]] <- data.frame(
+      assembly            = assembly,
+      contig              = contig,
+      start               = c(min.coord, max.coord),
+      end                 = c(min.coord + 1L, max.coord + 1L),
+      id                  = "",
+      site_id             = "",
+      n_alleles           = 0L,
+      desc                = c("alignment start", "alignment end"),
+      fill_gene_color     = "black",
+      fill_nalleles_color = "black",
+      stringsAsFactors    = FALSE
+    )
+  }
+
+  if (length(rows) == 0)
+    return(NULL)
+  do.call(rbind, rows)
 }

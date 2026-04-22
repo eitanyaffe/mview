@@ -131,6 +131,7 @@ query_variants_for_context <- function(assembly, contigs, zoom, tab_config) {
         
         # add gene columns using vectorized operations
         variants_df$gene_desc <- ifelse(!is.na(ix), genic_data$gene_desc[ix], "none")
+        variants_df$aa_coord <- ifelse(!is.na(ix), genic_data$aa_coord[ix], NA_integer_)
         variants_df$mutation_desc <- ifelse(!is.na(ix), genic_data$mutation_desc[ix], "")
         
         cat(sprintf("enhanced %d variants with gene annotation data\n", sum(!is.na(ix))))

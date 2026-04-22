@@ -56,7 +56,7 @@ get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE,
     stop("lookup table not set, call set_lookup first")
   }
 
-  id <- if (tag != "") paste(id, tag, sep = ":") else id
+  id <- if (!is.null(tag) && nzchar(tag)) paste(id, tag, sep = ":") else id
 
   # Check if ID exists in lookup table
   if (!id %in% .data_env$lookups$id) {

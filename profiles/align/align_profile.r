@@ -90,7 +90,7 @@ default_alignment_params <- list(
   height_style = list(
     group_id = "align_full",
     type = "select",
-    choices = c("by_mutations", "by_coord_left", "by_coord_right"), 
+    choices = c("by_mutations", "by_coord_left", "by_coord_right", "genotype"), 
     default = "by_mutations"
   ),  
   full_style = list(
@@ -119,7 +119,7 @@ default_alignment_params <- list(
   bin_style = list(
     group_id = "align_bin",
     type = "select",
-    choices = c("by_seg_density", "by_mut_density", "by_median_mutation_density", "by_genomic_distance", "by_nonref_density", "by_seg_clip_density", "by_non_ref_clip_density"),
+    choices = c("by_genomic_distance", "by_allele_count", "by_seg_density", "by_mut_density", "by_median_mutation_density", "by_nonref_density", "by_seg_clip_density", "by_non_ref_clip_density"),
     default = "by_seg_density"
   ),
   bin_type = list(
@@ -139,6 +139,11 @@ default_alignment_params <- list(
     default = 0.9
   ),
   min_seg_support = list(
+    group_id = "align_bin",
+    type = "integer",
+    default = 2
+  ),
+  min_allele_support = list(
     group_id = "align_bin",
     type = "integer",
     default = 2

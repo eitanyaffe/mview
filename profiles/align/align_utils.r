@@ -224,6 +224,52 @@ create_gradient_legend <- function(title, colors, max_val, n_steps = 10, as_perc
     ggplot2::coord_cartesian(xlim = c(0.5, 3), ylim = c(0.5, n_steps + 0.5))
 }
 
+# allele count color definitions: ref in light blue, 12 non-ref alleles in high-contrast colors
+# consecutive colors differ in hue family and darkness to aid color-impaired viewers
+get_allele_count_colors <- function() {
+  list(
+    ref = "#BBDEFB",
+    other = "#F48FB1",
+    alleles = c(
+      "#64B5F6", # light blue
+      "#FB8C00", # orange
+      "#43A047", # green
+      "#8E24AA", # purple
+      "#E53935", # red
+      "#00897B", # teal
+      "#FFB300", # amber
+      "#6D4C41", # brown
+      "#D81B60", # pink/maroon
+      "#546E7A", # slate
+      "#7CB342", # lime green
+      "#FF5722"  # deep orange
+    )
+  )
+}
+
+# allele count legend (ref + up to 12 alleles + other)
+create_allele_count_legend <- function() {
+  colors <- get_allele_count_colors()
+  labels <- c("reference", paste0("allele ", 1:12), "other alleles")
+  fill_colors <- c(colors$ref, colors$alleles, colors$other)
+  legend_data <- data.frame(
+    y = seq_along(labels), x = 1,
+    color = fill_colors, label = labels,
+    stringsAsFactors = FALSE
+  )
+  ggplot2::ggplot(legend_data, ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = x - 0.35, xmax = x + 0.35, ymin = y - 0.45, ymax = y + 0.45, fill = color),
+      color = "black", size = 0.3
+    ) +
+    ggplot2::geom_text(ggplot2::aes(label = label), x = 1.7, hjust = 0, size = 3.2) +
+    ggplot2::scale_fill_identity() +
+    ggplot2::labs(title = "allele counts") +
+    ggplot2::theme_void() +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 11, hjust = 0.5), plot.margin = ggplot2::margin(8, 8, 8, 8)) +
+    ggplot2::coord_cartesian(xlim = c(0.5, 3.5), ylim = c(0.5, length(labels) + 0.5))
+}
+
 # stacked mutation rates categories legend (discrete)
 create_stacked_mutation_rates_legend <- function() {
   colors <- get_alignment_color_definitions()
@@ -326,6 +372,10 @@ format_indel_desc_for_hover <- function(x) {
     }
     return(paste0("-", substr(seq, 1, 10), "... (", n, " bp deleted)"))
   }
+  # SNP format from alntools is variant:ref ("X:R"); convert to ref->variant ("R->X")
+  if (grepl("^[A-Z]:[A-Z]$", s)) {
+    return(paste0(substr(s, 3, 3), "->", substr(s, 1, 1)))
+  }
   return(s)
 }
 
@@ -381,63 +431,97 @@ plot_mutations_unified <- function(gg, mutation_data, profile) {
     mutation_data$hover_text <- ""
   }
   
+  # separate deletions: draw as gray rects spanning the full deleted region in contig coords
+  is_deletion <- grepl("^-", mutation_data$desc)
+  deletions <- mutation_data[is_deletion, ]
+  non_deletions <- mutation_data[!is_deletion, ]
+  
+  deletion_color <- "#E8789A"
+  
+  if (nrow(deletions) > 0) {
+    deletions$del_len <- nchar(gsub("^-", "", deletions$desc))
+    deletions$xmin_del <- deletions$gcoord - 0.5
+    deletions$xmax_del <- deletions$gcoord + deletions$del_len - 0.5
+    if (profile$show_hover) {
+      gg <- gg + ggplot2::geom_rect(
+        data = deletions,
+        ggplot2::aes(
+          xmin = xmin_del, xmax = xmax_del,
+          ymin = ybottom, ymax = ytop,
+          text = hover_text
+        ),
+        fill = deletion_color, color = NA
+      ) +
+        ggplot2::scale_fill_identity()
+    } else {
+      gg <- gg + ggplot2::geom_rect(
+        data = deletions,
+        ggplot2::aes(
+          xmin = xmin_del, xmax = xmax_del,
+          ymin = ybottom, ymax = ytop
+        ),
+        fill = deletion_color, color = NA
+      ) +
+        ggplot2::scale_fill_identity()
+    }
+  }
+
   # determine plot style based on zoom level (from align_profile_full logic)
   xlim <- cxt_get_xlim()
   xlim_range <- xlim[2] - xlim[1]
   use_rectangles <- xlim_range < 1000
   
-  if (use_rectangles) {
-    # plot mutation rectangles when zoomed in
-    mutation_border_size <- (profile$full_mutation_lwd %||% 0.5) * 0.8  # slightly thinner than mutation lines
-    if (profile$show_hover) {
-      gg <- gg + ggplot2::geom_rect(
-        data = mutation_data,
-        ggplot2::aes(
-          xmin = gcoord - 0.5, xmax = gcoord + 0.5,
-          ymin = ybottom, ymax = ytop,
-          fill = fill_color,
-          text = hover_text
-        ),
-        color = mutation_data$fill_color, size = mutation_border_size
-      ) +
-        ggplot2::scale_fill_identity()
+  if (nrow(non_deletions) > 0) {
+    if (use_rectangles) {
+      if (profile$show_hover) {
+        gg <- gg + ggplot2::geom_rect(
+          data = non_deletions,
+          ggplot2::aes(
+            xmin = gcoord - 0.5, xmax = gcoord + 0.5,
+            ymin = ybottom, ymax = ytop,
+            fill = fill_color,
+            text = hover_text
+          ),
+          color = NA
+        ) +
+          ggplot2::scale_fill_identity()
+      } else {
+        gg <- gg + ggplot2::geom_rect(
+          data = non_deletions,
+          ggplot2::aes(
+            xmin = gcoord - 0.5, xmax = gcoord + 0.5,
+            ymin = ybottom, ymax = ytop,
+            fill = fill_color
+          ),
+          color = NA
+        ) +
+          ggplot2::scale_fill_identity()
+      }
     } else {
-      gg <- gg + ggplot2::geom_rect(
-        data = mutation_data,
-        ggplot2::aes(
-          xmin = gcoord - 0.5, xmax = gcoord + 0.5,
-          ymin = ybottom, ymax = ytop,
-          fill = fill_color
-        ),
-        color = mutation_data$fill_color, size = mutation_border_size
-      ) +
-        ggplot2::scale_fill_identity()
-    }
-  } else {
-    # plot mutation segments when zoomed out
-    if (profile$show_hover) {
-      gg <- gg + ggplot2::geom_segment(
-        data = mutation_data,
-        ggplot2::aes(
-          x = gcoord, xend = gcoord,
-          y = ybottom, yend = ytop,
-          color = fill_color,
-          text = hover_text
-        ),
-        size = profile$full_mutation_lwd %||% 0.5
-      ) +
-        ggplot2::scale_color_identity()
-    } else {
-      gg <- gg + ggplot2::geom_segment(
-        data = mutation_data,
-        ggplot2::aes(
-          x = gcoord, xend = gcoord,
-          y = ybottom, yend = ytop,
-          color = fill_color
-        ),
-        size = profile$full_mutation_lwd %||% 0.5
-      ) +
-        ggplot2::scale_color_identity()
+      if (profile$show_hover) {
+        gg <- gg + ggplot2::geom_segment(
+          data = non_deletions,
+          ggplot2::aes(
+            x = gcoord, xend = gcoord,
+            y = ybottom, yend = ytop,
+            color = fill_color,
+            text = hover_text
+          ),
+          size = profile$full_mutation_lwd %||% 0.5
+        ) +
+          ggplot2::scale_color_identity()
+      } else {
+        gg <- gg + ggplot2::geom_segment(
+          data = non_deletions,
+          ggplot2::aes(
+            x = gcoord, xend = gcoord,
+            y = ybottom, yend = ytop,
+            color = fill_color
+          ),
+          size = profile$full_mutation_lwd %||% 0.5
+        ) +
+          ggplot2::scale_color_identity()
+      }
     }
   }
   

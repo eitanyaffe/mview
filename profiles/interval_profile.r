@@ -3,6 +3,7 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
                           color = "#2E86AB",
                           color_field = NULL,
                           color_f = NULL,
+                          outline_color = "black",
                           merge_adjacent = TRUE,
                           auto_register = TRUE) 
 {
@@ -88,7 +89,7 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
           text = hover_text
         ),
         fill = fill_colors,
-        color = "black",
+        color = if (identical(profile$outline_color, "fill")) fill_colors else profile$outline_color,
         size = 0.5
       )
     xlim <- cxt_get_xlim()
@@ -119,6 +120,7 @@ interval_profile <- function(id, name, height = 60, is_fixed = TRUE,
     color = color,
     color_field = color_field,
     color_f = color_f,
+    outline_color = outline_color,
     merge_adjacent = merge_adjacent,
     auto_register = auto_register
   )

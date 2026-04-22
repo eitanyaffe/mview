@@ -298,6 +298,7 @@ ui <- fluidPage(
       h5("Info"),
       verbatimTextOutput("basic_info"),
       actionButton("plotViewBtn", "Export", icon = icon("file-pdf")),
+      actionButton("fastaBtn", "FASTA"),
       actionButton("plotRegionsBtn", "Export All", icon = icon("file-pdf")),
       actionButton("helpBtn", "Help"),
       actionButton("aboutBtn", "About"),

@@ -53,16 +53,19 @@ observeEvent(input$gotoContigsBtn, {
   if (length(rows) > 0) {
     contigs_data <- get_contigs(state$assembly)
     selected_contigs <- contigs_data$contig[rows]
-    current_contigs <- get_state_contigs()
-    if (!identical(selected_contigs, current_contigs)) {
+
+    # get all segments for selected contigs
+    segments <- get_segments(state$assembly)
+    new_segments <- segments[segments$contig %in% selected_contigs, ]
+
+    # compare full segment-id sets so partial-segment state still triggers an update
+    current_segment_ids <- get_state_segments()$segment
+    if (!identical(sort(new_segments$segment), sort(current_segment_ids))) {
       # push current region to undo before changing
       regions_module_output$push_undo_state()
-      
-      # get segments for selected contigs
-      segments <- get_segments(state$assembly)
-      new_segments <- segments[segments$contig %in% selected_contigs, ]
+
       state$segments <- new_segments
-      
+
       # reset zoom to see full range of new segments
       state$zoom <- NULL
     }

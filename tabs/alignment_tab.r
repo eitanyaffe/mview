@@ -456,16 +456,38 @@ output$alignmentPlot <- plotly::renderPlotly({
       "Desc: ", format_indel_desc_for_hover(mutations$desc)
     )
     
-    gg <- gg + ggplot2::geom_segment(
-      data = mutations,
-      ggplot2::aes(
-        x = read_coord, xend = read_coord,
-        y = ymin, yend = ymax,
-        text = hover_text
-      ),
-      color = mutations$fill_color,
-      size = 0.8
-    )
+    insertion_color <- "#E8789A"
+    is_insertion <- mutations$type == "INS"
+    insertions <- mutations[is_insertion, ]
+    non_insertions <- mutations[!is_insertion, ]
+    
+    if (nrow(insertions) > 0) {
+      insertions$ins_len <- nchar(gsub("^\\+", "", insertions$desc))
+      insertions$xmin_ins <- insertions$read_coord - 0.5
+      insertions$xmax_ins <- insertions$read_coord + insertions$ins_len - 0.5
+      gg <- gg + ggplot2::geom_rect(
+        data = insertions,
+        ggplot2::aes(
+          xmin = xmin_ins, xmax = xmax_ins,
+          ymin = ymin, ymax = ymax,
+          text = hover_text
+        ),
+        fill = insertion_color, color = "black", linewidth = 0.3
+      )
+    }
+    
+    if (nrow(non_insertions) > 0) {
+      gg <- gg + ggplot2::geom_segment(
+        data = non_insertions,
+        ggplot2::aes(
+          x = read_coord, xend = read_coord,
+          y = ymin, yend = ymax,
+          text = hover_text
+        ),
+        color = non_insertions$fill_color,
+        size = 0.8
+      )
+    }
   }
   
   # add index labels in the middle of each alignment rectangle (if enabled)

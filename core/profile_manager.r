@@ -209,6 +209,11 @@ profile_get_param <- function(param_name, profile_type = NULL, default_value = N
   return(default_value)
 }
 
+profile_set_attr <- function(id, key, value) {
+  .profile_env$registered_profiles[[id]]$attr[[key]] <- value
+  invisible(NULL)
+}
+
 #' Clear all registered profiles
 #' Removes all profiles from the registry.
 profiles_clear_all <- function() {

@@ -7,6 +7,7 @@ set_tab_panel_f(function() {
     div(
       style = "margin-bottom: 10px;",
       actionButton("showGeneDetailsBtn", "Show Details"),
+      actionButton("geneSeqBtn", "Gene FASTA"),
       actionButton("zoomToGeneBtn", "Navigate to Gene"),
       actionButton("createRegionsBtn", "Create Regions")
     ),
@@ -195,6 +196,63 @@ observeEvent(input$showGeneDetailsBtn, {
       ))
     }
   }
+})
+
+observeEvent(input$geneSeqBtn, {
+  selected_row <- input$genesTable_rows_selected
+  if (length(selected_row) == 0) return()
+
+  genes_df <- get_genes_for_context(state$assembly, get_state_contigs(), state$zoom)
+  if (is.null(genes_df) || nrow(genes_df) == 0) return()
+
+  gene_id <- genes_df$gene[selected_row]
+  assembly <- state$assembly
+
+  # use the full unfiltered table to get unclipped coordinates
+  tab <- get_tab_by_id("genes")
+  all_genes <- tab$get_genes_f(assembly)
+  gene <- all_genes[all_genes$gene == gene_id, , drop = FALSE]
+  if (nrow(gene) == 0) return()
+  gene <- gene[1, ]
+
+  sequences <- tryCatch(get_fasta(assembly), error = function(e) NULL)
+  if (is.null(sequences)) {
+    showNotification("fasta not available for this assembly", type = "warning")
+    return()
+  }
+
+  contig_seq <- NULL
+  for (seq_name in names(sequences)) {
+    if (seq_name == gene$contig || grepl(paste0("^", gene$contig, "($|\\s)"), seq_name)) {
+      contig_seq <- as.character(sequences[[seq_name]])
+      break
+    }
+  }
+  if (is.null(contig_seq)) {
+    showNotification(paste("contig not found in fasta:", gene$contig), type = "warning")
+    return()
+  }
+
+  seq_start <- max(1L, as.integer(gene$start))
+  seq_end   <- min(nchar(contig_seq), as.integer(gene$end))
+  seq_str   <- substr(contig_seq, seq_start, seq_end)
+
+  chunks <- regmatches(seq_str, gregexpr(".{1,60}", seq_str))[[1]]
+  strand_str <- if ("strand" %in% names(gene)) gene$strand else "+"
+  header <- sprintf(">%s %s:%d-%d(%s)", gene$gene, gene$contig, seq_start, seq_end, strand_str)
+  fasta_text <- paste(c(header, chunks), collapse = "\n")
+
+  showModal(modalDialog(
+    title = paste("Gene FASTA:", gene$gene),
+    tags$textarea(
+      fasta_text,
+      rows = 15,
+      style = "width:100%; font-family:monospace; font-size:12px; white-space:pre;"
+    ),
+    easyClose = TRUE,
+    footer = modalButton("Close"),
+    size = "l"
+  ))
 })
 
 observeEvent(input$zoomToGeneBtn, {

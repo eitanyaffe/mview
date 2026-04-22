@@ -121,7 +121,7 @@ min_indel_length = 3) {
 align_profile_full <- function(profile, aln, gg) {
   intervals <- cxt_get_zoom_view()
   height_style <- profile$height_style
-  if (!is.element(height_style, c("by_mutations", "by_coord_left", "by_coord_right"))) {
+  if (!is.element(height_style, c("by_mutations", "by_coord_left", "by_coord_right", "genotype"))) {
     height_style <- "by_mutations"
   }
 

@@ -171,10 +171,12 @@ axis_profile <- function(id = "simple_axis",
         if (show_nt && window_size <= nt_threshold) {
           contig <- visible_df$contig[1]
           assembly <- cxt_get_assembly()
-          sequence <- get_sequence(assembly, contig, local_visible_start, local_visible_end)
+          # snap to integer coords so characters don't drift with fractional zoom offsets
+          local_visible_start_int <- ceiling(local_visible_start)
+          sequence <- get_sequence(assembly, contig, local_visible_start_int, local_visible_end)
           
           if (!is.null(sequence) && nchar(sequence) > 0) {
-            nt_local_positions <- seq(local_visible_start, local_visible_start + nchar(sequence) - 1)
+            nt_local_positions <- seq(local_visible_start_int, local_visible_start_int + nchar(sequence) - 1)
             nt_global_positions <- vstart + nt_local_positions - local_start
             nt_chars <- strsplit(sequence, "")[[1]]
             

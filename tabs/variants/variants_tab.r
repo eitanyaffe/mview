@@ -425,7 +425,7 @@ observeEvent(input$gotoVariantsBtn, {
   # set zoom to calculated range
   state$zoom <- c(zoom_start, zoom_end)
   
-  showNotification(sprintf("Navigated to %d selected variants", length(valid_rows)), type = "message")
+  showNotification(sprintf("Navigated to %d selected variants", length(matching_rows)), type = "message")
 })
 
 # clear selection button handler  
@@ -578,7 +578,7 @@ output$variantsTable <- renderDT({
         return(format_indel_desc_for_hover(desc))
       }
       if (nchar(desc) <= 15) {
-        return(desc)
+        return(format_indel_desc_for_hover(desc))
       }
       first_5 <- substr(desc, 1, 5)
       last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
@@ -589,6 +589,11 @@ output$variantsTable <- renderDT({
   # round frequency to 3 decimal places
   if ("frequency" %in% names(display_df)) {
     display_df$frequency <- round(display_df$frequency, 3)
+  }
+
+  # convert AA change from "R:X" to "R->X" format
+  if ("mutation_desc" %in% names(display_df)) {
+    display_df$mutation_desc <- gsub("^([A-Z]):([A-Z])$", "\\1->\\2", display_df$mutation_desc)
   }
 
 
@@ -624,7 +629,10 @@ output$variantsTable <- renderDT({
     "Description" = "desc"
   )
   
-  # Add mutation description if available
+  # Add amino acid annotation columns if available
+  if ("aa_coord" %in% names(display_df)) {
+    col_names <- c(col_names, "AA Coord" = "aa_coord")
+  }
   if ("mutation_desc" %in% names(display_df)) {
     col_names <- c(col_names, "AA Change" = "mutation_desc")
   }
@@ -650,6 +658,7 @@ output$variantsTable <- renderDT({
     "Gene" = "Description of the gene containing the variant",
     "Type" = "Type of variant (substitution, insertion, deletion)",
     "Description" = "Human-readable description of the change (hover for full text)",
+    "AA Coord" = "Amino acid position in the protein sequence",
     "AA Change" = "Amino acid change in the protein sequence",
     "Libraries" = "Number of libraries containing this variant",
     "Support" = "Total number of reads supporting this variant",
@@ -675,6 +684,7 @@ output$variantsTable <- renderDT({
   gene_cols <- c()
   if ("is_genic" %in% names(display_df)) gene_cols <- c(gene_cols, "is_genic")
   if ("gene_desc" %in% names(display_df)) gene_cols <- c(gene_cols, "gene_desc")
+  if ("aa_coord" %in% names(display_df)) gene_cols <- c(gene_cols, "aa_coord")
   if ("mutation_desc" %in% names(display_df)) gene_cols <- c(gene_cols, "mutation_desc")
   
   if (length(gene_cols) > 0) {

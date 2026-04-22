@@ -156,7 +156,7 @@ update_gg_objects <- function(profile_plotly_objects) {
     # Convert to plotly, using 'text' aesthetic when hover is enabled
     if (isFALSE(profile$show_hover)) {
       p_ly <- plotly::ggplotly(gg_final, tooltip = NULL) %>%
-         plotly::style(hoverinfo = "none")
+        plotly::style(hoverinfo = "none")
     } else {
       p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
     }
@@ -340,7 +340,6 @@ plot_profiles_cached <- function(plotly_objects_result, container_height_px = NU
   current_layout <- combined_plot$x$layout
   for (i in seq_along(profiles)) {
     profile <- profiles[[i]]
-    # Always clear default vertical y-axis title text
     yaxis_name <- if (i == 1) "yaxis" else paste0("yaxis", i)
     layout_args[[yaxis_name]] <- list(title = list(text = ""))
 
@@ -444,7 +443,7 @@ plot_profiles <- function() {
     # Convert to plotly, using 'text' aesthetic when hover is enabled
     if (isFALSE(profile$show_hover)) {
       p_ly <- plotly::ggplotly(gg_final, tooltip = NULL) %>%
-         plotly::style(hoverinfo = "none")
+        plotly::style(hoverinfo = "none")
     } else {
       p_ly <- plotly::ggplotly(gg_final, tooltip = "text")
     }
@@ -526,7 +525,6 @@ plot_profiles <- function() {
   current_layout <- combined_plot$x$layout
   for (i in seq_along(profiles)) {
     profile <- profiles[[i]]
-    # Always clear default vertical y-axis title text
     yaxis_name <- if (i == 1) "yaxis" else paste0("yaxis", i)
     layout_args[[yaxis_name]] <- list(title = list(text = ""))
 

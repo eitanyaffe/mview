@@ -151,6 +151,18 @@ gene_profile(
 )
 
 ########################################################
+# fancy gene profile
+########################################################
+
+source("profiles/genes/fancy_gene_profile.r")
+
+fancy_gene_profile(
+  id     = "fancy_genes",
+  name   = "Genes (fancy)",
+  gene_f = get_genes_f
+)
+
+########################################################
 # rRNA gene profile
 ########################################################
 
@@ -205,6 +217,67 @@ interval_profile(
 )
 
 ########################################################
+# malign hotspots interval profile (with window param)
+########################################################
+
+local({
+  params <- list(
+    window = list(
+      group_id = "hotspots",
+      type     = "integer",
+      default  = 100
+    )
+  )
+
+  plot_f <- function(profile, gg) {
+    assembly <- cxt_get_assembly()
+    hs <- get_malign_hotspots_f(assembly)
+    if (is.null(hs) || nrow(hs) == 0)
+      return(list(plot = gg, legends = list()))
+
+    w  <- as.integer(if (!is.null(profile$window)) profile$window else min(hs$window))
+    hs <- hs[hs$window == w, ]
+    if (nrow(hs) == 0)
+      return(list(plot = gg, legends = list()))
+
+    filtered <- cxt_filter_intervals(hs, merge_adjacent = FALSE)
+    if (is.null(filtered) || nrow(filtered) == 0)
+      return(list(plot = gg, legends = list()))
+
+    xlim       <- cxt_get_xlim()
+    hover_text <- paste0(filtered$contig, ": ", filtered$start, "-", filtered$end,
+                         "\n", filtered$desc)
+
+    gg <- gg +
+      ggplot2::geom_rect(
+        data = filtered,
+        ggplot2::aes(xmin = gstart, xmax = gend, ymin = -0.15, ymax = 0.15, text = hover_text),
+        fill = "#CC3333", color = "black", size = 0.5
+      ) +
+      ggplot2::geom_text(
+        data = filtered,
+        ggplot2::aes(x = gstart + diff(xlim) * 0.01, y = 0.25, label = id, text = hover_text),
+        color = "black", size = 2, hjust = 1, vjust = 0.5
+      ) +
+      ggplot2::ylim(-0.5, 0.6)
+
+    list(plot = gg, legends = list())
+  }
+
+  profile_create(
+    id            = "hotspots",
+    name          = "Hotspots",
+    type          = "intervals",
+    height        = 60,
+    is_fixed      = TRUE,
+    attr          = list(hide_y_ticks = TRUE),
+    params        = params,
+    plot_f        = plot_f,
+    auto_register = TRUE
+  )
+})
+
+########################################################
 # variants profile
 ########################################################
 
@@ -226,4 +299,4 @@ rearrangements_profile(
 # axis profile
 ########################################################
 
-axis_profile()
+axis_profile(height = 80)

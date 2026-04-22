@@ -61,7 +61,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
         return(format_indel_desc_for_hover(desc))
       }
       if (nchar(desc) <= 15) {
-        return(desc)
+        return(format_indel_desc_for_hover(desc))
       }
       first_5 <- substr(desc, 1, 5)
       last_5 <- substr(desc, nchar(desc) - 4, nchar(desc))
@@ -73,7 +73,7 @@ variants_profile <- function(id, name, height = 60, is_fixed = TRUE,
       "Position: ", position_label, "<br>",
       "Description: ", description_display, "<br>",
       ifelse(!is.na(filtered_variants$mutation_desc) & filtered_variants$mutation_desc != "", 
-             paste0("AA Change: ", filtered_variants$mutation_desc, "<br>"), ""),
+             paste0("AA Change: ", gsub("^([A-Z]):([A-Z])$", "\\1->\\2", filtered_variants$mutation_desc), "<br>"), ""),
       "Type: ", filtered_variants$type, "<br>"
     )
     

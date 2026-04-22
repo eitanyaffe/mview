@@ -358,6 +358,7 @@ create_scatter_plot <- function(data_matrix, items_df, library_ids, x_lib, y_lib
     y_jitter <- y_range * 0.05
     
     # apply jitter
+    set.seed(42)
     plot_data$x_value <- plot_data$x_value + runif(nrow(plot_data), -x_jitter, x_jitter)
     plot_data$y_value <- plot_data$y_value + runif(nrow(plot_data), -y_jitter, y_jitter)
     
@@ -478,6 +479,7 @@ create_temporal_plot <- function(data_matrix, items_df, library_ids,
     y_jitter <- y_range * 0.05
     
     # apply jitter
+    set.seed(42)
     plot_data$value <- plot_data$value + runif(nrow(plot_data), -y_jitter, y_jitter)
     
     # reapply bounds after jitter
@@ -853,6 +855,7 @@ create_scatter_plot_for_export <- function(data_matrix, items_df, library_ids, x
     x_jitter <- x_range * 0.02  # smaller jitter for PDF
     y_jitter <- y_range * 0.02
     
+    set.seed(42)
     plot_data$x_value <- plot_data$x_value + runif(nrow(plot_data), -x_jitter, x_jitter)
     plot_data$y_value <- plot_data$y_value + runif(nrow(plot_data), -y_jitter, y_jitter)
     
@@ -930,6 +933,7 @@ create_temporal_plot_for_export <- function(data_matrix, items_df, library_ids,
     y_range <- max(plot_data$value) - min(plot_data$value)
     y_jitter <- y_range * 0.02  # smaller jitter for PDF
     
+    set.seed(42)
     plot_data$value <- plot_data$value + runif(nrow(plot_data), -y_jitter, y_jitter)
     
     # apply bounds based on plot value type

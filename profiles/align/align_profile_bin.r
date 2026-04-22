@@ -42,7 +42,7 @@ get_current_bin_size <- function(xlim, bin_type, target_bins = 1024,
 align_query_bin_mode <- function(aln, bin_type, target_bins = 1024, 
   seg_threshold = 0.2, non_ref_threshold = 0.9, num_threads = 0, clip_mode = "all", 
   clip_margin = 10, min_mutations_percent = 0.0, max_mutations_percent = 10.0, min_alignment_length = 0, 
-  max_alignment_length = 0, min_indel_length = 3, min_seg_support = 2,
+  max_alignment_length = 0, min_indel_length = 3, min_seg_support = 2, min_allele_support = 2,
   binsizes = c(1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000)) 
 {
   intervals <- cxt_get_zoom_view()
@@ -81,7 +81,8 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
                        min_alignment_length = min_alignment_length,
                        max_alignment_length = max_alignment_length,
                        min_indel_length = min_indel_length,
-                       min_seg_support = min_seg_support
+                       min_seg_support = min_seg_support,
+                       min_allele_support = min_allele_support
                      ), algo = "md5"))
 
   
@@ -96,7 +97,8 @@ align_query_bin_mode <- function(aln, bin_type, target_bins = 1024,
       min_alignment_length = as.integer(min_alignment_length), 
       max_alignment_length = as.integer(max_alignment_length), 
       min_indel_length = as.integer(min_indel_length),
-      min_seg_support = as.integer(min_seg_support))
+      min_seg_support = as.integer(min_seg_support),
+      min_allele_support = as.integer(min_allele_support))
   })
 
   if (!is.null(df) && nrow(df) > 0) {
@@ -187,7 +189,7 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
         desc_h <- format_indel_desc_for_hover(category_data$description)
         if (normalize) {
           category_data$hover_text <- paste0(
-            sprintf("%.1f%%", category_data$count), " of reads\n",
+            sprintf("%.1f%%", 100 * category_data$count / mean_cov), " of reads\n",
             "Category: ", desc_h, "\n"
           )
         } else {
@@ -219,13 +221,117 @@ plot_stacked_mutation_rates <- function(gg, df, profile, normalize = FALSE) {
       ggplot2::aes(
         xmin = gstart, xmax = gend,
         ymin = ymin, ymax = ymax,
-        fill = fill_color, color = fill_color,
+        fill = fill_color,
         text = hover_text
       ),
-      size = 0.1
+      color = NA
     ) +
-      ggplot2::scale_fill_identity() +
-      ggplot2::scale_color_identity()
+      ggplot2::scale_fill_identity()
+  }
+  
+  return(gg)
+}
+
+# Plot allele count stacked bars: ref at bottom, allele1..12 stacked above
+plot_stacked_allele_counts <- function(gg, df, profile, normalize = FALSE) {
+  if (nrow(df) == 0) return(gg)
+
+  allele_colors <- get_allele_count_colors()
+
+  # stacking order bottom to top: allele1..allele12, other, ref
+  categories <- c(paste0("allele", 1:12), "other_count", "ref_count")
+  colors <- c(allele_colors$alleles, allele_colors$other, allele_colors$ref)
+  descriptions <- c(paste0("allele ", 1:12), "other alleles", "reference")
+
+  if (normalize) {
+    total_counts <- rep(0, nrow(df))
+    for (cat in categories) {
+      cat_counts <- df[[cat]]
+      if (!is.null(cat_counts)) {
+        cat_counts[is.na(cat_counts)] <- 0
+        total_counts <- total_counts + cat_counts
+      }
+    }
+    mean_cov <- mean(total_counts[total_counts > 0])
+    for (cat in categories) {
+      if (!is.null(df[[cat]])) {
+        df[[cat]] <- ifelse(total_counts > 0, (df[[cat]] / total_counts) * mean_cov, 0)
+      }
+    }
+  }
+
+  bottom_y <- rep(0, nrow(df))
+  stacked_data <- data.frame()
+
+  for (i in seq_along(categories)) {
+    cat <- categories[i]
+    color <- colors[i]
+    desc <- descriptions[i]
+
+    counts <- df[[cat]]
+    if (is.null(counts)) counts <- rep(0, nrow(df))
+    counts[is.na(counts)] <- 0
+
+    has_count <- counts > 0
+    if (any(has_count)) {
+      category_data <- data.frame(
+        gstart = df$gstart[has_count],
+        gend = df$gend[has_count],
+        ymin = bottom_y[has_count],
+        ymax = bottom_y[has_count] + counts[has_count],
+        fill_color = color,
+        category = cat,
+        description = desc,
+        count = counts[has_count],
+        contig = df$contig[has_count],
+        start = df$start[has_count],
+        end = df$end[has_count],
+        length = df$length[has_count],
+        read_count = df$read_count[has_count],
+        sequenced_bp = df$sequenced_bp[has_count],
+        stringsAsFactors = FALSE
+      )
+
+      if (profile$show_hover) {
+        desc_h <- format_indel_desc_for_hover(category_data$description)
+        if (normalize) {
+          category_data$hover_text <- paste0(
+            sprintf("%.1f%%", 100 * category_data$count / mean_cov), " of reads\n",
+            "Category: ", desc_h, "\n"
+          )
+        } else {
+          category_data$hover_text <- paste0(
+            category_data$count, " out of ", category_data$read_count, " reads\n",
+            "Category: ", desc_h, "\n"
+          )
+        }
+      } else {
+        category_data$hover_text <- ""
+      }
+
+      stacked_data <- rbind(stacked_data, category_data)
+    }
+
+    bottom_y <- bottom_y + counts
+  }
+
+  if (nrow(stacked_data) > 0) {
+    if ("is_low_cov" %in% colnames(df)) {
+      low_cov_gstarts <- df$gstart[df$is_low_cov]
+      stacked_data$fill_color[stacked_data$gstart %in% low_cov_gstarts] <- "#ececec"
+    }
+
+    gg <- gg + ggplot2::geom_rect(
+      data = stacked_data,
+      ggplot2::aes(
+        xmin = gstart, xmax = gend,
+        ymin = ymin, ymax = ymax,
+        fill = fill_color,
+        text = hover_text
+      ),
+      color = NA
+    ) +
+      ggplot2::scale_fill_identity()
   }
   
   return(gg)
@@ -576,6 +682,11 @@ create_bin_profile_legends <- function(bin_style, profile, df) {
     if (!is.null(legend_gg)) {
       legends <- c(legends, list(list(gg = legend_gg, height = 210, width = 320, title = "mutation rate bins")))
     }
+  } else if (bin_style == "by_allele_count") {
+    legend_gg <- create_allele_count_legend()
+    if (!is.null(legend_gg)) {
+      legends <- c(legends, list(list(gg = legend_gg, height = 450, width = 320, title = "allele counts")))
+    }
   }
   
   return(legends)
@@ -589,8 +700,9 @@ align_profile_bin <- function(profile, aln, gg) {
   non_ref_threshold <- if (!is.null(profile$non_ref_threshold)) profile$non_ref_threshold else 0.9
   num_threads <- if (!is.null(profile$num_threads)) profile$num_threads else 0
   min_seg_support <- if (!is.null(profile$min_seg_support)) profile$min_seg_support else 2
+  min_allele_support <- if (!is.null(profile$min_allele_support)) profile$min_allele_support else 2
   
-  df <- align_query_bin_mode(aln, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length), min_seg_support = as.integer(min_seg_support), binsizes = profile$binsizes)
+  df <- align_query_bin_mode(aln, profile$bin_type, target_bins = profile$target_bins, seg_threshold = seg_threshold, non_ref_threshold = non_ref_threshold, num_threads = num_threads, clip_mode = profile$clip_mode, clip_margin = profile$clip_margin, min_mutations_percent = as.numeric(profile$min_mutations_percent), max_mutations_percent = as.numeric(profile$max_mutations_percent), min_alignment_length = as.integer(profile$min_alignment_length), max_alignment_length = as.integer(profile$max_alignment_length), min_indel_length = as.integer(profile$min_indel_length), min_seg_support = as.integer(min_seg_support), min_allele_support = as.integer(min_allele_support), binsizes = profile$binsizes)
   if (is.null(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }
@@ -637,6 +749,8 @@ align_profile_bin <- function(profile, aln, gg) {
     gg <- plot_nonref_clip_sites_bins(gg, df, profile)
   } else if (bin_style == "by_genomic_distance") {
     gg <- plot_stacked_mutation_rates(gg, df, profile, normalize = normalize_distrib_bins)
+  } else if (bin_style == "by_allele_count") {
+    gg <- plot_stacked_allele_counts(gg, df, profile, normalize = normalize_distrib_bins)
   }
 
   gg <- gg + ggplot2::theme_minimal() +
