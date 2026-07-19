@@ -578,28 +578,33 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
             }
           }
           
-          # convert homologs results to proper region table format
+          # look up segments to map contig names to segment IDs
+          all_segments <- tryCatch(get_segments(current_assembly), error = function(e) {
+            cat("warning: could not get segments for assembly", current_assembly, ":", e$message, "\n")
+            NULL
+          })
+
+          # convert homologs results to new region table format
           region_format_results <- data.frame(
             id = homologs_results$id,
-            level = rep(1L, nrow(homologs_results)),  # default level
+            level = rep(1L, nrow(homologs_results)),
             description = better_descriptions,
-            assembly = rep(current_assembly, nrow(homologs_results)),  # use actual assembly name
-            contigs = homologs_results$contig,  # single contig per region
-            zoom_start = as.numeric(extended_starts),  # use extended coordinates
-            zoom_end = as.numeric(extended_ends),      # use extended coordinates
-            segment_contig = homologs_results$contig,
-            segment_start = as.integer(extended_starts),
-            segment_end = as.integer(extended_ends),
-            single_contig = rep(TRUE, nrow(homologs_results)),
+            assembly = rep(current_assembly, nrow(homologs_results)),
+            segments = character(nrow(homologs_results)),
+            xlim_start = as.numeric(extended_starts),
+            xlim_end = as.numeric(extended_ends),
             stringsAsFactors = FALSE
           )
-          
-          # compute global zoom coordinates from segment coordinates
-          for (i in seq_len(nrow(region_format_results))) {
-            # use segment coordinates directly as zoom (they're already in the right space)
-            # Note: With segment-based state, zoom coords are relative to the segment set
-            region_format_results$zoom_start[i] <- region_format_results$segment_start[i]
-            region_format_results$zoom_end[i] <- region_format_results$segment_end[i]
+
+          # map each contig to its segment ID
+          for (i in seq_len(nrow(homologs_results))) {
+            contig_name <- homologs_results$contig[i]
+            if (!is.null(all_segments) && nrow(all_segments) > 0) {
+              matching <- all_segments[all_segments$contig == contig_name, ]
+              if (nrow(matching) > 0) {
+                region_format_results$segments[i] <- matching$segment[1]
+              }
+            }
           }
           
           # write results to file
@@ -916,7 +921,17 @@ regions_server <- function(id = "regions_module", main_state_rv, session) {
         # Parse and set segments
         if (region_row$segments != "" && !is.na(region_row$segments)) {
           segment_ids <- trimws(strsplit(region_row$segments, ",")[[1]])
-          all_segments <- get_segments(main_state_rv$assembly)
+          all_segments <- tryCatch(get_segments(main_state_rv$assembly), error = function(e) {
+            shiny::showNotification(
+              paste("cannot navigate to region: assembly data not available (", region_row$assembly, ")"),
+              type = "error", duration = 8)
+            NULL
+          })
+          if (is.null(all_segments)) {
+            main_state_rv$assembly <- current_state$assembly
+            undo_stack(current_undo[-length(current_undo)])
+            return()
+          }
           selected_segments <- all_segments[all_segments$segment %in% segment_ids, ]
           # preserve order from saved segment_ids
           seg_order <- match(selected_segments$segment, segment_ids)

@@ -35,6 +35,27 @@ local({
     }
 })
 
+# copy sites region files into the regions directory (one deletion + integration per CME)
+local({
+    cme_df <- tryCatch(get_data("SITES_MOTIF_CME_ID_TABLE", null.on.missing = TRUE), error = function(e) NULL)
+    if (is.null(cme_df) || nrow(cme_df) == 0) {
+        return(invisible(NULL))
+    }
+    cme_ids <- sort(unique(as.character(cme_df$CME_ID)))
+    regions_dir <- "configs/c60/regions"
+    dir.create(regions_dir, recursive = TRUE, showWarnings = FALSE)
+    for (cme_id in cme_ids) {
+        for (kind in c("deletion", "integration")) {
+            var <- if (kind == "deletion") "SITES_REGIONS_DELETION" else "SITES_REGIONS_INTEGRATION"
+            src <- tryCatch(get_path(var, tag = cme_id), error = function(e) NULL)
+            if (is.null(src) || !file.exists(src)) next
+            dst <- file.path(regions_dir, paste0("sites_", kind, "_", cme_id, ".txt"))
+            file.copy(src, dst, overwrite = TRUE)
+            cat(sprintf("copied region file: %s -> %s\n", src, dst))
+        }
+    }
+})
+
 ########################################################
 # set default navigation mode
 ########################################################
@@ -481,6 +502,9 @@ get_map_tag <- function(assembly, timepoint) {
 # simple function to get alignment for any assembly/library_id combination
 get_aln_f <- function(assembly, library_id) {
   tag <- get_map_tag(assembly, library_id)
+  if (is.null(tag)) {
+    return(NULL)
+  }
   get_data("MINIMAP_LIB_ALN", tag = tag, read_f = aln_load)
 }
 
@@ -667,6 +691,43 @@ get_bin_segments_f <- function(assembly) {
 # malign allele association and site data functions
 ########################################################
 
+# consensus sites table: prefer MALIGN_CONSENSUS_SITES; if missing, build from
+# annotated sites using consensus_start/end on contig ctg_<csegment>
+get_malign_consensus_sites_table <- function() {
+  sites <- get_data("MALIGN_CONSENSUS_SITES", null.on.missing = TRUE)
+  if (!is.null(sites) && nrow(sites) > 0) {
+    return(sites)
+  }
+  ann <- get_malign_annotate_sites_f()
+  if (is.null(ann) || nrow(ann) == 0 || is.null(malign_cseg)) {
+    return(NULL)
+  }
+  assembly <- as.character(malign_cseg$csegment)
+  contig <- paste0("ctg_", assembly)
+  cs <- as.integer(ann$consensus_start)
+  ce <- as.integer(ann$consensus_end)
+  keep <- !is.na(cs) & !is.na(ce) & cs > 0L & ce > 0L
+  ann <- ann[keep, , drop = FALSE]
+  cs <- cs[keep]
+  ce <- ce[keep]
+  if (nrow(ann) == 0) {
+    return(NULL)
+  }
+  data.frame(
+    site_id         = ann$site_id,
+    start           = as.integer(ann$start),
+    end             = as.integer(ann$end),
+    n_alleles       = as.integer(ann$n_alleles),
+    ref_aid         = assembly,
+    ref_contig      = contig,
+    ref_start       = cs,
+    ref_end         = ce,
+    # placeholder so != "-" filter keeps consensus-mapped sites
+    ref_allele_seq  = "N",
+    stringsAsFactors = FALSE
+  )
+}
+
 get_malign_assoc_f <- function(assembly, binsize = "full") {
   is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
   if (binsize == "full") {
@@ -683,7 +744,7 @@ get_malign_assoc_f <- function(assembly, binsize = "full") {
 get_malign_transform_sites_f <- function(assembly) {
   is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
   sites <- if (is_consensus) {
-    get_data("MALIGN_CONSENSUS_SITES", null.on.missing = TRUE)
+    get_malign_consensus_sites_table()
   } else {
     get_data("MALIGN_TRANSFORM_SITES", null.on.missing = TRUE)
   }
@@ -845,7 +906,7 @@ get_malign_sites_f <- function(assembly) {
   is_consensus <- !is.null(malign_cseg) && assembly == malign_cseg$csegment
 
   sites <- if (is_consensus) {
-    get_data("MALIGN_CONSENSUS_SITES", null.on.missing = TRUE)
+    get_malign_consensus_sites_table()
   } else {
     get_data("MALIGN_TRANSFORM_SITES", null.on.missing = TRUE)
   }

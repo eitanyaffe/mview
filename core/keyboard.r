@@ -242,7 +242,7 @@ change_region_action <- function(regions_module_output, main_state_rv, direction
   
   # determine current region by matching current state
   current_assembly <- main_state_rv$assembly
-  current_contigs <- unique(main_state_rv$segments$contig)
+  current_segments <- main_state_rv$segments$segment
   current_zoom <- main_state_rv$zoom
   
   # find matching region or get first one if none match
@@ -253,21 +253,21 @@ change_region_action <- function(regions_module_output, main_state_rv, direction
     region_row <- region_table_data[i, ]
     
     # check if this region matches current state
-    region_contigs <- if (region_row$contigs == "" || is.na(region_row$contigs)) {
+    region_segments <- if (region_row$segments == "" || is.na(region_row$segments)) {
       character(0)
     } else {
-      trimws(strsplit(region_row$contigs, ",")[[1]])
+      trimws(strsplit(region_row$segments, ",")[[1]])
     }
     
-    region_zoom <- if (is.na(region_row$zoom_start) || is.na(region_row$zoom_end)) {
+    region_zoom <- if (is.na(region_row$xlim_start) || is.na(region_row$xlim_end)) {
       NULL
     } else {
-      c(region_row$zoom_start, region_row$zoom_end)
+      c(region_row$xlim_start, region_row$xlim_end)
     }
     
     # check for match
     assembly_match <- identical(current_assembly, region_row$assembly)
-    contigs_match <- identical(sort(current_contigs), sort(region_contigs))
+    contigs_match <- identical(sort(current_segments), sort(region_segments))
     zoom_match <- identical(current_zoom, region_zoom)
     
     if (assembly_match && contigs_match && zoom_match) {

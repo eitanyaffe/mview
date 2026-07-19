@@ -75,12 +75,16 @@ get_data <- function(id, tag = "", read_f = read.delim, null.on.missing = FALSE,
     return(read_f(path))
   }
 
+  # check file existence before entering the cache so null.on.missing can
+  # return NULL without caching anything (file may be absent for some assemblies)
+  if (!file.exists(path)) {
+    if (null.on.missing)
+      return(NULL)
+    stop(sprintf("data file not found: %s", path))
+  }
+
   # Use the cache module to load or retrieve from cache
   cache(path, {
-    # Check if file exists
-    if (!file.exists(path)) {
-      stop(sprintf("data file not found: %s", path))
-    }
     cat(sprintf("reading %s data from %s\n", id, path))
     read_f(path)
   })

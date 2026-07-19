@@ -135,51 +135,29 @@ observe({
   plot_updated(TRUE)
 }, priority = 10)
 
-# Observer to render plots when cached objects OR container height changes
-observe({
-  plotly_objects_result <- profile_plotly_objects()  # Reactive dependency on cached objects
-  container_height <- input$container_height  # Reactive dependency on resize (from ResizeObserver)
-  
-  # Update cached height when user resizes (but not on initial load)
+# single renderPlotly assignment; reactive deps live inside the expression.
+# assigning renderPlotly inside observe() on each container_height update created
+# duplicate plotly widgets side-by-side in #plot_wrap.
+output$combined_plot <- renderPlotly({
+  plotly_objects_result <- profile_plotly_objects()
+  req(plotly_objects_result, cxt_get_assembly())
+
+  container_height <- input$container_height
+  container_height_px <- NULL
   if (!is.null(container_height) && !is.na(container_height) && is.numeric(container_height)) {
-    cache_set("profile_panel_height", as.integer(container_height))
+    container_height_px <- as.integer(container_height)
+    cache_set("profile_panel_height", container_height_px)
   }
-  
-  # Convert to integer for use in calculations
-  container_height <- if (!is.null(container_height) && !is.na(container_height)) as.integer(container_height) else NULL
-  
 
-  req(plotly_objects_result)  # Don't proceed if objects not ready
-  
-  # Context already set by previous observer
-  req(cxt_get_assembly())
+  plot_result <- plot_profiles_cached(plotly_objects_result, container_height_px)
+  req(plot_result, plot_result$plot)
 
-  state$plotly_registered <- FALSE
-
-  # Get combined plotly object using cached objects
-  plot_result <- plot_profiles_cached(plotly_objects_result, container_height)
-  combined_plotly_obj <- if (!is.null(plot_result)) plot_result$plot else NULL
-  
-  # Store legends in state for the legend tab
-  state$current_legends <- if (!is.null(plot_result)) plot_result$legends else list()
-
-  # Register the relayout event for the plot so zoom events can be captured with the correct source ID
-  if (!is.null(combined_plotly_obj)) {
-    combined_plotly_obj <- plotly::event_register(combined_plotly_obj, "plotly_relayout")
-    # Register click for alignment details (source is implicitly the plot's outputId "combined_plot")
-    # combined_plotly_obj <- plotly::event_register(combined_plotly_obj, "plotly_selected")
-
-    # add a reactive flag to indicate that the plotly object has been registered
+  isolate({
+    state$current_legends <- plot_result$legends
     state$plotly_registered <- TRUE
-  }
-
-  # Render the combined plot
-  output$combined_plot <- renderPlotly({
-    # Make it reactive to container height changes
-    container_height_reactive <- input$container_height
-    
-    combined_plotly_obj
   })
+
+  plotly::event_register(plot_result$plot, "plotly_relayout")
 })
 
 # Handle plotly zoom/relayout events to update state$zoom

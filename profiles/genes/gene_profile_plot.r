@@ -71,24 +71,18 @@ plot_gene_profile <- function(profile, genes, gg, mode) {
     return(list(plot = gg, legends = list()))
   }
   
-  # Transform gene coordinates to view coordinates
+  # Transform gene coordinates to view coordinates, merging adjacent segment fragments
   tryCatch({
-    df <- cxt_contig2view_interval(df, "split")
+    df <- cxt_filter_intervals(df, merge_adjacent = TRUE)
   }, error = function(e) {
     df <<- NULL
   })
   if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }
-  
-  # Filter to visible range
+
   xlim <- cxt_get_xlim()
-  if (!is.null(xlim) && length(xlim) == 2) {
-    visible <- !is.na(df$vstart) & !is.na(df$vend) & 
-               df$vstart <= xlim[2] & df$vend >= xlim[1]
-    df <- df[visible, ]
-  }
-  
+
   if (!is.data.frame(df) || nrow(df) == 0) {
     return(list(plot = gg, legends = list()))
   }

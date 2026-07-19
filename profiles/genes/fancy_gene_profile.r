@@ -36,7 +36,7 @@ fancy_gene_profile <- function(id, name, height = 40, is_fixed = TRUE,
       return(list(plot = gg, legends = list()))
 
     tryCatch({
-      df <- cxt_contig2view_interval(df, "split")
+      df <- cxt_filter_intervals(df, merge_adjacent = TRUE)
     }, error = function(e) {
       df <<- NULL
     })
@@ -44,13 +44,6 @@ fancy_gene_profile <- function(id, name, height = 40, is_fixed = TRUE,
       return(list(plot = gg, legends = list()))
 
     xlim <- cxt_get_xlim()
-    if (!is.null(xlim) && length(xlim) == 2) {
-      vis <- !is.na(df$vstart) & !is.na(df$vend) &
-             df$vstart <= xlim[2] & df$vend >= xlim[1]
-      df <- df[vis, ]
-    }
-    if (!is.data.frame(df) || nrow(df) == 0)
-      return(list(plot = gg, legends = list()))
 
     df$gstart <- df$vstart
     df$gend   <- df$vend

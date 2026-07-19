@@ -485,8 +485,18 @@ allele_matrix_profile <- function(id, name, height = 700, is_fixed = FALSE,
       return(result)
     } else {
       assoc <- if (is.function(profile$assoc_f)) profile$assoc_f(assembly, binsize) else NULL
-      if (is.null(assoc) || nrow(assoc) == 0)
-        return(list(plot = gg, legends = matrix_legends))
+      # fall back to full site-pair matrix when binned assoc is unavailable
+      if (is.null(assoc) || nrow(assoc) == 0) {
+        cat(sprintf("[allele_matrix] binned assoc missing for binsize=%s, falling back to full\n", binsize))
+        assoc <- if (is.function(profile$assoc_f)) profile$assoc_f(assembly, "full") else NULL
+        sites <- if (is.function(profile$sites_f)) profile$sites_f(assembly) else NULL
+        if (is.null(assoc) || nrow(assoc) == 0 || is.null(sites) || nrow(sites) == 0)
+          return(list(plot = gg, legends = matrix_legends))
+        cat(sprintf("[allele_matrix] full data: %d pairs, %d sites\n", nrow(assoc), nrow(sites)))
+        result <- plot_full(profile, gg, assoc, sites, style, orientation, xlim, use_hover)
+        result$legends <- matrix_legends
+        return(result)
+      }
       cat(sprintf("[allele_matrix] binned data: %d pairs\n", nrow(assoc)))
       result <- plot_binned(profile, gg, assoc, style, orientation, xlim, use_hover, binsize = binsize)
       result$legends <- matrix_legends

@@ -282,7 +282,6 @@ plot_profiles_cached <- function(plotly_objects_result, container_height_px = NU
   
   # Extract just the plotly objects for subplot
   plotly_objects <- lapply(plotly_list, function(p) p$plotly)
-  
 
   # Combine plots
   if (length(plotly_objects) > 1) {

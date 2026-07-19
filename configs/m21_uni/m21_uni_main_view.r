@@ -21,6 +21,9 @@ source("profiles/synteny/synteny_profile_summary.r")
 # Load differing variants profile
 source("profiles/differing_variants_profile.r")
 
+# Load CME predicted sites profile
+source("profiles/sites_profile.r")
+
 # Initialize alntools
 init_alntools(verbose = FALSE)
 
@@ -215,3 +218,27 @@ differing_variants_profile(
 ########################################################
 
 axis_profile()
+
+########################################################
+# CME predicted sites profile
+########################################################
+
+sites_df <- get_data("SITES_PREDICT_TABLE", null.on.missing = TRUE)
+
+if (!is.null(sites_df)) {
+  cme_choices <- sort(unique(as.character(sites_df$cme_id)))
+  default_cme <- if (length(cme_choices) > 0) cme_choices[1] else ""
+
+  rv_cme_id <- register_param(
+    "sites", "cme_id", "select",
+    default = default_cme,
+    choices = cme_choices
+  )
+
+  sites_profile(
+    id   = "sites_predict",
+    name = "CME Sites",
+    sites_f = function(assembly) sites_df,
+    rv_cme_id = rv_cme_id
+  )
+}

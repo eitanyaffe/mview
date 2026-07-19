@@ -173,7 +173,8 @@ axis_profile <- function(id = "simple_axis",
           assembly <- cxt_get_assembly()
           # snap to integer coords so characters don't drift with fractional zoom offsets
           local_visible_start_int <- ceiling(local_visible_start)
-          sequence <- get_sequence(assembly, contig, local_visible_start_int, local_visible_end)
+          local_visible_end_int <- floor(local_visible_end)
+          sequence <- get_sequence(assembly, contig, local_visible_start_int, local_visible_end_int)
           
           if (!is.null(sequence) && nchar(sequence) > 0) {
             nt_local_positions <- seq(local_visible_start_int, local_visible_start_int + nchar(sequence) - 1)
